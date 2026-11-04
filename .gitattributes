@@ -1,0 +1,8 @@
+# 统一换行，避免 Windows 下 LF/CRLF 反复改写整个文件
+* text=auto eol=lf
+
+# 二进制与数据文件不做换行转换
+*.db binary
+*.png binary
+*.zip binary
+*.jsonl text eol=lf

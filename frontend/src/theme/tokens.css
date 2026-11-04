@@ -1,0 +1,161 @@
+/* 语义 token 层：唯一允许出现具体色值的地方。
+   组件、SVG、Canvas 一律读取这些变量，不得内联色值。 */
+
+:root {
+  --font-sans: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "Consolas", monospace;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+}
+
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #f5f8f7;
+  --bg-sunken: #eaf0ee;
+  --panel: #ffffff;
+  --panel-raised: #ffffff;
+  --border: #d5e0dc;
+  --border-strong: #b4c6c0;
+
+  --text: #172d29;
+  --text-muted: #50645f;
+  --text-faint: #7b8b86;
+
+  --accent: #0f766e;
+  --accent-contrast: #ffffff;
+  --accent-soft: #e2f1ee;
+
+  --risk: #b42336;
+  --risk-soft: #fbe9ec;
+  --warn: #8a5500;
+  --warn-soft: #fbf0dd;
+  --ok: #1d6f42;
+  --ok-soft: #e4f2e8;
+
+  --grid: #e3ebe8;
+  --selection: #0f766e;
+  --selection-soft: rgba(15, 118, 110, 0.12);
+  --shadow: 0 1px 2px rgba(23, 45, 41, 0.06), 0 8px 24px rgba(23, 45, 41, 0.06);
+
+  /* 事件类别色表：与主强调色分离，两套主题保持同一色相语义 */
+  --cat-1: #1d6fb8;
+  --cat-2: #7a4fbf;
+  --cat-3: #b5531e;
+  --cat-4: #6b7a2e;
+  --cat-5: #a63d6b;
+  --cat-6: #1f7a8c;
+  --cat-7: #8a6a1f;
+  --cat-8: #6b7280;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #101917;
+  --bg-sunken: #0b1211;
+  --panel: #182522;
+  --panel-raised: #1d2e2a;
+  --border: #2a3b37;
+  --border-strong: #3c514b;
+
+  --text: #e6f1ed;
+  --text-muted: #a3b8b0;
+  --text-faint: #7d918a;
+
+  --accent: #5edbc7;
+  --accent-contrast: #101917;
+  --accent-soft: #17322e;
+
+  --risk: #ff8796;
+  --risk-soft: #3a1c22;
+  --warn: #f4c36a;
+  --warn-soft: #362b16;
+  --ok: #77d39b;
+  --ok-soft: #17321f;
+
+  --grid: #22332f;
+  --selection: #5edbc7;
+  --selection-soft: rgba(94, 219, 199, 0.16);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.32);
+
+  --cat-1: #6ea8e8;
+  --cat-2: #b79be8;
+  --cat-3: #e8935e;
+  --cat-4: #c0cf7a;
+  --cat-5: #e58bb0;
+  --cat-6: #6fc7d4;
+  --cat-7: #d9b45e;
+  --cat-8: #9aa3af;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 主题切换只改变量，选择与筛选状态由 React 状态持有，不受影响 */
+body,
+.panel,
+.surface {
+  transition: background-color var(--motion-base) ease, border-color var(--motion-base) ease,
+    color var(--motion-base) ease;
+}
+
+:focus-visible {
+  outline: 2px solid var(--selection);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+::selection {
+  background: var(--selection-soft);
+}
+
+/* 减少动态效果：关闭非必要动画与过渡 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+:root[data-reduced-motion="true"] *,
+:root[data-reduced-motion="true"] *::before,
+:root[data-reduced-motion="true"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}

@@ -1,0 +1,25 @@
+# ---- 依赖与构建产物 ----
+node_modules/
+dist/
+__pycache__/
+*.py[cod]
+.venv/
+
+# ---- 本地数据库、基准结果与截图（可由脚本重建）----
+build/
+*.db
+*.db-wal
+*.db-shm
+
+# ---- 第三方参考工程：独立 clone，内含 150 MB neo4j.zip ----
+VAST_Challenge_2026-main/
+
+# ---- 数据：体积 168 MB 且可由官方数据包重建，见 docs/数据获取.md ----
+data/
+
+# ---- 编辑器与系统 ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
