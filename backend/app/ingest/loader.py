@@ -1,19 +1,24 @@
-"""导入管线：manifest 驱动的 adapter，把三套数据写入同一套规范表。
+"""导入管线：manifest 驱动的 adapter，把三套数据写入同一套规范表（schema v2）。
 
 原则（对应《数据适配规则》C1–C16）：
 - 只对确实缺失的源信息写 null，不臆造 actor / target / parent。
-- 每条派生关系都带 derivation，界面上属于"规范化解释"而非原始观测。
+- 每条派生关系都带 derivation，界面上属于“规范化解释”而非原始观测。
 - 无法解析的引用计数上报，不静默丢弃。
+- 时间统一用整数微秒排序（time_sort_us），并保留整数秒 time_sort_key 供按天/小时聚合。
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from ..config import DATA_DIR, IMPORT_VERSION
+from ..domain import event_types
 from . import schema
 from .manifest import DatasetManifest
 
@@ -32,6 +37,36 @@ TEXT_KEYS = (
     "path",
 )
 
+_EVENT_COLUMNS = (
+    "dataset_id",
+    "event_id",
+    "source_record_id",
+    "timestamp_raw",
+    "timestamp_normalized",
+    "time_sort_us",
+    "time_sort_key",
+    "timezone_status",
+    "actor_id",
+    "actor_rule",
+    "event_type",
+    "task_id",
+    "run_id",
+    "document_id",
+    "target_id",
+    "version",
+    "channel_id",
+    "parent_event_id",
+    "details_json",
+    "source_file",
+    "source_ordinal",
+    "source_json_pointer",
+    "source_missing_id",
+    "has_deliberation",
+)
+
+_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+_FRACTION = re.compile(r"\.(\d+)")
+
 
 @dataclass
 class DatasetStats:
@@ -47,21 +82,40 @@ class DatasetStats:
     deliberations: int = 0
     ts_min: str | None = None
     ts_max: str | None = None
+    ts_min_us: int | None = None
+    ts_max_us: int | None = None
+    data_version: str = ""
+    runs: int = 0
+    unknown_types: list[str] = field(default_factory=list)
     checks: list[tuple[str, bool, str]] = field(default_factory=list)
 
     def check(self, name: str, ok: bool, detail: str = "") -> None:
         self.checks.append((name, ok, detail))
 
 
-def parse_epoch(ts: str) -> int:
-    """把源时间转成排序用 epoch。MC1 时区未知，按字面量处理，仅用于本数据集内排序。"""
+def parse_epoch_us(ts: str) -> int:
+    """把源时间转成整数微秒。
+
+    - 不使用 datetime.timestamp() * 1e6，避免浮点舍入；用 days/seconds/microseconds 整数运算。
+    - MC1 时区未知：按字面量当成本数据集内部坐标轴，不与其他数据集混排。
+    - 源时间超过 6 位小数时直接报错，不静默截断。
+    """
+    match = _FRACTION.search(ts)
+    if match and len(match.group(1)) > 6:
+        raise ValueError(f"时间精度超过微秒，拒绝静默截断：{ts}")
     try:
         dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
     except ValueError:
         dt = datetime.fromisoformat(ts)
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
-    return int(dt.timestamp())
+    delta = dt.astimezone(timezone.utc) - _EPOCH
+    return (delta.days * 86400 + delta.seconds) * 1_000_000 + delta.microseconds
+
+
+def parse_epoch(ts: str) -> int:
+    """整数秒：只保留给按天/小时聚合与旧锚点区间，不用于新查询排序。"""
+    return parse_epoch_us(ts) // 1_000_000
 
 
 def _norm_ts(ts: str, tz_status: str) -> str:
@@ -89,6 +143,25 @@ def _text_of(details, raw) -> str:
                 if isinstance(value, str) and value:
                     parts.append(value)
     return "\n".join(parts)
+
+
+def _as_int(value) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _sha256(path: str) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _load_entities(conn, manifest: DatasetManifest, stats: DatasetStats) -> tuple[dict[str, str], dict[str, str]]:
@@ -136,7 +209,11 @@ def _load_entities(conn, manifest: DatasetManifest, stats: DatasetStats) -> tupl
         for role in roles or []:
             role_map[str(role)] = eid
 
-    conn.executemany("INSERT INTO entities VALUES (?,?,?,?,?,?,?)", rows)
+    conn.executemany(
+        "INSERT INTO entities (dataset_id,entity_id,entity_type,source_value,label,roles_json,attrs_json) "
+        "VALUES (?,?,?,?,?,?,?)",
+        rows,
+    )
 
     rel_rows = []
     for edge in org_edges:
@@ -146,7 +223,11 @@ def _load_entities(conn, manifest: DatasetManifest, stats: DatasetStats) -> tupl
                 (manifest.dataset_id, None, src, dst, rel or "org_edge", "source:org_edges", "entity")
             )
     if rel_rows:
-        conn.executemany("INSERT INTO relations VALUES (?,?,?,?,?,?,?)", rel_rows)
+        conn.executemany(
+            "INSERT INTO relations (dataset_id,event_id,src_id,dst_id,relation,derivation,target_kind) "
+            "VALUES (?,?,?,?,?,?,?)",
+            rel_rows,
+        )
 
     stats.entities = len(rows)
     stats.relations += len(rel_rows)
@@ -190,25 +271,46 @@ def load_dataset(conn, manifest: DatasetManifest) -> DatasetStats:
         _build_record_index(manifest) if manifest.participant_rule == "mc1_recipients" else {}
     )
 
+    events_path = os.path.join(DATA_DIR, manifest.events_file)
+    stats.data_version = _sha256(events_path)
+
     buffers = {"ev": [], "raw": [], "part": [], "rel": [], "fts": []}
+    type_counter: Counter[str] = Counter()
+    runs: set[str] = set()
+
+    event_sql = (
+        "INSERT INTO events (" + ",".join(_EVENT_COLUMNS) + ") VALUES ("
+        + ",".join("?" * len(_EVENT_COLUMNS)) + ")"
+    )
 
     def flush():
         if buffers["ev"]:
-            conn.executemany("INSERT INTO events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", buffers["ev"])
+            conn.executemany(event_sql, buffers["ev"])
         if buffers["raw"]:
-            conn.executemany("INSERT INTO event_raw VALUES (?,?,?)", buffers["raw"])
+            conn.executemany(
+                "INSERT INTO event_raw (dataset_id,event_id,raw_json) VALUES (?,?,?)", buffers["raw"]
+            )
         if buffers["part"]:
-            conn.executemany("INSERT INTO participants VALUES (?,?,?,?,?,?)", buffers["part"])
+            conn.executemany(
+                "INSERT INTO participants (dataset_id,event_id,entity_id,role,derivation,time_sort_key,time_sort_us) "
+                "VALUES (?,?,?,?,?,?,?)",
+                buffers["part"],
+            )
         if buffers["rel"]:
-            conn.executemany("INSERT INTO relations VALUES (?,?,?,?,?,?,?)", buffers["rel"])
+            conn.executemany(
+                "INSERT INTO relations (dataset_id,event_id,src_id,dst_id,relation,derivation,target_kind) "
+                "VALUES (?,?,?,?,?,?,?)",
+                buffers["rel"],
+            )
         if buffers["fts"]:
-            conn.executemany("INSERT INTO event_fts (event_id, dataset_id, body) VALUES (?,?,?)", buffers["fts"])
+            conn.executemany(
+                "INSERT INTO event_fts (event_id,dataset_id,body) VALUES (?,?,?)", buffers["fts"]
+            )
         for value in buffers.values():
             value.clear()
 
-    path = os.path.join(DATA_DIR, manifest.events_file)
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
+    with open(events_path, "r", encoding="utf-8") as f:
+        for ordinal, line in enumerate(f, start=1):
             line = line.strip()
             if not line:
                 continue
@@ -219,15 +321,25 @@ def load_dataset(conn, manifest: DatasetManifest) -> DatasetStats:
             raw = obj.get("raw")
             actor = obj.get("actor_id")
             etype = obj.get("event_type") or "unknown"
-            tsk = parse_epoch(ts)
+            ts_us = parse_epoch_us(ts)
+            tsk = ts_us // 1_000_000
+            type_counter[etype] += 1
 
-            stats.ts_min = ts if stats.ts_min is None or ts < stats.ts_min else stats.ts_min
-            stats.ts_max = ts if stats.ts_max is None or ts > stats.ts_max else stats.ts_max
+            if stats.ts_min_us is None or ts_us < stats.ts_min_us:
+                stats.ts_min = ts
+                stats.ts_min_us = ts_us
+            if stats.ts_max_us is None or ts_us > stats.ts_max_us:
+                stats.ts_max = ts
+                stats.ts_max_us = ts_us
 
             source_record = obj.get("source_record_id")
             missing_id = source_record is None
             if missing_id:
                 stats.missing_source_id += 1
+
+            run_id = obj.get("run_id")
+            if run_id:
+                runs.add(str(run_id))
 
             deliberation = 0
             if isinstance(raw, dict) and isinstance(raw.get("internal_state"), dict):
@@ -242,15 +354,22 @@ def load_dataset(conn, manifest: DatasetManifest) -> DatasetStats:
                     str(source_record) if source_record is not None else None,
                     ts,
                     _norm_ts(ts, tz),
+                    ts_us,
                     tsk,
                     tz,
                     actor,
                     obj.get("actor_rule"),
                     etype,
                     obj.get("task_id"),
+                    str(run_id) if run_id is not None else None,
                     obj.get("document_id") or obj.get("file_id"),
+                    obj.get("target_id"),
+                    _as_int(obj.get("version")),
+                    obj.get("channel_id"),
                     obj.get("parent_event_id"),
                     json.dumps(details, ensure_ascii=False) if details else None,
+                    obj.get("source_file"),
+                    ordinal,
                     obj.get("source_json_pointer"),
                     int(missing_id),
                     deliberation,
@@ -266,7 +385,7 @@ def load_dataset(conn, manifest: DatasetManifest) -> DatasetStats:
 
             def add_participant(pid: str | None, role: str, derivation: str) -> None:
                 if pid and pid not in seen:
-                    buffers["part"].append((dataset_id, eid, pid, role, derivation, tsk))
+                    buffers["part"].append((dataset_id, eid, pid, role, derivation, tsk, ts_us))
                     seen.add(pid)
 
             add_participant(actor, "actor", "source:actor_id")
@@ -364,7 +483,7 @@ def load_dataset(conn, manifest: DatasetManifest) -> DatasetStats:
         "SELECT COUNT(*) FROM relations WHERE dataset_id=?", (dataset_id,)
     ).fetchone()[0]
 
-    # 预聚合与统计
+    # 预聚合与统计：这里继续使用整数秒 time_sort_key，桶语义不变
     for granularity, div in (("hour", 3600), ("day", 86400)):
         conn.execute(
             "INSERT INTO time_buckets (dataset_id, granularity, bucket_key, event_type, event_count) "
@@ -383,8 +502,13 @@ def load_dataset(conn, manifest: DatasetManifest) -> DatasetStats:
         (dataset_id,),
     )
 
+    stats.runs = len(runs)
+    stats.unknown_types = event_types.unknown_types(dataset_id, list(type_counter))
+
     conn.execute(
-        "INSERT INTO datasets VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO datasets (dataset_id,name,question,timezone_status,event_count,entity_count,"
+        "ts_min,ts_max,deliberation_count,import_version,data_version,schema_version,imported_at) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             dataset_id,
             manifest.name,
@@ -396,6 +520,8 @@ def load_dataset(conn, manifest: DatasetManifest) -> DatasetStats:
             stats.ts_max,
             stats.deliberations,
             IMPORT_VERSION,
+            stats.data_version,
+            schema.SCHEMA_VERSION,
             datetime.now(timezone.utc).isoformat(timespec="seconds"),
         ),
     )
@@ -429,7 +555,7 @@ def _load_annotations(conn, manifest: DatasetManifest, stats: DatasetStats) -> N
         annotation_id = cursor.lastrowid
         for event_id in label.get("affected_event_ids") or []:
             conn.execute(
-                "INSERT INTO annotation_events VALUES (?,?,?)",
+                "INSERT INTO annotation_events (annotation_id,dataset_id,event_id) VALUES (?,?,?)",
                 (annotation_id, manifest.dataset_id, event_id),
             )
             ids.add(event_id)
@@ -467,9 +593,34 @@ def _run_checks(conn, manifest: DatasetManifest, stats: DatasetStats) -> None:
             f"源时间 {stats.ts_min} → {stats.ts_max}",
         )
 
+    if dataset_id == "CUSTOM":
+        distinct_us = conn.execute(
+            "SELECT COUNT(DISTINCT time_sort_us) FROM events WHERE dataset_id=?", (dataset_id,)
+        ).fetchone()[0]
+        stats.check(
+            "微秒排序键未折叠",
+            distinct_us == stats.events,
+            f"{distinct_us}/{stats.events} 个不同微秒",
+        )
+        missing_run = conn.execute(
+            "SELECT COUNT(*) FROM events WHERE dataset_id=? AND run_id IS NULL", (dataset_id,)
+        ).fetchone()[0]
+        stats.check(
+            "运行维度完整",
+            missing_run == 0 and stats.runs > 0,
+            f"{stats.runs} 个运行，缺失 run_id {missing_run} 条",
+        )
+
+    stats.check(
+        "事件类型均在字典内",
+        not stats.unknown_types,
+        "未知：" + "、".join(stats.unknown_types[:5]) if stats.unknown_types else f"{len(event_types.types_for(dataset_id))} 类已知",
+    )
+
     for anchor in manifest.anchor_list:
+        anchor_us = parse_epoch_us(anchor.time_raw)
         hit = conn.execute(
-            "SELECT COUNT(*) FROM events WHERE dataset_id=? AND time_sort_key BETWEEN ? AND ?",
-            (dataset_id, parse_epoch(anchor.time_raw) - 3600, parse_epoch(anchor.time_raw) + 3600),
+            "SELECT COUNT(*) FROM events WHERE dataset_id=? AND time_sort_us BETWEEN ? AND ?",
+            (dataset_id, anchor_us - 3_600_000_000, anchor_us + 3_600_000_000),
         ).fetchone()[0]
         stats.check(f"锚点可定位：{anchor.key}", hit > 0, f"±1h 内 {hit} 条")

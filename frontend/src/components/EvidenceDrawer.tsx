@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useWorkspace } from "../state/workspace";
 import { fetchDatasets, fetchEvent, type EventDetail } from "../data/api";
+import { annotationBadge, badgeClass } from "../data/labels";
 import { DualChannel } from "./DualChannel";
 import { NotesPanel } from "./NotesPanel";
 
@@ -174,25 +175,39 @@ export function EvidenceDrawer() {
             )}
             {details && typeof details.content_source === "string" && (
               <div className="callout callout-warn">
-                <strong>正文不在事件记录中。</strong>
+                <strong>日志只记录了来源文件名，未提供正文。</strong>
                 <p>
-                  该事件的 <code>details.content_source</code> 指向文件实体{" "}
-                  <code>{details.content_source}</code>，正文需另行读取文件内容。界面不能凭空补全这段文字。
+                  <code>details.content_source</code> 指向文件实体{" "}
+                  <code>{details.content_source}</code>。事件载荷与文件实体都没有正文文本，
+                  界面不能凭空补全内容，也不能据此断言帖子的含义。
                 </p>
+                {dataset === "MC2" && (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => focusEntity(`MC2:file_path:${details.content_source}`, { switchView: true })}
+                    title="在关系图中查看该文件的操作轨迹"
+                  >
+                    查看文件轨迹
+                  </button>
+                )}
               </div>
             )}
 
-            {event.annotations.map((a) => (
-              <div key={`${a.scenario}-${a.run_id}`} className="callout">
-                <strong>{a.observed ? "已观测异常" : "已配置为异常但未观测到"}</strong>{" "}
-                <ProvenanceTag kind="hint" />
-                <p>
-                  scenario <code>{a.scenario}</code>
-                  {a.anomaly_type && <> · {a.anomaly_type}</>}
-                </p>
-                {a.reason && <p>{a.reason}</p>}
-              </div>
-            ))}
+            {event.annotations.map((a) => {
+              const badge = annotationBadge(a);
+              return (
+                <div key={`${a.scenario}-${a.run_id}`} className="callout">
+                  <strong className={badgeClass(badge.tone)}>{badge.text}</strong>{" "}
+                  <ProvenanceTag kind="hint" />
+                  <p>
+                    scenario <code>{a.scenario ?? "（未标注）"}</code>
+                    {a.anomaly_type && <> · {a.anomaly_type}</>}
+                  </p>
+                  {a.reason && <p>{a.reason}</p>}
+                </div>
+              );
+            })}
 
             <p className="muted small">
               来源指针 <code>{event.source_json_pointer ?? "—"}</code>

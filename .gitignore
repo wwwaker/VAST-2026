@@ -6,7 +6,8 @@ __pycache__/
 .venv/
 
 # ---- 本地数据库、基准结果与截图（可由脚本重建）----
-build/
+# 注意使用根锚点：未锚定的 data/ 会误伤 frontend/src/data/
+/build/
 *.db
 *.db-wal
 *.db-shm
@@ -15,8 +16,8 @@ build/
 VAST_Challenge_2026-main/
 
 # ---- 本地数据与派生分析产物：体积较大，使用说明见 docs/数据获取.md ----
-data/
-final-data/
+/data/
+/final-data/
 
 # ---- 编辑器与系统 ----
 .vscode/

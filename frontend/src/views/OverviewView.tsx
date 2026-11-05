@@ -1,28 +1,57 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { scaleLinear } from "d3-scale";
-import { CATEGORIES, categoryOf } from "../theme/categories";
+import { CATEGORIES } from "../theme/categories";
 import { useTheme } from "../theme/theme";
 import { useWorkspace } from "../state/workspace";
 import {
+  HOUR_US,
   fetchDatasets,
   fetchOverview,
   formatUtc,
   formatUtcDate,
   type DatasetInfo,
   type OverviewPayload,
+  type OverviewSeries,
 } from "../data/api";
+import { hasActiveFilters } from "../data/filterContext";
+import { useDebounced } from "../hooks/useDebounced";
 
-const PAD = { top: 18, right: 16, bottom: 26, left: 46 };
+const PAD = { top: 20, right: 16, bottom: 28, left: 52 };
 const CAT_COUNT = CATEGORIES.length;
+const DAY_US = 86_400_000_000;
 
-interface Aggregates {
+interface Matrix {
   byCategory: Float64Array;
   totals: Float64Array;
   max: number;
 }
 
+function buildMatrix(series: OverviewSeries | undefined): Matrix | null {
+  if (!series || series.buckets.length === 0) return null;
+  const count = series.buckets.length;
+  const byCategory = new Float64Array(count * CAT_COUNT);
+  const totals = new Float64Array(count);
+  let max = 1;
+  for (const [bucket, category, value] of series.points) {
+    if (bucket < 0 || bucket >= count) continue;
+    const index = Math.max(0, Math.min(CAT_COUNT - 1, category));
+    byCategory[bucket * CAT_COUNT + index] += value;
+    totals[bucket] += value;
+  }
+  for (let i = 0; i < count; i++) if (totals[i] > max) max = totals[i];
+  return { byCategory, totals, max };
+}
+
 export function OverviewView() {
-  const { dataset, filters, setFilters, cursor, masking, selectedEventAt, setCursor } = useWorkspace();
+  const {
+    dataset,
+    filters,
+    setFilters,
+    cursor,
+    masking,
+    selectedEventAt,
+    setCursor,
+  } = useWorkspace();
   const { colors, reducedMotion } = useTheme();
 
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -33,91 +62,94 @@ export function OverviewView() {
   const [overview, setOverview] = useState<OverviewPayload | null>(null);
   const [granularity, setGranularity] = useState<"day" | "hour">("day");
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [size, setSize] = useState({ w: 800, h: 320 });
   const [drag, setDrag] = useState<{ x0: number; x1: number } | null>(null);
-  const [hover, setHover] = useState<number | null>(null);
+  const [hoverUs, setHoverUs] = useState<number | null>(null);
+
+  const keyword = useDebounced(filters.keyword, 250);
+  const requestFilters = useMemo(() => ({ ...filters, keyword }), [filters, keyword]);
+  const active = hasActiveFilters(requestFilters);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchDatasets(controller.signal)
+      .then((list) => {
+        if (!controller.signal.aborted) {
+          setInfo(list.find((d) => d.dataset_id === dataset) ?? null);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setInfo(null);
+      });
+    return () => controller.abort();
+  }, [dataset]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setError(null);
+    setLoading(true);
+    fetchOverview(
+      dataset,
+      { filters: requestFilters, granularity, cursorUs: cursor, masking },
+      controller.signal,
+    )
+      .then((payload) => {
+        if (!controller.signal.aborted) setOverview(payload);
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) return;
+        setError(err instanceof Error ? err.message : "接口不可用");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [dataset, granularity, requestFilters, cursor, masking]);
+
+  const setWrap = useCallback((node: HTMLDivElement | null) => {
+    roRef.current?.disconnect();
+    wrapRef.current = node;
+    if (!node) return;
+    const observer = new ResizeObserver((entries) => {
+      const rect = entries[0].contentRect;
+      setSize({ w: Math.max(320, rect.width), h: Math.max(180, rect.height) });
+    });
+    observer.observe(node);
+    roRef.current = observer;
+  }, []);
+
+  const rangeStart = overview?.time_range.start_us ?? 0;
+  const rangeEnd = overview?.time_range.end_us ?? 1;
+  const bucketUs = granularity === "hour" ? HOUR_US : DAY_US;
+
+  const xScale = useMemo(
+    () => scaleLinear().domain([rangeStart, rangeEnd]).range([PAD.left, Math.max(PAD.left + 1, size.w - PAD.right)]),
+    [rangeStart, rangeEnd, size.w],
+  );
+
+  const filteredMatrix = useMemo(() => buildMatrix(overview?.filtered.series), [overview]);
+  const globalMatrix = useMemo(() => buildMatrix(overview?.global_context.series), [overview]);
+
+  const yScale = useMemo(
+    () =>
+      scaleLinear()
+        .domain([0, Math.max(filteredMatrix?.max ?? 1, globalMatrix?.max ?? 1)])
+        .nice()
+        .range([size.h - PAD.bottom, PAD.top]),
+    [filteredMatrix, globalMatrix, size.h],
+  );
 
   const visibleCategory = useCallback(
     (id: number) => filters.categories.length === 0 || filters.categories.includes(id),
     [filters.categories],
   );
 
-  useEffect(() => {
-    let cancelled = false;
-    setError(null);
-    setOverview(null);
-    Promise.all([fetchDatasets(), fetchOverview(dataset, { granularity, topTypes: 6 })])
-      .then(([datasets, payload]) => {
-        if (cancelled) return;
-        setInfo(datasets.find((d) => d.dataset_id === dataset) ?? null);
-        setOverview(payload);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setError(err instanceof Error ? err.message : "接口不可用");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [dataset, granularity]);
-
-  const setWrap = useCallback((node: HTMLDivElement | null) => {
-    wrapRef.current = node;
-    roRef.current?.disconnect();
-    if (!node) return;
-    const ro = new ResizeObserver((entries) => {
-      const rect = entries[0].contentRect;
-      setSize({ w: Math.max(320, rect.width), h: Math.max(180, rect.height) });
-    });
-    ro.observe(node);
-    roRef.current = ro;
-  }, []);
-
-  const series = overview?.series;
-  const bucketCount = series?.buckets.length ?? 0;
-
-  const agg = useMemo<Aggregates | null>(() => {
-    if (!series || bucketCount === 0) return null;
-    const byCategory = new Float64Array(bucketCount * CAT_COUNT);
-    for (const [b, t, count] of series.points) {
-      const cat = categoryOf(series.types[t] ?? "__other__").id - 1;
-      byCategory[b * CAT_COUNT + cat] += count;
-    }
-    const totals = new Float64Array(bucketCount);
-    let max = 1;
-    for (let b = 0; b < bucketCount; b++) {
-      let sum = 0;
-      for (let c = 0; c < CAT_COUNT; c++) {
-        if (visibleCategory(CATEGORIES[c].id)) sum += byCategory[b * CAT_COUNT + c];
-      }
-      totals[b] = sum;
-      if (sum > max) max = sum;
-    }
-    return { byCategory, totals, max };
-  }, [series, bucketCount, visibleCategory]);
-
-  const xScale = useMemo(
-    () => scaleLinear().domain([0, Math.max(1, bucketCount)]).range([PAD.left, size.w - PAD.right]),
-    [bucketCount, size.w],
-  );
-  const yScale = useMemo(
-    () => scaleLinear().domain([0, agg?.max ?? 1]).nice().range([size.h - PAD.bottom, PAD.top]),
-    [agg, size.h],
-  );
-
   const anchors = info?.anchors ?? [];
-  const anchorPositions = useMemo(() => {
-    if (!series || anchors.length === 0) return [];
-    return anchors.map((a) => {
-      const idx = series.buckets.findIndex((b) => b >= a.sort_key);
-      const i = idx === -1 ? bucketCount - 1 : idx;
-      return { anchor: a, x: xScale(i + 0.5) };
-    });
-  }, [anchors, series, bucketCount, xScale]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !series || !agg) return;
+    if (!canvas || !overview || !filteredMatrix) return;
     const dpr = window.devicePixelRatio || 1;
     canvas.width = size.w * dpr;
     canvas.height = size.h * dpr;
@@ -146,46 +178,62 @@ export function OverviewView() {
       ctx.fillText(String(tick), 6, y + 4);
     }
 
-    const tickCount = Math.min(6, bucketCount);
-    for (let i = 0; i < tickCount; i++) {
-      const idx = Math.round((i / Math.max(1, tickCount - 1)) * (bucketCount - 1));
-      const x = xScale(idx + 0.5);
-      // 首末刻度贴边对齐，避免被裁掉
-      if (i === 0) ctx.textAlign = "left";
-      else if (i === tickCount - 1) ctx.textAlign = "right";
-      else ctx.textAlign = "center";
-      ctx.fillText(formatUtcDate(series.buckets[idx]), x, size.h - 8);
+    // 真实时间横轴：刻度位置来自微秒映射，缺失时段自然留白
+    const ticks = xScale.ticks(5);
+    ctx.textAlign = "center";
+    for (const tick of ticks) {
+      const x = xScale(tick);
+      if (x < PAD.left - 1 || x > plotRight + 1) continue;
+      ctx.fillText(granularity === "day" ? formatUtcDate(tick) : formatUtc(tick).slice(5), x, size.h - 8);
     }
     ctx.textAlign = "left";
 
-    const step = (plotRight - PAD.left) / Math.max(1, bucketCount);
-    // 桶很少时（如自建集只有 1 天）不要撑满整幅，限制宽度并居中
-    const barW = Math.min(48, Math.max(0.8, step - 0.2));
-    const barOffset = (step - barW) / 2;
-    const maskCutoff = masking && cursor != null ? cursor : null;
+    const widthOf = (bucket: number) => Math.max(1, xScale(bucket + bucketUs) - xScale(bucket) - 0.6);
+    const bucketCount = filteredMatrix.totals.length;
 
+    // 首末桶可能跨出数据范围，裁剪到绘图区，避免压到坐标轴
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(PAD.left, PAD.top, plotRight - PAD.left, plotBottom - PAD.top);
+    ctx.clip();
+
+    // 背景：全局上下文（忽略局部时间窗与非时间筛选），用低饱和轮廓保留对照
+    if (active && globalMatrix) {
+      const globalBuckets = overview.global_context.series.buckets;
+      ctx.fillStyle = colors.textFaint;
+      ctx.globalAlpha = 0.22;
+      for (let i = 0; i < globalBuckets.length; i++) {
+        const total = globalMatrix.totals[i];
+        if (total <= 0) continue;
+        const x = xScale(globalBuckets[i]);
+        const height = plotBottom - yScale(total);
+        ctx.fillRect(x, plotBottom - height, widthOf(globalBuckets[i]), Math.max(1, height));
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    const buckets = overview.filtered.series.buckets;
     for (let b = 0; b < bucketCount; b++) {
-      if (maskCutoff != null && series.buckets[b] > maskCutoff) continue;
-      const total = agg.totals[b];
+      const total = filteredMatrix.totals[b];
       if (total <= 0) continue;
-      const x = xScale(b) + barOffset;
+      const x = xScale(buckets[b]);
+      const width = widthOf(buckets[b]);
       let yCursor = plotBottom;
       for (let c = 0; c < CAT_COUNT; c++) {
         if (!visibleCategory(CATEGORIES[c].id)) continue;
-        const v = agg.byCategory[b * CAT_COUNT + c];
-        if (v <= 0) continue;
-        const h = plotBottom - yScale(v);
-        yCursor -= h;
+        const value = filteredMatrix.byCategory[b * CAT_COUNT + c];
+        if (value <= 0) continue;
+        const height = plotBottom - yScale(value);
+        yCursor -= height;
         ctx.fillStyle = colors.categories[c];
-        ctx.fillRect(x, yCursor, barW, Math.max(1, h));
+        ctx.fillRect(x, yCursor, width, Math.max(1, height));
       }
     }
+    ctx.restore();
 
-    if (filters.from != null && filters.to != null) {
-      const i0 = series.buckets.findIndex((b) => b >= filters.from!);
-      const i1 = series.buckets.findIndex((b) => b > filters.to!);
-      const x0 = xScale(i0 === -1 ? 0 : i0);
-      const x1 = xScale(i1 === -1 ? bucketCount : i1);
+    if (filters.startUs != null && filters.endUs != null) {
+      const x0 = xScale(filters.startUs);
+      const x1 = xScale(filters.endUs);
       ctx.fillStyle = colors.selection;
       ctx.globalAlpha = 0.08;
       ctx.fillRect(x0, PAD.top, Math.max(1, x1 - x0), plotBottom - PAD.top);
@@ -209,8 +257,7 @@ export function OverviewView() {
     }
 
     if (cursor != null) {
-      const idx = series.buckets.findIndex((b) => b >= cursor);
-      const x = xScale(idx === -1 ? bucketCount : idx);
+      const x = xScale(cursor);
       ctx.strokeStyle = colors.warn;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -220,7 +267,8 @@ export function OverviewView() {
       ctx.lineWidth = 1;
     }
 
-    for (const { x } of anchorPositions) {
+    for (const anchor of anchors) {
+      const x = xScale(anchor.time_us);
       ctx.fillStyle = colors.risk;
       ctx.beginPath();
       ctx.moveTo(x, PAD.top - 2);
@@ -231,8 +279,7 @@ export function OverviewView() {
     }
 
     if (selectedEventAt != null) {
-      const idx = series.buckets.findIndex((b) => b >= selectedEventAt);
-      const x = xScale(idx === -1 ? bucketCount : idx + 0.5);
+      const x = xScale(selectedEventAt);
       ctx.strokeStyle = colors.accent;
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -241,39 +288,32 @@ export function OverviewView() {
       ctx.lineWidth = 1;
     }
   }, [
-    series,
-    agg,
+    overview,
+    filteredMatrix,
+    globalMatrix,
     size,
     colors,
     xScale,
     yScale,
-    filters.from,
-    filters.to,
+    filters.startUs,
+    filters.endUs,
     drag,
     cursor,
-    masking,
-    anchorPositions,
+    anchors,
     selectedEventAt,
-    bucketCount,
+    granularity,
+    bucketUs,
     visibleCategory,
+    active,
   ]);
 
-  const xToBucket = useCallback(
-    (x: number) => {
-      if (bucketCount === 0) return 0;
-      const ratio = (x - PAD.left) / Math.max(1, size.w - PAD.right - PAD.left);
-      return Math.max(0, Math.min(bucketCount - 1, Math.round(ratio * (bucketCount - 1))));
-    },
-    [bucketCount, size.w],
+  const xToUs = useCallback(
+    (x: number) => Math.max(rangeStart, Math.min(rangeEnd, xScale.invert(x))),
+    [xScale, rangeStart, rangeEnd],
   );
 
-  const bucketEnd = useCallback(
-    (index: number) => {
-      if (!series) return 0;
-      return series.buckets[index] + (granularity === "hour" ? 3600 : 86400);
-    },
-    [series, granularity],
-  );
+  // 桶由服务端按 epoch 对齐（time_sort_us // div * div），这里必须用同一基准
+  const snapBucket = useCallback((us: number) => Math.floor(us / bucketUs) * bucketUs, [bucketUs]);
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -290,27 +330,41 @@ export function OverviewView() {
       setDrag({ x0: drag.x0, x1: x });
       return;
     }
-    setHover(xToBucket(x));
+    if (!overview) return;
+    const us = xToUs(x);
+    setHoverUs(snapBucket(us));
   };
 
   const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!drag || !series) return;
+    if (!drag) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const i0 = xToBucket(Math.min(drag.x0, x));
-    const i1 = xToBucket(Math.max(drag.x0, x));
     setDrag(null);
     if (Math.abs(x - drag.x0) < 3) {
-      if (filters.from != null) setFilters({ from: null, to: null });
+      if (filters.startUs != null) setFilters({ startUs: null, endUs: null });
       return;
     }
-    setFilters({ from: series.buckets[i0], to: bucketEnd(i1) });
+    const left = snapBucket(xToUs(Math.min(drag.x0, x)));
+    const right = Math.max(left + bucketUs, snapBucket(xToUs(Math.max(drag.x0, x))) + bucketUs);
+    setFilters({ startUs: Math.max(rangeStart, left), endUs: Math.min(rangeEnd, right) });
   };
 
-  // 只有"存在起始时间晚于游标的桶"才算真的遮住了记录；
-  // 游标停在数据集末尾时，最后一桶虽未结束，但内容已全部可见，不应报警。
+  const hovered = useMemo(() => {
+    if (hoverUs == null || !overview) return null;
+    const index = overview.filtered.series.buckets.indexOf(hoverUs);
+    if (index === -1) return { bucket: hoverUs, count: 0, globalCount: null as number | null };
+    const globalIndex = overview.global_context.series.buckets.indexOf(hoverUs);
+    return {
+      bucket: hoverUs,
+      count: filteredMatrix?.totals[index] ?? 0,
+      globalCount: globalIndex >= 0 ? (globalMatrix?.totals[globalIndex] ?? 0) : null,
+    };
+  }, [hoverUs, overview, filteredMatrix, globalMatrix]);
+
   const hasMaskedRecords =
-    masking && cursor != null && series != null && series.buckets.some((b) => b > cursor);
+    masking && cursor != null && overview != null
+      ? overview.filtered.series.buckets.some((bucket) => bucket > cursor)
+      : false;
 
   if (error) {
     return (
@@ -318,17 +372,15 @@ export function OverviewView() {
         <h2>无法读取数据</h2>
         <p>{error}</p>
         <p className="muted">
-          确认后端已启动：<code>cd backend &amp;&amp; python -m uvicorn app.main:app --port 8000</code>
+          确认后端已启动且主库为 v2：<code>python -m uvicorn app.main:app --port 8000</code>
         </p>
       </div>
     );
   }
 
-  if (!overview || !agg) {
+  if (!overview || !filteredMatrix) {
     return <div className="empty-state"><p className="muted">正在载入概览…</p></div>;
   }
-
-  const hoveredBucket = hover != null ? series!.buckets[hover] : null;
 
   return (
     <div className="overview">
@@ -336,9 +388,15 @@ export function OverviewView() {
         <div>
           <h2>系统活动概览</h2>
           <p className="muted">
-            {series!.buckets.length.toLocaleString()} 个{granularity === "hour" ? "小时" : "天"}桶 ·
-            共 {overview.total_events.toLocaleString()} 条事件 · 源时区{" "}
-            {overview.timezone_status === "unknown" ? "未知" : "UTC"}
+            匹配 {overview.filtered.matched_events.toLocaleString()} 条
+            {active && ` · 全局背景 ${overview.global_context.matched_events.toLocaleString()} 条`}
+            {" · "}源时区 {overview.timezone_status === "unknown" ? "未知" : "UTC"}
+            {loading && " · 更新中…"}
+          </p>
+          <p className="muted small">
+            横轴按真实时间线性映射；没有记录的时段保留空白，不当作零活动。
+            {overview.filtered.coverage.coverage_status === "partial" &&
+              " 当前窗口只有部分落在数据范围内。"}
           </p>
         </div>
         <div className="overview-tools">
@@ -356,10 +414,13 @@ export function OverviewView() {
             ))}
           </div>
           <div className="readout">
-            {hoveredBucket != null ? (
+            {hovered ? (
               <>
-                <span className="readout-key">{formatUtc(hoveredBucket)}</span>
-                <span className="readout-val">{agg.totals[hover!].toLocaleString()} 条</span>
+                <span className="readout-key">{formatUtc(hovered.bucket)}</span>
+                <span className="readout-val">{hovered.count.toLocaleString()} 条匹配</span>
+                {hovered.globalCount != null && (
+                  <span className="muted small"> · 全局 {hovered.globalCount.toLocaleString()}</span>
+                )}
               </>
             ) : (
               <span className="muted">拖动选取时间窗</span>
@@ -372,37 +433,40 @@ export function OverviewView() {
         <canvas
           ref={canvasRef}
           role="img"
-          aria-label="系统活动时间分布，按事件类别堆叠"
+          aria-label="系统活动时间分布：真实时间轴，按事件类别堆叠"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
-          onPointerLeave={() => setHover(null)}
+          onPointerLeave={() => setHoverUs(null)}
         />
         {hasMaskedRecords && <div className="mask-badge">回放遮蔽中：游标之后的记录不显示</div>}
         {!masking && cursor != null && <div className="mask-badge mask-off">已关闭回放遮蔽</div>}
       </div>
 
       <div className="legend">
-        {CATEGORIES.map((c) => {
-          const active = visibleCategory(c.id);
+        {CATEGORIES.map((c, index) => {
+          const cat = overview.categories.find((item) => item.id === c.id);
+          const visible = visibleCategory(c.id);
           return (
             <button
               key={c.id}
               type="button"
-              className={`legend-item${active ? "" : " legend-off"}`}
+              className={`legend-item${visible ? "" : " legend-off"}`}
               onClick={() =>
                 setFilters({
-                  categories: active
+                  categories: visible
                     ? filters.categories.length === 0
                       ? CATEGORIES.filter((x) => x.id !== c.id).map((x) => x.id)
                       : filters.categories.filter((x) => x !== c.id)
                     : [...filters.categories, c.id],
                 })
               }
-              aria-pressed={active}
+              aria-pressed={visible}
+              title={`${c.label}：当前筛选 ${cat?.count_filtered ?? 0} 条 / 全局 ${cat?.count_global ?? 0} 条`}
             >
-              <span className="swatch" style={{ background: colors.categories[c.id - 1] }} />
+              <span className="swatch" style={{ background: colors.categories[index] }} />
               {c.label}
+              <span className="muted small">{cat?.count_filtered ?? 0}</span>
             </button>
           );
         })}
@@ -418,12 +482,12 @@ export function OverviewView() {
               className={`anchor-chip${a.primary ? " anchor-primary" : ""}`}
               title={a.note}
               onClick={() => {
-                setFilters({ from: a.sort_key - 3600, to: a.sort_key + 3600 });
-                setCursor(a.sort_key);
+                setFilters({ startUs: a.time_us - HOUR_US, endUs: a.time_us + HOUR_US });
+                setCursor(a.time_us);
               }}
             >
               {a.primary && <span className="anchor-star" aria-label="演示主线">★</span>}
-              {formatUtcDate(a.sort_key)} · {a.label}
+              {formatUtcDate(a.time_us)} · {a.label}
             </button>
           ))}
         </div>
@@ -431,13 +495,15 @@ export function OverviewView() {
 
       {info?.intervention && (
         <div className="callout intervention">
-          <strong>建议的唯一干预点</strong>
+          <strong>候选干预点（待证据核验）</strong>
           <p>{info.intervention}</p>
+          <p className="muted small">
+            这是提交约束下的候选位置，不是已证明的唯一入口；需要目标链与历史实例的事件证据支持。
+          </p>
         </div>
       )}
 
       {reducedMotion && <p className="muted small">已开启减少动态效果，图表仅静态重绘。</p>}
-
     </div>
   );
 }

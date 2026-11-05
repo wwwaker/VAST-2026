@@ -85,7 +85,11 @@ export function NotesPanel({
                     事件 {n.event_id.slice(-12)}
                   </span>
                 )}
-                {n.event_time != null && <span className="mono">{formatUtc(n.event_time)}</span>}
+                {n.event_time != null && (
+                  <span className="mono">
+                    {formatUtc(n.event_time > 1e12 ? n.event_time : n.event_time * 1e6)}
+                  </span>
+                )}
                 <button
                   type="button"
                   className="btn btn-quiet note-del"

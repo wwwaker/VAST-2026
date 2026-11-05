@@ -25,7 +25,7 @@
 # 1. 后端依赖
 python -m pip install -r backend/requirements.txt
 
-# 2. 导入数据（约 20 秒，生成 build/mas.db，约 250 MB）
+# 2. 导入数据（约 20 秒，生成 build/mas.db，约 340 MB，schema v2）
 cd backend
 python -m app.ingest.cli --all --fresh
 cd ..
@@ -43,7 +43,7 @@ python -m uvicorn app.main:app --port 8000
 
 打开 <http://127.0.0.1:8000>。
 
-导入结束会打印各数据集的校验项，出现 `FAIL` 时命令以非 0 退出，不会写入半成品数据。
+导入在同目录临时库中完整构建并校验，通过后才备份旧库并替换；出现 `FAIL` 时命令以非 0 退出，旧库保持不变，详细结果写入 `build/ingest-validation.json`。替换主库前必须先停止后端服务（Windows 文件锁）。
 
 ---
 
@@ -95,13 +95,15 @@ docs/                    计划书、数据适配规则、基准与接口说明
 | MC2 | 11:21Z 目标帖子（`target_post`） | 官方口径 04:21 为本地时间 |
 | CUSTOM | 无（按 `run_id` 选运行） | 32 次运行，标签区分 scenario 与 observed |
 
-MC2 还在 manifest 里记录了**唯一干预点**：`SwiftWren_further_instructions.md` 的任务接力环节。
-界面会在锚点行下方以「建议的唯一干预点」展示这段说明。
+MC2 还在 manifest 里记录了**候选干预点**：`SwiftWren_further_instructions.md` 的任务接力环节。
+界面以「候选干预点（待证据核验）」展示，提交约束要求最多选择一个位置，但数据尚未证明它是唯一入口。
 
 ---
 
 ## 数据与语义注意事项
 
+- **时间契约 v2**：库内排序键为整数微秒 `time_sort_us`，窗口统一为半开区间 `[start_us, end_us)`；`time_sort_key` 只保留整数秒供按天/小时聚合。接口参数与响应都使用微秒。
+- **统一筛选**：`backend/app/query/filters.py` 生成唯一的 WHERE；类别先由服务端字典映射再聚合，前端不再维护事件类型表。
 - **MC1 时区未知**：源时间不做 UTC 换算，也不与其它数据集比较绝对时刻。界面会标注"源时区 未知"。
 - **MC2 官方时间 04:21 是本地时间**，文件中对应 `2046-05-17T11:21:15Z`；锚点同时给出两种表述。
 - **MC1 的 `responding_to` 有两种含义**：命中消息 ID 时生成 `reply_to` 边，是 `@提及`文本时生成 `mention` 边，界面上必须区分。
@@ -118,8 +120,10 @@ MC2 还在 manifest 里记录了**唯一干预点**：`SwiftWren_further_instruc
 - 调查笔记只能在本机查看，没有导出为报告或 Markdown 的功能。
 - 对比度已按 WCAG 计算并通过，但未在真实投影仪上验收。
 - 窄屏布局（1180 px 以下）未做真机验证。
-- 服务为单进程单连接，未做并发压测。
-- 两跳以上的关系遍历未实现，关系图最多 2 跳且限 80 节点。
+- 服务为单进程、每请求一个只读连接，未做并发压测。
+- 关系图支持 1–3 跳，默认 80 节点 / 300 边；任何裁剪都会返回具体原因。
+- MC2 帖子正文不在数据集内，界面只能确认来源文件名，不能还原内容含义。
+- CUSTOM 的运行级流程、配对审计与 MC1 决策泳道尚未实现（S2/S4），当前只有统一的日志浏览与筛选。
 
 ---
 

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useWorkspace } from "../state/workspace";
+import { HOUR_US, SECOND_US } from "../data/api";
 
 /** 计划书约定的键盘验收范围：筛选、时间刷选与回放、事件选择、证据侧栏开关。
  *  不覆盖全部界面元素，也不与输入框抢键。 */
@@ -15,6 +16,7 @@ function isTyping(target: EventTarget | null): boolean {
 
 export function useHotkeys(onToggleHelp: () => void) {
   const {
+    dataset,
     setCursor,
     togglePlaying,
     masking,
@@ -30,7 +32,8 @@ export function useHotkeys(onToggleHelp: () => void) {
       if (isTyping(event.target)) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
 
-      const step = event.shiftKey ? 6 * 3600 : 3600;
+      const baseStep = dataset === "CUSTOM" ? SECOND_US : HOUR_US;
+      const step = event.shiftKey ? baseStep * 6 : baseStep;
 
       switch (event.key) {
         case "?":
@@ -83,7 +86,7 @@ export function useHotkeys(onToggleHelp: () => void) {
             event.preventDefault();
             setEvidenceOpen(false);
           } else {
-            setFilters({ from: null, to: null });
+            setFilters({ startUs: null, endUs: null });
           }
           break;
 
@@ -96,6 +99,7 @@ export function useHotkeys(onToggleHelp: () => void) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [
     onToggleHelp,
+    dataset,
     setCursor,
     togglePlaying,
     masking,

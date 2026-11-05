@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "../theme/theme";
 import { fetchOverview, type OverviewPayload } from "../data/api";
+import { EMPTY_FILTERS } from "../data/filterContext";
 
 type Mode = "svg" | "canvas";
 
@@ -22,14 +23,14 @@ export function RenderBenchView() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    fetchOverview("MC2", { granularity: "hour", topTypes: 24 })
+    fetchOverview("MC2", { filters: EMPTY_FILTERS, granularity: "hour" })
       .then(setData)
       .catch(() => setData(null));
   }, []);
 
   const cells = useMemo(() => {
     if (!data) return [] as [number, number, number][];
-    return data.series.points;
+    return data.global_context.series.points;
   }, [data]);
 
   const clear = useCallback(() => {
@@ -59,7 +60,7 @@ export function RenderBenchView() {
       svg.setAttribute("viewBox", `0 0 ${VIEW_W} ${VIEW_H}`);
 
       for (let i = 0; i < n; i++) {
-        const point = data.series.points[i];
+        const point = data.global_context.series.points[i];
         const cat = point ? point[1] % 8 : 0;
         const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
         rect.setAttribute("x", String((i % cols) * cw));
@@ -97,7 +98,7 @@ export function RenderBenchView() {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       const { cols, cw, ch } = geometry(n);
       for (let i = 0; i < n; i++) {
-        const point = data.series.points[i];
+        const point = data.global_context.series.points[i];
         const cat = point ? point[1] % 8 : 0;
         ctx.fillStyle = colors.categories[cat];
         ctx.fillRect(
@@ -164,21 +165,21 @@ export function RenderBenchView() {
           type="button"
           className="btn"
           onClick={() =>
-            run("svg", data?.series.buckets.length ?? 0, `${(data?.series.buckets.length ?? 0).toLocaleString()} 图元（小时聚合）`)
+            run("svg", data?.global_context.series.buckets.length ?? 0, `${(data?.global_context.series.buckets.length ?? 0).toLocaleString()} 图元（小时聚合）`)
           }
           disabled={busy || !data}
         >
-          SVG · {data?.series.buckets.length.toLocaleString()} 图元（聚合）
+          SVG · {data?.global_context.series.buckets.length.toLocaleString()} 图元（聚合）
         </button>
         <button
           type="button"
           className="btn"
           onClick={() =>
-            run("canvas", data?.series.buckets.length ?? 0, `${(data?.series.buckets.length ?? 0).toLocaleString()} 图元（小时聚合）`)
+            run("canvas", data?.global_context.series.buckets.length ?? 0, `${(data?.global_context.series.buckets.length ?? 0).toLocaleString()} 图元（小时聚合）`)
           }
           disabled={busy || !data}
         >
-          Canvas · {data?.series.buckets.length.toLocaleString()} 图元（聚合）
+          Canvas · {data?.global_context.series.buckets.length.toLocaleString()} 图元（聚合）
         </button>
       </div>
 

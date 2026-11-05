@@ -11,6 +11,8 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 
 from ..db import get_conn, require_dataset
+from ..domain import event_types
+from ..query import filters
 
 router = APIRouter(prefix="/api/search", tags=["search"])
 
@@ -46,11 +48,12 @@ def search(
             raise HTTPException(404, f"未知数据集 {dataset}")
 
         try:
+            match_query = filters.fts_match_query(q)
             hits = conn.execute(
                 "SELECT f.rowid AS rid, f.event_id FROM event_fts_idx i "
                 "JOIN event_fts f ON f.rowid = i.rowid "
                 "WHERE event_fts_idx MATCH ? AND f.dataset_id = ? LIMIT ?",
-                (q, dataset, limit),
+                (match_query, dataset, limit),
             ).fetchall()
         except Exception as exc:  # FTS 语法错误
             raise HTTPException(400, f"检索语法错误：{exc}")
@@ -72,7 +75,7 @@ def search(
         meta = {
             r["event_id"]: r
             for r in conn.execute(
-                "SELECT event_id, timestamp_normalized, event_type, actor_id, details_json FROM events "
+                "SELECT event_id, timestamp_normalized, time_sort_us, event_type, actor_id, details_json FROM events "
                 "WHERE dataset_id=? AND event_id IN (" + ",".join("?" * len(event_ids)) + ")",
                 [dataset, *event_ids],
             )
@@ -87,7 +90,9 @@ def search(
             {
                 "event_id": hit["event_id"],
                 "timestamp": row["timestamp_normalized"],
+                "time_us": row["time_sort_us"],
                 "event_type": row["event_type"],
+                "category": event_types.category_of(dataset, row["event_type"]),
                 "actor_id": row["actor_id"],
                 "excerpt": _excerpt(bodies.get(hit["rid"], ""), q),
             }

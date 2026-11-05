@@ -7,12 +7,14 @@
 from __future__ import annotations
 
 import os
+import sqlite3
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .config import DB_PATH, FRONTEND_DIST
+from .ingest import schema
 from .notes_store import ensure_schema as ensure_notes_schema
 from .routers import compare, datasets, entities, events, graph, notes, search
 
@@ -43,11 +45,40 @@ ensure_notes_schema()
 
 @app.get("/api/health")
 def health():
-    return {
-        "status": "ok" if os.path.exists(DB_PATH) else "missing_db",
+    exists = os.path.exists(DB_PATH)
+    payload = {
+        "status": "ok" if exists else "missing_db",
         "db": DB_PATH,
-        "db_size_mb": round(os.path.getsize(DB_PATH) / 1024 / 1024, 1) if os.path.exists(DB_PATH) else 0,
+        "db_size_mb": round(os.path.getsize(DB_PATH) / 1024 / 1024, 1) if exists else 0,
+        "schema_version": None,
+        "expected_schema_version": schema.SCHEMA_VERSION,
+        "datasets": {},
     }
+    if not exists:
+        return payload
+    conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
+    try:
+        version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+        payload["schema_version"] = version
+        if version != schema.SCHEMA_VERSION:
+            payload["status"] = "schema_outdated"
+            payload["hint"] = (
+                "旧版主库不再支持 v2 查询。请停止服务后执行："
+                "python -m app.ingest.cli --all --fresh"
+            )
+            return payload
+        payload["datasets"] = {
+            row[0]: {"event_count": row[1], "data_version": row[2]}
+            for row in conn.execute(
+                "SELECT dataset_id, event_count, data_version FROM datasets ORDER BY dataset_id"
+            )
+        }
+    except sqlite3.Error as exc:
+        payload["status"] = "schema_outdated"
+        payload["error"] = str(exc)
+    finally:
+        conn.close()
+    return payload
 
 
 if os.path.isdir(FRONTEND_DIST):

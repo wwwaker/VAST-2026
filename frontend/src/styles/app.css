@@ -698,6 +698,43 @@ select:focus-visible {
   gap: var(--space-1);
 }
 
+.graph-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.graph-evidence {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 280px;
+  overflow: auto;
+}
+
+.graph-evidence-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.graph-evidence-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.graph-evidence-list .stream-row {
+  border-bottom: 1px solid var(--grid);
+}
+
 .participant-btn {
   display: flex;
   align-items: center;
@@ -1357,6 +1394,28 @@ select:focus-visible {
 
 .compare-deviated {
   background: var(--risk-soft);
+}
+
+/* 比较行可点击下钻：保持表格观感，同时暴露按钮语义 */
+.compare-row-button {
+  width: 100%;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.compare-row-button:hover {
+  background: var(--bg-sunken);
+}
+
+.compare-row-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .cmp-label {

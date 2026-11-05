@@ -11,6 +11,7 @@ import json
 from fastapi import APIRouter, HTTPException, Query
 
 from ..db import get_conn, require_dataset
+from ..domain import event_types
 from .events import _preview
 
 router = APIRouter(prefix="/api/entities", tags=["entities"])
@@ -73,17 +74,17 @@ def entity_events(
     entity_id: str,
     dataset: str,
     limit: int = Query(300, ge=1, le=1000),
-    start: int | None = None,
-    end: int | None = None,
+    start_us: int | None = Query(None, ge=0),
+    end_us: int | None = Query(None, ge=0),
 ):
     where = ["p.dataset_id=?", "p.entity_id=?"]
     params: list = [dataset, entity_id]
-    if start is not None:
-        where.append("p.time_sort_key>=?")
-        params.append(start)
-    if end is not None:
-        where.append("p.time_sort_key<=?")
-        params.append(end)
+    if start_us is not None:
+        where.append("p.time_sort_us>=?")
+        params.append(start_us)
+    if end_us is not None:
+        where.append("p.time_sort_us<?")
+        params.append(end_us)
 
     with get_conn() as conn:
         try:
@@ -91,13 +92,14 @@ def entity_events(
         except KeyError:
             raise HTTPException(404, f"未知数据集 {dataset}")
 
-        # 用 participants 的去规格化时间键排序，避免回表排序
+        # 用 participants 的去规格化时间键排序，避免回表排序；v2 使用微秒列
         rows = conn.execute(
-            "SELECT e.event_id, e.timestamp_normalized, e.event_type, e.actor_id, e.details_json, "
-            "p.role "
+            "SELECT e.event_id, e.timestamp_normalized, e.time_sort_us, e.event_type, e.actor_id, "
+            "e.details_json, p.role "
             "FROM participants p JOIN events e "
             "ON e.dataset_id=p.dataset_id AND e.event_id=p.event_id "
-            "WHERE " + " AND ".join(where) + " ORDER BY p.time_sort_key LIMIT ?",
+            "WHERE " + " AND ".join(where)
+            + " ORDER BY p.time_sort_us, e.event_id LIMIT ?",
             [*params, limit],
         ).fetchall()
 
@@ -108,7 +110,9 @@ def entity_events(
             {
                 "event_id": r["event_id"],
                 "timestamp": r["timestamp_normalized"],
+                "time_us": r["time_sort_us"],
                 "event_type": r["event_type"],
+                "category": event_types.category_of(dataset, r["event_type"]),
                 "actor_id": r["actor_id"],
                 "role": r["role"],
                 "preview": _preview(r["details_json"]),

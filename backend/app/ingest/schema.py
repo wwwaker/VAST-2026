@@ -1,4 +1,14 @@
-"""建库 DDL。表结构与《SQLite 基准报告》一致，另外补充了标注与证据字段。"""
+"""建库 DDL（schema v2）。
+
+v2 相对 v1 的变化：
+- events 增加微秒排序键 time_sort_us、运行维度 run_id、目标 target_id、版本 version、
+  渠道 channel_id、来源文件 source_file、源行序 source_ordinal。
+- participants 增加 time_sort_us，避免实体时间线仍按秒排序。
+- datasets 增加 data_version（源事件文件 SHA-256）与 schema_version。
+- time_sort_key 继续保存“整数秒”，只服务 time_buckets 等旧聚合，新查询一律走 time_sort_us。
+"""
+
+SCHEMA_VERSION = 2
 
 TABLES = """
 CREATE TABLE datasets (
@@ -13,6 +23,8 @@ CREATE TABLE datasets (
     -- 含内部审议文本的事件数：MC1 的双声道覆盖率只有 9.4%，界面必须能提示这一点
     deliberation_count INTEGER NOT NULL DEFAULT 0,
     import_version   TEXT NOT NULL,
+    data_version     TEXT NOT NULL DEFAULT '',
+    schema_version   INTEGER NOT NULL DEFAULT 2,
     imported_at      TEXT NOT NULL
 );
 
@@ -22,15 +34,24 @@ CREATE TABLE events (
     source_record_id     TEXT,
     timestamp_raw        TEXT NOT NULL,
     timestamp_normalized TEXT NOT NULL,
+    -- 新的唯一排序键：整数微秒，半开窗口 [start_us, end_us)
+    time_sort_us         INTEGER NOT NULL,
+    -- 旧键保留为整数秒，只用于 time_buckets 等按天/小时聚合
     time_sort_key        INTEGER NOT NULL,
     timezone_status      TEXT NOT NULL,
     actor_id             TEXT,
     actor_rule           TEXT,
     event_type           TEXT NOT NULL,
     task_id              TEXT,
+    run_id               TEXT,
     document_id          TEXT,
+    target_id            TEXT,
+    version              INTEGER,
+    channel_id           TEXT,
     parent_event_id      TEXT,
     details_json         TEXT,
+    source_file          TEXT,
+    source_ordinal       INTEGER,
     source_json_pointer  TEXT,
     source_missing_id    INTEGER NOT NULL DEFAULT 0,
     has_deliberation     INTEGER NOT NULL DEFAULT 0,
@@ -61,7 +82,8 @@ CREATE TABLE participants (
     entity_id     TEXT NOT NULL,
     role          TEXT NOT NULL,
     derivation    TEXT NOT NULL,
-    time_sort_key INTEGER NOT NULL
+    time_sort_key INTEGER NOT NULL,
+    time_sort_us  INTEGER NOT NULL
 );
 
 CREATE TABLE relations (
@@ -116,21 +138,28 @@ CREATE TABLE event_fts (
 """
 
 INDEXES = """
-CREATE INDEX IF NOT EXISTS idx_events_time   ON events(dataset_id, time_sort_key, event_id);
-CREATE INDEX IF NOT EXISTS idx_events_actor  ON events(dataset_id, actor_id, time_sort_key);
-CREATE INDEX IF NOT EXISTS idx_events_type   ON events(dataset_id, event_type, time_sort_key);
-CREATE INDEX IF NOT EXISTS idx_events_run    ON events(dataset_id, task_id, time_sort_key);
-CREATE INDEX IF NOT EXISTS idx_part_entity   ON participants(dataset_id, entity_id, time_sort_key);
-CREATE INDEX IF NOT EXISTS idx_part_event    ON participants(dataset_id, event_id);
-CREATE INDEX IF NOT EXISTS idx_rel_src       ON relations(dataset_id, src_id);
-CREATE INDEX IF NOT EXISTS idx_rel_dst       ON relations(dataset_id, dst_id);
+CREATE INDEX IF NOT EXISTS idx_events_time_us   ON events(dataset_id, time_sort_us, event_id);
+CREATE INDEX IF NOT EXISTS idx_events_actor_us  ON events(dataset_id, actor_id, time_sort_us, event_id);
+CREATE INDEX IF NOT EXISTS idx_events_type_us   ON events(dataset_id, event_type, time_sort_us, event_id);
+CREATE INDEX IF NOT EXISTS idx_events_run_us    ON events(dataset_id, run_id, time_sort_us, event_id);
+CREATE INDEX IF NOT EXISTS idx_events_time      ON events(dataset_id, time_sort_key, event_id);
+CREATE INDEX IF NOT EXISTS idx_events_actor     ON events(dataset_id, actor_id, time_sort_key);
+CREATE INDEX IF NOT EXISTS idx_events_type      ON events(dataset_id, event_type, time_sort_key);
+CREATE INDEX IF NOT EXISTS idx_events_run       ON events(dataset_id, task_id, time_sort_key);
+CREATE INDEX IF NOT EXISTS idx_part_entity      ON participants(dataset_id, entity_id, time_sort_key);
+CREATE INDEX IF NOT EXISTS idx_part_entity_us   ON participants(dataset_id, entity_id, time_sort_us);
+CREATE INDEX IF NOT EXISTS idx_part_event       ON participants(dataset_id, event_id);
+CREATE INDEX IF NOT EXISTS idx_part_event_entity ON participants(dataset_id, event_id, entity_id);
+CREATE INDEX IF NOT EXISTS idx_rel_src          ON relations(dataset_id, src_id);
+CREATE INDEX IF NOT EXISTS idx_rel_dst          ON relations(dataset_id, dst_id);
 -- 事件详情按事件取关系边，缺索引会退化为全表扫描（实测 1.1s）
-CREATE INDEX IF NOT EXISTS idx_rel_event     ON relations(dataset_id, event_id);
+CREATE INDEX IF NOT EXISTS idx_rel_event        ON relations(dataset_id, event_id);
 -- 允许用 source_record_id 反查事件（MC1 的 responding_to 就指向它）
-CREATE INDEX IF NOT EXISTS idx_events_srcid  ON events(dataset_id, source_record_id);
-CREATE INDEX IF NOT EXISTS idx_anno_event    ON annotation_events(dataset_id, event_id);
-CREATE INDEX IF NOT EXISTS idx_fts_dataset   ON event_fts(dataset_id);
-CREATE INDEX IF NOT EXISTS idx_bucket        ON time_buckets(dataset_id, granularity, bucket_key);
+CREATE INDEX IF NOT EXISTS idx_events_srcid     ON events(dataset_id, source_record_id);
+CREATE INDEX IF NOT EXISTS idx_events_file      ON events(dataset_id, source_file);
+CREATE INDEX IF NOT EXISTS idx_anno_event       ON annotation_events(dataset_id, event_id);
+CREATE INDEX IF NOT EXISTS idx_fts_dataset      ON event_fts(dataset_id);
+CREATE INDEX IF NOT EXISTS idx_bucket           ON time_buckets(dataset_id, granularity, bucket_key);
 CREATE VIRTUAL TABLE IF NOT EXISTS event_fts_idx USING fts5(
     body, content='event_fts', content_rowid='rowid', tokenize='unicode61'
 );
@@ -138,5 +167,6 @@ CREATE VIRTUAL TABLE IF NOT EXISTS event_fts_idx USING fts5(
 
 POST = """
 INSERT INTO event_fts_idx(event_fts_idx) VALUES('rebuild');
+PRAGMA user_version=2;
 ANALYZE;
 """

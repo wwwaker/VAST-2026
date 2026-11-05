@@ -1,6 +1,6 @@
 import { useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { ThemeProvider } from "./theme/theme";
-import { WorkspaceProvider, useWorkspace, type CanvasView, type Filters } from "./state/workspace";
+import { WorkspaceProvider, useWorkspace, type CanvasView } from "./state/workspace";
 import { StatusBar, TopBar } from "./components/Shell";
 import { TimeBrush } from "./components/TimeBrush";
 import { EvidenceDrawer } from "./components/EvidenceDrawer";
@@ -49,7 +49,7 @@ function Workspace() {
   const [eventOpen, setEventOpen] = useState(() => readLayout("event-open", "true") === "true");
   const [evidenceSize, setEvidenceSize] = useState(() => Math.max(280, Math.min(560, Number(readLayout("evidence-size", "392")) || 392)));
   const [eventSize, setEventSize] = useState(() => Math.max(240, Math.min(520, Number(readLayout("event-size", "320")) || 320)));
-  const { canvasView, dataset, filters, evidenceOpen, setEvidenceOpen } = useWorkspace();
+  const { canvasView, evidenceOpen, setEvidenceOpen } = useWorkspace();
   useHotkeys(() => setShowHelp((v) => !v));
 
   const persist = (key: string, value: string) => {
@@ -120,7 +120,7 @@ function Workspace() {
           {eventOpen && (
             <aside className="event-dock event-dock-right">
               <div className="dock-resizer dock-resizer-left" role="separator" tabIndex={0} aria-valuemin={240} aria-valuemax={520} aria-valuenow={eventSize} aria-orientation="vertical" aria-label="调整事件面板宽度" onPointerDown={(e) => resizePanel("event", e)} onKeyDown={(e) => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); const next = Math.max(240, Math.min(520, eventSize + (e.key === "ArrowLeft" ? 16 : -16))); setEventSize(next); persist("event-size", String(next)); } }} />
-              <EventPanel dataset={dataset} filters={filters} onClose={() => { setEventOpen(false); persist("event-open", "false"); }} />
+              <EventPanel onClose={() => { setEventOpen(false); persist("event-open", "false"); }} />
             </aside>
           )}
         </div>
@@ -131,17 +131,13 @@ function Workspace() {
   );
 }
 
-function EventPanel({ dataset, filters, onClose }: {
-  dataset: string;
-  filters: Filters;
-  onClose: () => void;
-}) {
+function EventPanel({ onClose }: { onClose: () => void }) {
   return <div className="event-panel">
     <div className="event-panel-toolbar">
       <span className="dock-label">事件流</span>
       <button type="button" className="btn btn-quiet" onClick={onClose} title="收起事件流">收起</button>
     </div>
-    <EventStream dataset={dataset} filters={filters} />
+    <EventStream />
   </div>;
 }
 

@@ -1,12 +1,19 @@
-"""事件列表与事件详情。列表走时间+ID 稳定游标分页，详情才读取 raw。"""
+"""事件列表与事件详情。
+
+列表走 v2 版本化游标（微秒 + event_id 稳定排序），详情才读取 raw。
+所有筛选条件由 query.filters 统一生成，不在本文件另写一套。
+"""
 
 from __future__ import annotations
 
 import json
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..db import get_conn, require_dataset
+from ..domain import event_types
+from ..query import filters
+from ..query.filters import EventSelection, FilterError, RawFilter
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 
@@ -14,7 +21,7 @@ PREVIEW_KEYS = ("content", "subject", "title", "reason", "feedback", "purpose")
 
 
 def _preview(details_json: str | None, limit: int = 180) -> str:
-    """事件流摘要。先按已知语义取值，取不到再用键值对回落，避免整列都是"无摘要"。"""
+    """事件流摘要。先按已知语义取值，取不到再用键值对回落，避免整列都是“无摘要”。"""
     if not details_json:
         return ""
     try:
@@ -59,14 +66,68 @@ def _preview(details_json: str | None, limit: int = 180) -> str:
     return clip(" · ".join(parts)) if parts else ""
 
 
+def summarize(row, dataset: str, annotations: list[dict]) -> dict:
+    return {
+        "event_id": row["event_id"],
+        "timestamp": row["timestamp_normalized"],
+        "timestamp_raw": row["timestamp_raw"],
+        "time_us": row["time_sort_us"],
+        "timezone_status": row["timezone_status"],
+        "event_type": row["event_type"],
+        "category": event_types.category_of(dataset, row["event_type"]),
+        "actor_id": row["actor_id"],
+        "actor_label": row["actor_label"],
+        "actor_rule": row["actor_rule"],
+        "run_id": row["run_id"],
+        "version": row["version"],
+        "document_id": row["document_id"],
+        "channel_id": row["channel_id"],
+        "preview": _preview(row["details_json"]),
+        "has_deliberation": bool(row["has_deliberation"]),
+        "source_missing_id": bool(row["source_missing_id"]),
+        "annotations": annotations,
+    }
+
+
+def load_annotations(conn, dataset: str, event_ids: list[str]) -> dict[str, list[dict]]:
+    annotations: dict[str, list[dict]] = {}
+    if not event_ids:
+        return annotations
+    placeholders = ",".join("?" * len(event_ids))
+    for anno in conn.execute(
+        "SELECT ae.event_id, a.scenario, a.anomaly_type, a.observed, a.reason, a.run_id "
+        f"FROM annotation_events ae JOIN annotations a ON a.annotation_id=ae.annotation_id "
+        f"WHERE ae.dataset_id=? AND ae.event_id IN ({placeholders})",
+        [dataset, *event_ids],
+    ):
+        annotations.setdefault(anno["event_id"], []).append(
+            {
+                "scenario": anno["scenario"],
+                "anomaly_type": anno["anomaly_type"],
+                "observed": bool(anno["observed"]),
+                "reason": anno["reason"],
+                "run_id": anno["run_id"],
+            }
+        )
+    return annotations
+
+
+def _selection(conn, dataset: str, raw: RawFilter) -> tuple[EventSelection, object]:
+    try:
+        dataset_row = require_dataset(conn, dataset)
+    except KeyError:
+        raise HTTPException(404, f"未知数据集 {dataset}")
+    try:
+        selection = filters.build_selection(raw.to_context(dataset))
+    except FilterError as exc:
+        raise HTTPException(exc.status_code, exc.detail) from exc
+    return selection, dataset_row
+
+
 @router.get("")
 def list_events(
     dataset: str,
-    start: int | None = None,
-    end: int | None = None,
-    types: str | None = Query(None, description="逗号分隔的事件类型"),
-    actor: str | None = None,
-    q: str | None = Query(None, description="关键词，走 FTS5"),
+    raw: RawFilter = Depends(filters.filter_params),
     has_deliberation: bool | None = Query(
         None, description="true 只返回含内部审议的事件（MC1 双声道用）"
     ),
@@ -74,106 +135,33 @@ def list_events(
     cursor: str | None = Query(None, description="上一页返回的 next_cursor"),
     direction: str = Query("desc", pattern="^(asc|desc)$"),
 ):
-    where = ["e.dataset_id=?"]
-    params: list = [dataset]
-
-    if start is not None:
-        where.append("e.time_sort_key>=?")
-        params.append(start)
-    if end is not None:
-        where.append("e.time_sort_key<=?")
-        params.append(end)
-    if types:
-        names = [t for t in types.split(",") if t]
-        if names:
-            where.append("e.event_type IN (" + ",".join("?" * len(names)) + ")")
-            params.extend(names)
-    if actor:
-        where.append("e.actor_id=?")
-        params.append(actor)
-    if q:
-        where.append(
-            "e.event_id IN (SELECT f.event_id FROM event_fts f WHERE f.rowid IN "
-            "(SELECT rowid FROM event_fts_idx WHERE event_fts_idx MATCH ?))"
-        )
-        params.append(q)
-    if has_deliberation is not None:
-        where.append("e.has_deliberation=?")
-        params.append(1 if has_deliberation else 0)
-
-    if cursor:
-        try:
-            cts, cid = cursor.rsplit("|", 1)
-            cmp_ts, cmp_id = int(cts), cid
-        except (ValueError, AttributeError):
-            raise HTTPException(400, "cursor 格式无效")
-        op = "<" if direction == "desc" else ">"
-        where.append(f"(e.time_sort_key, e.event_id) {op} (?, ?)")
-        params.extend([cmp_ts, cmp_id])
-
-    order = "DESC" if direction == "desc" else "ASC"
-    sql = (
-        "SELECT e.event_id, e.timestamp_raw, e.timestamp_normalized, e.time_sort_key, e.timezone_status, "
-        "e.event_type, e.actor_id, e.actor_rule, e.details_json, e.has_deliberation, e.source_missing_id, "
-        "en.label AS actor_label "
-        "FROM events e LEFT JOIN entities en ON en.dataset_id=e.dataset_id AND en.entity_id=e.actor_id "
-        "WHERE " + " AND ".join(where) + f" ORDER BY e.time_sort_key {order}, e.event_id {order} LIMIT ?"
-    )
-    params.append(limit + 1)
-
     with get_conn() as conn:
+        selection, dataset_row = _selection(conn, dataset, raw)
+        if has_deliberation is not None:
+            selection = selection.extend(
+                "e.has_deliberation = :f_delib",
+                {"f_delib": 1 if has_deliberation else 0},
+                salt="has_deliberation",
+            )
+
         try:
-            dataset_row = require_dataset(conn, dataset)
-        except KeyError:
-            raise HTTPException(404, f"未知数据集 {dataset}")
+            matched = filters.count_events(conn, selection)
+            rows, next_cursor = filters.page_events(conn, selection, limit, cursor, direction)
+        except FilterError as exc:
+            raise HTTPException(exc.status_code, exc.detail) from exc
 
-        rows = conn.execute(sql, params).fetchall()
-        has_more = len(rows) > limit
-        rows = rows[:limit]
+        annotations = load_annotations(conn, dataset, [r["event_id"] for r in rows])
 
-        ids = [r["event_id"] for r in rows]
-        annotations: dict[str, list[dict]] = {}
-        if ids:
-            for anno in conn.execute(
-                "SELECT ae.event_id, a.scenario, a.anomaly_type, a.observed, a.reason "
-                "FROM annotation_events ae JOIN annotations a ON a.annotation_id=ae.annotation_id "
-                "WHERE ae.dataset_id=? AND ae.event_id IN (" + ",".join("?" * len(ids)) + ")",
-                [dataset, *ids],
-            ):
-                annotations.setdefault(anno["event_id"], []).append(
-                    {
-                        "scenario": anno["scenario"],
-                        "anomaly_type": anno["anomaly_type"],
-                        "observed": bool(anno["observed"]),
-                        "reason": anno["reason"],
-                    }
-                )
-
-    items = [
-        {
-            "event_id": r["event_id"],
-            "timestamp": r["timestamp_normalized"],
-            "timestamp_raw": r["timestamp_raw"],
-            "time_sort_key": r["time_sort_key"],
-            "timezone_status": r["timezone_status"],
-            "event_type": r["event_type"],
-            "actor_id": r["actor_id"],
-            "actor_label": r["actor_label"],
-            "actor_rule": r["actor_rule"],
-            "preview": _preview(r["details_json"]),
-            "has_deliberation": bool(r["has_deliberation"]),
-            "source_missing_id": bool(r["source_missing_id"]),
-            "annotations": annotations.get(r["event_id"], []),
-        }
-        for r in rows
-    ]
-
-    next_cursor = None
-    if has_more and rows:
-        last = rows[-1]
-        next_cursor = f"{last['time_sort_key']}|{last['event_id']}"
+        items = [summarize(row, dataset, annotations.get(row["event_id"], [])) for row in rows]
 
     return {
+        "meta": filters.build_meta(
+            selection,
+            scope="filtered",
+            data_version=dataset_row["data_version"],
+            matched_events=matched,
+            next_cursor=next_cursor,
+        ),
         "dataset_id": dataset,
         "timezone_status": dataset_row["timezone_status"],
         "items": items,
@@ -185,7 +173,7 @@ def list_events(
 def event_detail(event_id: str, dataset: str):
     with get_conn() as conn:
         try:
-            require_dataset(conn, dataset)
+            dataset_row = require_dataset(conn, dataset)
         except KeyError:
             raise HTTPException(404, f"未知数据集 {dataset}")
 
@@ -239,20 +227,7 @@ def event_detail(event_id: str, dataset: str):
             )
         ]
 
-        annotations = [
-            {
-                "scenario": a["scenario"],
-                "anomaly_type": a["anomaly_type"],
-                "observed": bool(a["observed"]),
-                "reason": a["reason"],
-                "run_id": a["run_id"],
-            }
-            for a in conn.execute(
-                "SELECT a.* FROM annotation_events ae JOIN annotations a ON a.annotation_id=ae.annotation_id "
-                "WHERE ae.dataset_id=? AND ae.event_id=?",
-                (dataset, event_id),
-            )
-        ]
+        annotations = load_annotations(conn, dataset, [event_id]).get(event_id, [])
 
     # MC1 双声道：外发文本来自 details.content，内部审议来自 raw.internal_state
     deliberation = None
@@ -265,18 +240,30 @@ def event_detail(event_id: str, dataset: str):
     outgoing_text = details_obj.get("content") if isinstance(details_obj, dict) else None
 
     return {
+        "meta": {
+            "contract_version": filters.CONTRACT_VERSION,
+            "dataset_id": dataset,
+            "data_version": dataset_row["data_version"],
+            "scope": "single",
+        },
         "dataset_id": dataset,
         "event_id": row["event_id"],
         "source_record_id": row["source_record_id"],
         "source_missing_id": bool(row["source_missing_id"]),
         "timestamp": row["timestamp_normalized"],
         "timestamp_raw": row["timestamp_raw"],
+        "time_us": row["time_sort_us"],
         "timezone_status": row["timezone_status"],
         "event_type": row["event_type"],
+        "category": event_types.category_of(dataset, row["event_type"]),
         "actor_id": row["actor_id"],
         "actor_rule": row["actor_rule"],
         "task_id": row["task_id"],
+        "run_id": row["run_id"],
         "document_id": row["document_id"],
+        "target_id": row["target_id"],
+        "version": row["version"],
+        "channel_id": row["channel_id"],
         "parent_event_id": row["parent_event_id"],
         "details": details_obj,
         "has_deliberation": bool(row["has_deliberation"]),
@@ -284,6 +271,8 @@ def event_detail(event_id: str, dataset: str):
         "outgoing_text": outgoing_text if isinstance(outgoing_text, str) else None,
         "deliberation": deliberation,
         "deliberation_source": "raw.internal_state" if deliberation else None,
+        "source_file": row["source_file"],
+        "source_ordinal": row["source_ordinal"],
         "source_json_pointer": row["source_json_pointer"],
         "raw": raw_obj,
         "participants": participants,

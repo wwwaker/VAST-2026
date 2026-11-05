@@ -1,63 +1,63 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useWorkspace, type Filters } from "../state/workspace";
+import { useWorkspace } from "../state/workspace";
 import { useTheme } from "../theme/theme";
-import { categoryOf } from "../theme/categories";
-import { fetchEvents, fetchOverview, formatUtc, type EventItem } from "../data/api";
+import { fetchEvents, formatUtc, type EventItem } from "../data/api";
+import { filterKey } from "../data/filterContext";
+import { annotationBadge, badgeClass } from "../data/labels";
+import { useDebounced } from "../hooks/useDebounced";
 
 const PAGE = 50;
 
-export function EventStream({ dataset, filters }: {
-  dataset: string;
-  filters: Filters;
-}) {
-  const { selectedEventId, selectEvent } = useWorkspace();
+export function EventStream() {
+  const { dataset, filters, cursor, masking, selectedEventId, selectEvent } = useWorkspace();
   const { colors } = useTheme();
 
+  const keyword = useDebounced(filters.keyword, 250);
+  const requestFilters = useMemo(() => ({ ...filters, keyword }), [filters, keyword]);
+  const requestKey = filterKey(requestFilters, {
+    dataset,
+    cursor_us: masking ? cursor : undefined,
+    masking,
+  });
+
   const [items, setItems] = useState<EventItem[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [matched, setMatched] = useState<number | null>(null);
   /** 仅 MC1 有内部审议，其余数据集不显示该开关 */
   const [onlyDeliberation, setOnlyDeliberation] = useState(false);
   const requestId = useRef(0);
-  const [allTypes, setAllTypes] = useState<string[]>([]);
 
   useEffect(() => {
-    let cancelled = false;
-    fetchOverview(dataset, { granularity: "day", topTypes: 24 })
-      .then((payload) => { if (!cancelled) setAllTypes(payload.types.map((type) => type.type)); })
-      .catch(() => { if (!cancelled) setAllTypes([]); });
-    return () => { cancelled = true; };
+    if (dataset !== "MC1") setOnlyDeliberation(false);
   }, [dataset]);
 
-  const activeTypes = useMemo(
-    () => filters.categories.length === 0
-      ? undefined
-      : allTypes.filter((t) => filters.categories.includes(categoryOf(t).id)),
-    [allTypes, filters.categories],
-  );
-
   const load = useCallback(
-    async (nextCursor: string | null, append: boolean) => {
+    async (pageCursor: string | null, append: boolean, signal: AbortSignal) => {
       const ticket = ++requestId.current;
       setLoading(true);
       setError(null);
       try {
-        const page = await fetchEvents({
-          dataset,
-          start: filters.from ?? undefined,
-          end: filters.to ?? undefined,
-          types: activeTypes,
-          actor: filters.actorId ?? undefined,
-          q: filters.keyword || undefined,
-          hasDeliberation: onlyDeliberation ? true : undefined,
-          limit: PAGE,
-          cursor: nextCursor,
-        });
+        const page = await fetchEvents(
+          {
+            dataset,
+            filters: requestFilters,
+            limit: PAGE,
+            cursor: pageCursor,
+            direction: "desc",
+            cursorUs: masking ? cursor : null,
+            masking,
+            hasDeliberation: onlyDeliberation ? true : undefined,
+          },
+          signal,
+        );
         if (ticket !== requestId.current) return;
+        setMatched(page.meta.matched_events);
         setItems((prev) => (append ? [...prev, ...page.items] : page.items));
-        setCursor(page.next_cursor);
+        setNextCursor(page.next_cursor);
       } catch (err) {
+        if (signal.aborted) return;
         if (ticket === requestId.current) {
           setError(err instanceof Error ? err.message : "加载失败");
         }
@@ -65,18 +65,17 @@ export function EventStream({ dataset, filters }: {
         if (ticket === requestId.current) setLoading(false);
       }
     },
-    [dataset, filters.from, filters.to, filters.keyword, filters.actorId, activeTypes, onlyDeliberation],
+    [dataset, requestFilters, cursor, masking, onlyDeliberation],
   );
 
+  // 筛选键变化即重置分页并取消旧请求
   useEffect(() => {
-    if (dataset !== "MC1") setOnlyDeliberation(false);
-  }, [dataset]);
-
-  useEffect(() => {
+    const controller = new AbortController();
     setItems([]);
-    setCursor(null);
-    void load(null, false);
-  }, [load]);
+    setNextCursor(null);
+    void load(null, false, controller.signal);
+    return () => controller.abort();
+  }, [load, requestKey]);
 
   // 上下键在事件流内移动选择；输入框内不抢键
   useEffect(() => {
@@ -98,7 +97,7 @@ export function EventStream({ dataset, filters }: {
         next = event.key === "ArrowDown" ? Math.min(items.length - 1, current + 1) : Math.max(0, current - 1);
       }
       const target = items[next];
-      selectEvent(target.event_id, target.time_sort_key);
+      selectEvent(target.event_id, target.time_us);
       requestAnimationFrame(() => {
         document
           .querySelector(`[data-event-id="${CSS.escape(target.event_id)}"]`)
@@ -115,8 +114,12 @@ export function EventStream({ dataset, filters }: {
       <div className="stream-head">
         <h3>事件流</h3>
         <span className="muted small">
-          {loading && items.length === 0 ? "加载中…" : `已载入 ${items.length} 条`}
-          {filters.keyword && ` · 关键词「${filters.keyword}」`}
+          {loading && items.length === 0
+            ? "加载中…"
+            : matched != null
+              ? `${matched.toLocaleString()} 条匹配 · 已载入 ${items.length}`
+              : `已载入 ${items.length} 条`}
+          {keyword.trim() && ` · 关键词「${keyword.trim()}」`}
         </span>
         {dataset === "MC1" && (
           <label className="check" title="MC1 全库只有 86 条事件记录了内部审议">
@@ -131,56 +134,73 @@ export function EventStream({ dataset, filters }: {
         <button
           type="button"
           className="btn btn-quiet stream-refresh"
-          onClick={() => load(null, false)}
+          onClick={() => {
+            const controller = new AbortController();
+            void load(null, false, controller.signal);
+          }}
           disabled={loading}
         >
           刷新
         </button>
       </div>
 
+      {masking && cursor != null && (
+        <p className="muted small">
+          回放遮蔽：仅显示 {formatUtc(cursor)} 之前的记录
+          {matched === 0 && "（当前游标之前没有匹配记录）"}
+        </p>
+      )}
       {error && <p className="stream-error">接口错误：{error}</p>}
 
       <ul className="stream-list">
-        {items.map((item) => (
-          <li key={item.event_id}>
-            <button
-              type="button"
-              data-event-id={item.event_id}
-              className={`stream-row${selectedEventId === item.event_id ? " stream-row-active" : ""}`}
-              onClick={() => selectEvent(item.event_id, item.time_sort_key)}
-            >
-              <span className="stream-time mono">{formatUtc(item.time_sort_key)}</span>
-              <span
-                className="stream-dot"
-                style={{ background: colors.categories[categoryOf(item.event_type).id - 1] }}
-                aria-hidden="true"
-              />
-              <span className="stream-type">{item.event_type}</span>
-              <span className="stream-actor mono">{item.actor_label ?? item.actor_id ?? "—"}</span>
-              <span className="stream-preview">{item.preview || "（无正文摘要）"}</span>
-              {/* 已按"仅含内心审议"筛选时不再逐行重复该标记 */}
-              {item.has_deliberation && !onlyDeliberation && (
-                <span className="tag tag-delib">含内心审议</span>
-              )}
-              {item.annotations.length > 0 && (
+        {items.map((item) => {
+          const badges = item.annotations.map((a) => ({ ...annotationBadge(a), reason: a.reason }));
+          return (
+            <li key={item.event_id}>
+              <button
+                type="button"
+                data-event-id={item.event_id}
+                className={`stream-row${selectedEventId === item.event_id ? " stream-row-active" : ""}`}
+                onClick={() => selectEvent(item.event_id, item.time_us)}
+              >
+                <span className="stream-time mono">{formatUtc(item.time_us)}</span>
                 <span
-                  className={`tag${item.annotations[0].observed ? " tag-risk" : " tag-warn"}`}
-                  title={item.annotations[0].reason ?? ""}
-                >
-                  {item.annotations[0].observed ? "已观测异常" : "已配置未观测"}
-                </span>
-              )}
-            </button>
-          </li>
-        ))}
+                  className="stream-dot"
+                  style={{ background: colors.categories[Math.max(0, Math.min(7, item.category - 1))] }}
+                  aria-hidden="true"
+                />
+                <span className="stream-type">{item.event_type}</span>
+                <span className="stream-actor mono">{item.actor_label ?? item.actor_id ?? "—"}</span>
+                <span className="stream-preview">{item.preview || "（无正文摘要）"}</span>
+                {/* 已按“仅含内心审议”筛选时不再逐行重复该标记 */}
+                {item.has_deliberation && !onlyDeliberation && (
+                  <span className="tag tag-delib">含内心审议</span>
+                )}
+                {badges[0] && (
+                  <span className={badgeClass(badges[0].tone)} title={badges[0].reason ?? ""}>
+                    {badges[0].text}
+                  </span>
+                )}
+              </button>
+            </li>
+          );
+        })}
       </ul>
 
       {items.length === 0 && !loading && !error && (
         <p className="muted small stream-empty">当前筛选条件下没有事件。放宽时间窗或清除筛选。</p>
       )}
 
-      {cursor && (
-        <button type="button" className="btn stream-more" onClick={() => load(cursor, true)} disabled={loading}>
+      {nextCursor && (
+        <button
+          type="button"
+          className="btn stream-more"
+          onClick={() => {
+            const controller = new AbortController();
+            void load(nextCursor, true, controller.signal);
+          }}
+          disabled={loading}
+        >
           {loading ? "加载中…" : "加载更多"}
         </button>
       )}
