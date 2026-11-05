@@ -7,6 +7,8 @@ import { EvidenceDrawer } from "./components/EvidenceDrawer";
 import { OverviewView } from "./views/OverviewView";
 import { RelationGraph } from "./views/RelationGraph";
 import { CompareView } from "./views/CompareView";
+import { ShortcutsHelp } from "./components/ShortcutsHelp";
+import { useHotkeys } from "./hooks/useHotkeys";
 import { RenderBenchView } from "./views/RenderBenchView";
 
 const VIEWS: { key: CanvasView; label: string; hint: string }[] = [
@@ -38,11 +40,17 @@ function ViewTabs() {
 
 function Workspace() {
   const [showBench, setShowBench] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const { canvasView } = useWorkspace();
+  useHotkeys(() => setShowHelp((v) => !v));
 
   return (
     <div className="app">
-      <TopBar showBench={showBench} onToggleBench={() => setShowBench((v) => !v)} />
+      <TopBar
+        showBench={showBench}
+        onToggleBench={() => setShowBench((v) => !v)}
+        onShowHelp={() => setShowHelp(true)}
+      />
       <QuestionBar />
       <div className="body">
         <ChapterNav />
@@ -62,6 +70,7 @@ function Workspace() {
       </div>
       <TimeBrush />
       <StatusBar />
+      {showHelp && <ShortcutsHelp onClose={() => setShowHelp(false)} />}
     </div>
   );
 }

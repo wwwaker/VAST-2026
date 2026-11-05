@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useWorkspace } from "../state/workspace";
 import { fetchDatasets, fetchEvent, type EventDetail } from "../data/api";
 import { DualChannel } from "./DualChannel";
+import { NotesPanel } from "./NotesPanel";
 
 /** 证据分层标签：把"数据里记了什么"和"我们推断出什么"分开呈现 */
 function ProvenanceTag({ kind }: { kind: "observed" | "derived" | "hint" | "conclusion" }) {
@@ -22,7 +23,11 @@ export function EvidenceDrawer() {
     evidenceTab,
     setEvidenceTab,
     selectedEventId,
+    selectedEventAt,
     notes,
+    notesLoading,
+    addNote,
+    removeNote,
     focusEntity,
   } = useWorkspace();
 
@@ -89,6 +94,7 @@ export function EvidenceDrawer() {
           { key: "message", label: "消息" },
           { key: "related", label: "关联" },
           { key: "raw", label: "原始记录" },
+          { key: "notes", label: "笔记" },
         ].map((t) => (
           <button
             key={t.key}
@@ -104,20 +110,22 @@ export function EvidenceDrawer() {
       </div>
 
       <div className="drawer-body">
-        {!selectedEventId ? (
+        {evidenceTab === "notes" ? (
+          <NotesPanel
+            notes={notes}
+            loading={notesLoading}
+            selectedEventId={selectedEventId}
+            eventTime={selectedEventAt}
+            onAdd={addNote}
+            onRemove={removeNote}
+          />
+        ) : !selectedEventId ? (
           <div className="empty-state">
             <p>尚未选择事件。</p>
             <p className="muted">在下方事件流中点击任意一行，或点击时间线上的红色三角锚点。</p>
-            {notes.length > 0 && (
-              <>
-                <h3>已保存的笔记</h3>
-                <ul className="note-list">
-                  {notes.map((n, i) => (
-                    <li key={i}>{n}</li>
-                  ))}
-                </ul>
-              </>
-            )}
+            <p className="muted small">
+              需要记录结论时可以切到「笔记」页，笔记存在服务端，刷新不会丢。
+            </p>
           </div>
         ) : loading ? (
           <p className="muted small">正在读取事件…</p>

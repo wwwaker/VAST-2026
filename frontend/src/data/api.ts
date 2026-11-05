@@ -186,6 +186,16 @@ export interface ComparePayload {
   metric_note: string;
 }
 
+export interface NoteItem {
+  note_id: number;
+  dataset_id: string;
+  event_id: string | null;
+  event_time: number | null;
+  body: string;
+  filter_summary: string | null;
+  created_at: string;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -252,6 +262,44 @@ export function fetchEvents(params: {
     limit: params.limit,
     cursor: params.cursor ?? undefined,
   });
+}
+
+async function sendJson<T>(path: string, method: "POST" | "DELETE", body?: unknown): Promise<T | null> {
+  const res = await fetch(new URL(path, window.location.origin), {
+    method,
+    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const payload = (await res.json()) as { detail?: string };
+      if (payload.detail) detail = payload.detail;
+    } catch {
+      /* 保留 statusText */
+    }
+    throw new ApiError(detail, res.status);
+  }
+  if (res.status === 204) return null;
+  return (await res.json()) as T;
+}
+
+export function fetchNotes(dataset: string): Promise<{ items: NoteItem[] }> {
+  return getJson<{ items: NoteItem[] }>("/api/notes", { dataset });
+}
+
+export function createNote(payload: {
+  dataset_id: string;
+  body: string;
+  event_id?: string | null;
+  event_time?: number | null;
+  filter_summary?: string | null;
+}): Promise<NoteItem> {
+  return sendJson<NoteItem>("/api/notes", "POST", payload) as Promise<NoteItem>;
+}
+
+export function deleteNote(noteId: number): Promise<null> {
+  return sendJson<null>(`/api/notes/${noteId}`, "DELETE");
 }
 
 export function fetchEvent(dataset: string, eventId: string): Promise<EventDetail> {

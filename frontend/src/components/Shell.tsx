@@ -10,9 +10,11 @@ const QUESTIONS: Record<DatasetId, string> = {
 export function TopBar({
   showBench,
   onToggleBench,
+  onShowHelp,
 }: {
   showBench: boolean;
   onToggleBench: () => void;
+  onShowHelp: () => void;
 }) {
   const { dataset, setDataset, filters, setFilters } = useWorkspace();
   const { mode, setMode, reducedMotion, setReducedMotion } = useTheme();
@@ -63,6 +65,10 @@ export function TopBar({
         />
         <span>减少动效</span>
       </label>
+
+      <button type="button" className="btn" onClick={onShowHelp} title="键盘快捷键（?）">
+        ?
+      </button>
 
       <button type="button" className={`btn${showBench ? " btn-active" : ""}`} onClick={onToggleBench}>
         {showBench ? "返回调查" : "渲染基准"}
@@ -140,9 +146,9 @@ export function StatusBar() {
         <button
           type="button"
           className="btn btn-quiet"
-          onClick={() => addNote(`筛选快照：${filterSummary}`)}
+          onClick={() => void addNote(`筛选快照：${filterSummary}`)}
         >
-          保存证据 {notes.length > 0 && <span className="badge">{notes.length}</span>}
+          记录当前筛选 {notes.length > 0 && <span className="badge">{notes.length}</span>}
         </button>
       </div>
     </footer>

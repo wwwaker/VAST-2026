@@ -33,7 +33,9 @@
 
   --text: #172d29;
   --text-muted: #50645f;
-  --text-faint: #7b8b86;
+  /* 原 #7b8b86 在 #ffffff 上只有 3.57:1，正文不达标；
+     需同时满足 bg(#f5f8f7) 与 bg-sunken(#eaf0ee)，后者最严，故取到 4.6:1 以上 */
+  --text-faint: #5c6e67;
 
   --accent: #0f766e;
   --accent-contrast: #ffffff;

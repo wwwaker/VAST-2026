@@ -64,6 +64,38 @@ export function EventStream({ allTypes }: { allTypes: string[] }) {
     void load(null, false);
   }, [load]);
 
+  // 上下键在事件流内移动选择；输入框内不抢键
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const el = event.target as HTMLElement | null;
+      if (el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable)) {
+        return;
+      }
+      if (items.length === 0) return;
+
+      event.preventDefault();
+      const current = items.findIndex((i) => i.event_id === selectedEventId);
+      let next: number;
+      if (current === -1) {
+        next = event.key === "ArrowDown" ? 0 : items.length - 1;
+      } else {
+        next = event.key === "ArrowDown" ? Math.min(items.length - 1, current + 1) : Math.max(0, current - 1);
+      }
+      const target = items[next];
+      selectEvent(target.event_id, target.time_sort_key);
+      requestAnimationFrame(() => {
+        document
+          .querySelector(`[data-event-id="${CSS.escape(target.event_id)}"]`)
+          ?.scrollIntoView({ block: "nearest" });
+      });
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [items, selectedEventId, selectEvent]);
+
   return (
     <section className="stream" aria-label="事件流">
       <div className="stream-head">
@@ -99,6 +131,7 @@ export function EventStream({ allTypes }: { allTypes: string[] }) {
           <li key={item.event_id}>
             <button
               type="button"
+              data-event-id={item.event_id}
               className={`stream-row${selectedEventId === item.event_id ? " stream-row-active" : ""}`}
               onClick={() => selectEvent(item.event_id, item.time_sort_key)}
             >

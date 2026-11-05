@@ -65,7 +65,8 @@ cd frontend && npm run dev        # http://localhost:5173
 | `python -m app.ingest.cli --all --fresh` | 全量重建数据库 |
 | `python -m app.ingest.cli --dataset MC1` | 只重导一个数据集 |
 | `python tools/bench_sqlite.py --dataset MC2` | SQLite 导入与查询基准 |
-| `cd frontend && npm run check:ui -- http://127.0.0.1:8000` | 无头浏览器自检：布局、截图、渲染基准、控制台错误 |
+| `cd frontend && npm run check:ui -- http://127.0.0.1:8000` | 无头浏览器自检：布局、交互、键盘、截图、渲染基准、控制台错误 |
+| `python tools/check_contrast.py --strict` | 双主题对比度验收（WCAG 2.1），有失败项时退出码非 0 |
 | `curl http://127.0.0.1:8000/api/health` | 健康检查（含库大小） |
 
 ---
@@ -114,9 +115,11 @@ MC2 还在 manifest 里记录了**唯一干预点**：`SwiftWren_further_instruc
 ## 已知限制
 
 - 检索不做相关性排序，只按索引命中顺序返回。
-- 关系图、基线比较、调查笔记持久化尚未实现。
-- 多键盘快捷键、窄屏布局、投影环境对比度未验收。
+- 调查笔记只能在本机查看，没有导出为报告或 Markdown 的功能。
+- 对比度已按 WCAG 计算并通过，但未在真实投影仪上验收。
+- 窄屏布局（1180 px 以下）未做真机验证。
 - 服务为单进程单连接，未做并发压测。
+- 两跳以上的关系遍历未实现，关系图最多 2 跳且限 80 节点。
 
 ---
 
@@ -129,3 +132,4 @@ MC2 还在 manifest 里记录了**唯一干预点**：`SwiftWren_further_instruc
 | `docs/SQLite基准报告.md` | 建库体积、查询延迟、索引决策 |
 | `docs/后端接口说明.md` | 接口契约、实测延迟、性能陷阱 |
 | `docs/前端骨架说明.md` | token 层、渲染决策、交互闭环、遗留项 |
+| `docs/数据获取.md` | 数据不入库的原因、恢复步骤与校验基线 |

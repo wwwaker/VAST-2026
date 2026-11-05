@@ -2,12 +2,14 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type Dispatch,
   type ReactNode,
   type SetStateAction,
 } from "react";
+import { createNote, deleteNote, fetchNotes, type NoteItem } from "../data/api";
 
 export type Chapter = "overview" | "trace" | "compare" | "evidence";
 
@@ -35,7 +37,7 @@ export interface Filters {
 
 const EMPTY_FILTERS: Filters = { from: null, to: null, categories: [], actorId: null, keyword: "" };
 
-export type EvidenceTab = "message" | "related" | "raw";
+export type EvidenceTab = "message" | "related" | "raw" | "notes";
 
 interface WorkspaceValue {
   dataset: DatasetId;
@@ -75,8 +77,15 @@ interface WorkspaceValue {
   masking: boolean;
   setMasking: (on: boolean) => void;
 
-  notes: string[];
-  addNote: (text: string) => void;
+  /** 笔记存在后端，刷新页面不丢 */
+  notes: NoteItem[];
+  notesLoading: boolean;
+  refreshNotes: () => Promise<void>;
+  addNote: (
+    body: string,
+    options?: { eventId?: string | null; eventTime?: number | null },
+  ) => Promise<void>;
+  removeNote: (noteId: number) => Promise<void>;
 }
 
 const WorkspaceContext = createContext<WorkspaceValue | null>(null);
@@ -94,7 +103,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [cursor, setCursor] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
   const [masking, setMasking] = useState(true);
-  const [notes, setNotes] = useState<string[]>([]);
+  const [notes, setNotes] = useState<NoteItem[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
 
   /** 切换数据集必须清空时间窗与选中项：不同数据集的时间轴不可比，沿用会造成空结果 */
   const setDataset = useCallback((id: DatasetId) => {
@@ -132,18 +142,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const addNote = useCallback((text: string) => {
-    const trimmed = text.trim();
-    if (trimmed) setNotes((prev) => [trimmed, ...prev]);
-  }, []);
-
-  const stepCursor = useCallback((direction: 1 | -1) => {
-    setCursor((prev) => {
-      if (prev == null) return null;
-      return prev + direction * 3600;
-    });
-  }, []);
-
+  // 笔记会把当时的筛选条件一并存档，所以要先算好摘要
   const filterSummary = useMemo(() => {
     const parts: string[] = [];
     if (filters.from != null && filters.to != null) {
@@ -156,6 +155,51 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (filters.keyword) parts.push(`关键词 "${filters.keyword}"`);
     return parts.length ? parts.join(" · ") : "无筛选（全量数据）";
   }, [filters]);
+
+  const refreshNotes = useCallback(async () => {
+    setNotesLoading(true);
+    try {
+      const data = await fetchNotes(dataset);
+      setNotes(data.items);
+    } catch {
+      // 后端不可用时保持空列表，不阻塞其它功能
+      setNotes([]);
+    } finally {
+      setNotesLoading(false);
+    }
+  }, [dataset]);
+
+  useEffect(() => {
+    void refreshNotes();
+  }, [refreshNotes]);
+
+  const addNote = useCallback(
+    async (body: string, options?: { eventId?: string | null; eventTime?: number | null }) => {
+      const trimmed = body.trim();
+      if (!trimmed) return;
+      const created = await createNote({
+        dataset_id: dataset,
+        body: trimmed,
+        event_id: options?.eventId ?? null,
+        event_time: options?.eventTime ?? null,
+        filter_summary: filterSummary,
+      });
+      setNotes((prev) => [created, ...prev]);
+    },
+    [dataset, filterSummary],
+  );
+
+  const removeNote = useCallback(async (noteId: number) => {
+    await deleteNote(noteId);
+    setNotes((prev) => prev.filter((n) => n.note_id !== noteId));
+  }, []);
+
+  const stepCursor = useCallback((direction: 1 | -1) => {
+    setCursor((prev) => {
+      if (prev == null) return null;
+      return prev + direction * 3600;
+    });
+  }, []);
 
   const modeLabel = chapter
     ? `章节：${CHAPTERS.find((c) => c.key === chapter)?.label ?? ""}`
@@ -191,7 +235,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       masking,
       setMasking,
       notes,
+      notesLoading,
+      refreshNotes,
       addNote,
+      removeNote,
     }),
     [
       dataset,
@@ -216,7 +263,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       stepCursor,
       masking,
       notes,
+      notesLoading,
+      refreshNotes,
       addNote,
+      removeNote,
     ],
   );
 

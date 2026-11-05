@@ -192,6 +192,108 @@ const cmp = await page.evaluate(() => {
 console.log("[比较]", JSON.stringify(cmp, null, 1));
 await page.screenshot({ path: path.join(OUT, "ui-compare.png") });
 
+console.log("== 调查笔记 ==");
+await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
+await page.waitForSelector(".stream-row", { timeout: 20000 });
+const rows4 = await page.$$(".stream-row");
+await rows4[0].click();
+await wait(500);
+await page.evaluate(() => {
+  const tab = [...document.querySelectorAll(".tab")].find((t) => t.textContent?.includes("笔记"));
+  tab?.click();
+});
+await page.waitForSelector(".notes-editor textarea", { timeout: 10000 });
+await page.type(".notes-editor textarea", "UI 自检写入的笔记：验证前端到后端的完整链路。", { delay: 0 });
+await page.evaluate(() => {
+  const btn = [...document.querySelectorAll(".notes-actions .btn")].find((b) =>
+    b.textContent?.includes("保存笔记"),
+  );
+  btn?.click();
+});
+await wait(900);
+const notesState = await page.evaluate(() => ({
+  count: document.querySelectorAll(".note-item").length,
+  first: document.querySelector(".note-body")?.textContent?.slice(0, 40),
+  attached: document.querySelector(".note-meta .mono")?.textContent,
+  badge: document.querySelector(".status-actions .badge")?.textContent,
+}));
+console.log("[笔记]", JSON.stringify(notesState));
+await page.screenshot({ path: path.join(OUT, "ui-notes.png") });
+
+// 刷新页面，确认笔记没有丢
+await page.reload({ waitUntil: "networkidle0" });
+await page.waitForSelector(".stream-row", { timeout: 20000 });
+const rows5 = await page.$$(".stream-row");
+await rows5[0].click();
+await wait(500);
+await page.evaluate(() => {
+  const tab = [...document.querySelectorAll(".tab")].find((t) => t.textContent?.includes("笔记"));
+  tab?.click();
+});
+await wait(600);
+const afterReload = await page.evaluate(() => document.querySelectorAll(".note-item").length);
+console.log(`[刷新后] 笔记数 ${afterReload}`);
+
+// 清理
+await page.evaluate(() => {
+  document.querySelectorAll(".note-del").forEach((b) => b.click());
+});
+await wait(800);
+const cleaned = await page.evaluate(() => document.querySelectorAll(".note-item").length);
+console.log(`[清理后] 笔记数 ${cleaned}`);
+
+console.log("== 键盘操作 ==");
+await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
+await page.waitForSelector(".stream-row", { timeout: 20000 });
+await page.evaluate(() => document.body.focus());
+await wait(400);
+
+// ? 打开快捷键说明
+await page.keyboard.press("?");
+await wait(400);
+const helpOpen = await page.evaluate(() => !!document.querySelector(".modal"));
+await page.screenshot({ path: path.join(OUT, "ui-hotkeys.png") });
+await page.keyboard.press("Escape");
+await wait(300);
+const helpClosed = await page.evaluate(() => !document.querySelector(".modal"));
+console.log(`[? / Esc] 打开=${helpOpen} 关闭=${helpClosed}`);
+
+// 方向键移动游标
+const before = await page.$eval(".timebrush-readout", (n) => n.textContent.trim());
+await page.keyboard.press("ArrowLeft");
+await wait(400);
+const after = await page.$eval(".timebrush-readout", (n) => n.textContent.trim());
+console.log(`[←] ${before.slice(0, 16)} -> ${after.slice(0, 16)}  变化=${before !== after}`);
+
+// 空格播放
+await page.keyboard.press("Space");
+await wait(500);
+const playing = await page.$eval(".timebrush-row .btn", (n) => n.textContent.trim());
+await page.keyboard.press("Space");
+await wait(300);
+console.log(`[空格] 播放态按钮文案=${playing}`);
+
+// ↓ 选中事件并打开侧栏
+await page.keyboard.press("ArrowDown");
+await wait(700);
+const kbdSelect = await page.evaluate(() => ({
+  selected: document.querySelector(".stream-row-active")?.textContent?.slice(0, 30) ?? null,
+  drawer: !!document.querySelector(".drawer"),
+}));
+console.log("[↓ / Enter]", JSON.stringify(kbdSelect));
+
+// Esc 关闭侧栏
+await page.keyboard.press("Escape");
+await wait(400);
+const drawerClosed = await page.evaluate(() => !document.querySelector(".drawer"));
+console.log(`[Esc 关侧栏] ${drawerClosed}`);
+
+// / 聚焦关键词
+await page.keyboard.press("/");
+await wait(300);
+const focused = await page.evaluate(() => document.activeElement?.tagName + ":" + document.activeElement?.getAttribute("type"));
+console.log(`[/] 焦点=${focused}`);
+
 console.log("== 渲染基准 ==");
 await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
 await page.waitForSelector(".topbar", { timeout: 10000 });
