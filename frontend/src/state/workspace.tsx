@@ -11,15 +11,6 @@ import {
 } from "react";
 import { createNote, deleteNote, fetchNotes, type NoteItem } from "../data/api";
 
-export type Chapter = "overview" | "trace" | "compare" | "evidence";
-
-export const CHAPTERS: { key: Chapter; label: string; hint: string }[] = [
-  { key: "overview", label: "概览", hint: "建立行为基线，找出值得深入的时间段" },
-  { key: "trace", label: "追踪", hint: "沿参与者与事件重建链路" },
-  { key: "compare", label: "比较", hint: "与历史窗口或同角色基线对比" },
-  { key: "evidence", label: "证据记录", hint: "核对原始记录并记录结论" },
-];
-
 export type DatasetId = "MC1" | "MC2" | "CUSTOM";
 
 /** 主画布视图：三个切面共享同一套筛选与选中状态 */
@@ -42,11 +33,6 @@ export type EvidenceTab = "message" | "related" | "raw" | "notes";
 interface WorkspaceValue {
   dataset: DatasetId;
   setDataset: (id: DatasetId) => void;
-
-  /** null 表示自由探索；章节用于讲解，不强制接受预设结论 */
-  chapter: Chapter | null;
-  setChapter: (c: Chapter | null) => void;
-  modeLabel: string;
 
   filters: Filters;
   setFilters: (patch: Partial<Filters>) => void;
@@ -92,7 +78,6 @@ const WorkspaceContext = createContext<WorkspaceValue | null>(null);
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [dataset, setDatasetState] = useState<DatasetId>("MC2");
-  const [chapter, setChapterState] = useState<Chapter | null>("overview");
   const [filters, setFiltersState] = useState<Filters>(EMPTY_FILTERS);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [selectedEventAt, setSelectedEventAt] = useState<number | null>(null);
@@ -122,11 +107,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearFilters = useCallback(() => setFiltersState(EMPTY_FILTERS), []);
-
-  const setChapter = useCallback((c: Chapter | null) => {
-    setChapterState(c);
-    setPlaying(false);
-  }, []);
 
   const selectEvent = useCallback((id: string | null, at?: number | null) => {
     setSelectedEventId(id);
@@ -201,17 +181,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const modeLabel = chapter
-    ? `章节：${CHAPTERS.find((c) => c.key === chapter)?.label ?? ""}`
-    : "自由探索";
-
   const value = useMemo<WorkspaceValue>(
     () => ({
       dataset,
       setDataset,
-      chapter,
-      setChapter,
-      modeLabel,
       filters,
       setFilters,
       clearFilters,
@@ -243,9 +216,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [
       dataset,
       setDataset,
-      chapter,
-      setChapter,
-      modeLabel,
       filters,
       setFilters,
       clearFilters,

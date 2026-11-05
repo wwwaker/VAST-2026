@@ -141,6 +141,7 @@ export interface GraphNode {
   entity_type: string;
   degree: number;
   is_center: boolean;
+  level: number;
 }
 
 export interface GraphEdge {

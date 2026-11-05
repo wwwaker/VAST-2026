@@ -30,13 +30,19 @@ def _display_name(source_value: str | None) -> str | None:
 def _edges_of(conn, dataset: str, entity_id: str, per_dir: int):
     # 只取实体关系：reply_to 指向的是另一条事件，端点不是实体，不能进图
     out = conn.execute(
-        "SELECT src_id, dst_id, relation, derivation, event_id FROM relations "
-        "WHERE dataset_id=? AND src_id=? AND target_kind='entity' LIMIT ?",
+        "SELECT src_id, dst_id, relation, derivation, COUNT(*) AS evidence_count, "
+        "MIN(event_id) AS event_id FROM relations "
+        "WHERE dataset_id=? AND src_id=? AND target_kind='entity' "
+        "GROUP BY src_id, dst_id, relation, derivation "
+        "ORDER BY evidence_count DESC, relation, dst_id LIMIT ?",
         (dataset, entity_id, per_dir),
     ).fetchall()
     inn = conn.execute(
-        "SELECT src_id, dst_id, relation, derivation, event_id FROM relations "
-        "WHERE dataset_id=? AND dst_id=? AND target_kind='entity' LIMIT ?",
+        "SELECT src_id, dst_id, relation, derivation, COUNT(*) AS evidence_count, "
+        "MIN(event_id) AS event_id FROM relations "
+        "WHERE dataset_id=? AND dst_id=? AND target_kind='entity' "
+        "GROUP BY src_id, dst_id, relation, derivation "
+        "ORDER BY evidence_count DESC, relation, src_id LIMIT ?",
         (dataset, entity_id, per_dir),
     ).fetchall()
     return [*out, *inn]
@@ -46,7 +52,7 @@ def _edges_of(conn, dataset: str, entity_id: str, per_dir: int):
 def graph(
     dataset: str,
     center: str,
-    depth: int = Query(1, ge=1, le=2),
+    depth: int = Query(2, ge=1, le=3),
     node_limit: int = Query(MAX_NODES, ge=5, le=MAX_NODES),
 ):
     with get_conn() as conn:
@@ -62,7 +68,8 @@ def graph(
             raise HTTPException(404, f"未知实体 {center}")
 
         node_ids: set[str] = {center}
-        raw_edges: dict[tuple[str, str, str], dict] = {}
+        levels: dict[str, int] = {center: 0}
+        raw_edges: dict[tuple[str, str, str, str], dict] = {}
         frontier = [center]
         truncated = False
 
@@ -76,21 +83,18 @@ def graph(
                     # src 为 null 的边（源 actor 缺失）仍然保留，用 dst 一端呈现
                     if src is None:
                         src = ""
-                    if src not in node_ids and len(node_ids) >= node_limit:
+                    endpoints = [endpoint for endpoint in (src, dst) if endpoint]
+                    new_endpoints = [endpoint for endpoint in endpoints if endpoint not in node_ids]
+                    if len(node_ids) + len(new_endpoints) > node_limit:
                         truncated = True
                         continue
-                    if dst not in node_ids and len(node_ids) >= node_limit:
-                        truncated = True
-                        continue
-                    if src:
-                        node_ids.add(src)
-                        if src != seed:
-                            next_frontier.append(src)
-                    node_ids.add(dst)
-                    if dst != seed:
-                        next_frontier.append(dst)
+                    for endpoint in new_endpoints:
+                        node_ids.add(endpoint)
+                        levels[endpoint] = hop + 1
+                        if endpoint != seed:
+                            next_frontier.append(endpoint)
 
-                    key = (src, dst, row["relation"])
+                    key = (src, dst, row["relation"], row["derivation"])
                     entry = raw_edges.get(key)
                     if entry is None:
                         raw_edges[key] = {
@@ -98,18 +102,18 @@ def graph(
                             "target": dst,
                             "relation": row["relation"],
                             "derivation": row["derivation"],
-                            "evidence_count": 1,
+                            "evidence_count": row["evidence_count"],
                             "evidence_event_id": row["event_id"],
                         }
                     else:
-                        entry["evidence_count"] += 1
+                        entry["evidence_count"] += row["evidence_count"]
 
                 if len(raw_edges) >= MAX_EDGES:
                     truncated = True
                     break
             if len(raw_edges) >= MAX_EDGES or len(node_ids) >= node_limit:
                 break
-            frontier = [n for n in next_frontier if n]
+            frontier = list(dict.fromkeys(n for n in next_frontier if n))
 
         if len(raw_edges) > MAX_EDGES:
             raw_edges = dict(list(sorted(raw_edges.items()))[:MAX_EDGES])
@@ -144,6 +148,7 @@ def graph(
                 "entity_type": info.get("entity_type") or "unknown",
                 "degree": degree.get(nid, 0),
                 "is_center": nid == center,
+                "level": levels.get(nid, 1),
             }
         )
 

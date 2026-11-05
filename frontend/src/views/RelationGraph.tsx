@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import {
   forceCenter,
   forceCollide,
   forceLink,
   forceManyBody,
+  forceRadial,
   forceSimulation,
   type SimulationLinkDatum,
   type SimulationNodeDatum,
@@ -15,6 +16,8 @@ import { fetchGraph, type GraphPayload } from "../data/api";
 
 const W = 1000;
 const H = 620;
+const LAYER_RADIUS = [0, 135, 235, 335];
+const TRANSITION_MS = 380;
 
 const TYPE_COLOR_INDEX: Record<string, number> = {
   agent: 1,
@@ -60,12 +63,14 @@ interface SimNode extends SimulationNodeDatum {
   entity_type: string;
   degree: number;
   is_center: boolean;
+  level: number;
 }
 
 interface SimLink extends SimulationLinkDatum<SimNode> {
   relation: string;
   derivation: string;
   evidence_count: number;
+  curveOffset: number;
 }
 
 interface DrawnLink {
@@ -74,6 +79,63 @@ interface DrawnLink {
   relation: string;
   derivation: string;
   evidence_count: number;
+  curveOffset: number;
+}
+
+interface GraphLayout {
+  id: number;
+  nodes: SimNode[];
+  links: DrawnLink[];
+  radius: (n: SimNode) => number;
+  showLabel: (n: SimNode) => boolean;
+  unlinked: number;
+}
+
+interface GraphTransform {
+  x: number;
+  y: number;
+  scale: number;
+}
+
+function stableAngle(id: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < id.length; i++) {
+    hash = Math.imul(hash ^ id.charCodeAt(i), 16777619);
+  }
+  return ((hash >>> 0) / 0xffffffff) * Math.PI * 2;
+}
+
+function edgeKey(edge: DrawnLink): string {
+  const a = edge.source.id;
+  const b = edge.target.id;
+  return `${a < b ? a : b}\u0000${a < b ? b : a}`;
+}
+
+function edgePath(edge: DrawnLink): string {
+  const sx = edge.source.x ?? W / 2;
+  const sy = edge.source.y ?? H / 2;
+  const tx = edge.target.x ?? W / 2;
+  const ty = edge.target.y ?? H / 2;
+  const dx = tx - sx;
+  const dy = ty - sy;
+  const length = Math.max(1, Math.hypot(dx, dy));
+  const cx = (sx + tx) / 2 - (dy / length) * edge.curveOffset;
+  const cy = (sy + ty) / 2 + (dx / length) * edge.curveOffset;
+  return `M ${sx} ${sy} Q ${cx} ${cy} ${tx} ${ty}`;
+}
+
+function edgeMidpoint(edge: DrawnLink): { x: number; y: number } {
+  const sx = edge.source.x ?? W / 2;
+  const sy = edge.source.y ?? H / 2;
+  const tx = edge.target.x ?? W / 2;
+  const ty = edge.target.y ?? H / 2;
+  const dx = tx - sx;
+  const dy = ty - sy;
+  const length = Math.max(1, Math.hypot(dx, dy));
+  return {
+    x: (sx + tx) / 2 - (dy / length) * edge.curveOffset / 2,
+    y: (sy + ty) / 2 + (dx / length) * edge.curveOffset / 2,
+  };
 }
 
 export function RelationGraph() {
@@ -81,9 +143,92 @@ export function RelationGraph() {
   const { colors } = useTheme();
 
   const [payload, setPayload] = useState<GraphPayload | null>(null);
-  const [depth, setDepth] = useState(1);
+  const [depth, setDepth] = useState(2);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [leavingLayout, setLeavingLayout] = useState<GraphLayout | null>(null);
+  const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [viewTransform, setViewTransform] = useState<GraphTransform>({ x: 0, y: 0, scale: 1 });
+  const [panning, setPanning] = useState(false);
+  const graphStageRef = useRef<HTMLDivElement>(null);
+  const previousLayout = useRef<GraphLayout | null>(null);
+  const layoutSequence = useRef(0);
+  const panStart = useRef<{ pointerId: number; clientX: number; clientY: number; transform: GraphTransform } | null>(null);
+
+  function buildLayout(data: GraphPayload | null): GraphLayout | null {
+    if (!data) return null;
+    const nodes: SimNode[] = data.nodes.map((n) => ({
+      ...n,
+      x: n.is_center
+        ? W / 2
+        : W / 2 + Math.cos(stableAngle(n.id)) * LAYER_RADIUS[Math.min(n.level, LAYER_RADIUS.length - 1)],
+      y: n.is_center
+        ? H / 2
+        : H / 2 + Math.sin(stableAngle(n.id)) * LAYER_RADIUS[Math.min(n.level, LAYER_RADIUS.length - 1)],
+    }));
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    const links: SimLink[] = data.edges
+      .filter((e) => e.source && byId.has(e.source) && byId.has(e.target))
+      .map((e) => ({
+        source: byId.get(e.source)!,
+        target: byId.get(e.target)!,
+        relation: e.relation,
+        derivation: e.derivation,
+        evidence_count: e.evidence_count,
+        curveOffset: 0,
+      }));
+
+    const parallelEdges = new Map<string, SimLink[]>();
+    for (const edge of links) {
+      const key = edgeKey(edge as unknown as DrawnLink);
+      parallelEdges.set(key, [...(parallelEdges.get(key) ?? []), edge]);
+    }
+    for (const edges of parallelEdges.values()) {
+      edges.sort((a, b) => a.relation.localeCompare(b.relation) || a.derivation.localeCompare(b.derivation));
+      edges.forEach((edge, index) => {
+        edge.curveOffset = (index - (edges.length - 1) / 2) * 14;
+      });
+    }
+
+    const sim = forceSimulation<SimNode>(nodes)
+      .force(
+        "link",
+        forceLink<SimNode, SimLink>(links)
+          .id((d) => d.id)
+          .distance((e) => (Math.max((e.source as SimNode).level, (e.target as SimNode).level) > 1 ? 105 : 130))
+          .strength(0.7),
+      )
+      .force("charge", forceManyBody().strength(-320))
+      .force("center", forceCenter(W / 2, H / 2))
+      .force(
+        "radial",
+        forceRadial<SimNode>((n) => LAYER_RADIUS[Math.min(n.level, LAYER_RADIUS.length - 1)], W / 2, H / 2)
+          .strength(0.8),
+      )
+      .force("collide", forceCollide<SimNode>().radius((n) => (n.is_center ? 34 : 25)))
+      .stop();
+
+    sim.randomSource(() => 0.5);
+    for (let i = 0; i < 300; i++) sim.tick();
+
+    const maxDegree = Math.max(1, ...nodes.map((n) => n.degree));
+    const radius = scaleSqrt().domain([0, maxDegree]).range([7, 20]);
+    const ranked = [...nodes].sort((a, b) => b.degree - a.degree);
+    const topIds = new Set(ranked.slice(0, 12).map((n) => n.id));
+    const firstLayerCount = nodes.filter((n) => n.level === 1).length;
+    return {
+      id: ++layoutSequence.current,
+      nodes,
+      links: links as unknown as DrawnLink[],
+      radius: (n: SimNode) => (n.is_center ? Math.max(14, radius(n.degree)) : radius(n.degree)),
+      showLabel: (n: SimNode) =>
+        n.is_center ||
+        (n.level === 1 && firstLayerCount <= 20) ||
+        topIds.has(n.id),
+      unlinked: data.edges.length - links.length,
+    };
+  }
 
   useEffect(() => {
     if (!focusedEntityId) {
@@ -93,6 +238,7 @@ export function RelationGraph() {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setPayload(null);
     fetchGraph(dataset, focusedEntityId, depth)
       .then((data) => {
         if (!cancelled) setPayload(data);
@@ -108,74 +254,72 @@ export function RelationGraph() {
     };
   }, [dataset, focusedEntityId, depth]);
 
-  const layout = useMemo(() => {
-    if (!payload) return null;
-    const nodes: SimNode[] = payload.nodes.map((n) => ({
-      ...n,
-      x: W / 2 + (Math.random() - 0.5) * 120,
-      y: H / 2 + (Math.random() - 0.5) * 120,
-    }));
-    const byId = new Map(nodes.map((n) => [n.id, n]));
-    const links: SimLink[] = payload.edges
-      .filter((e) => e.source && byId.has(e.source) && byId.has(e.target))
-      .map((e) => ({
-        source: byId.get(e.source)!,
-        target: byId.get(e.target)!,
-        relation: e.relation,
-        derivation: e.derivation,
-        evidence_count: e.evidence_count,
-      }));
+  useEffect(() => {
+    setViewTransform({ x: 0, y: 0, scale: 1 });
+  }, [dataset, focusedEntityId]);
 
-    const sim = forceSimulation<SimNode>(nodes)
-      .force(
-        "link",
-        forceLink<SimNode, SimLink>(links)
-          .id((d) => d.id)
-          .distance(130)
-          .strength(0.7),
-      )
-      .force("charge", forceManyBody().strength(-420))
-      .force("center", forceCenter(W / 2, H / 2))
-      .force("collide", forceCollide<SimNode>().radius(30))
-      .stop();
-
-    // 同步跑完布局：结果确定、无动画，减少动效设置下行为一致
-    for (let i = 0; i < 350; i++) sim.tick();
-
-    // 力学布局的绝对尺寸与节点数不成比例，统一缩放铺满画布，避免挤在中间
-    const PAD = 70;
-    const xs = nodes.map((n) => n.x ?? 0);
-    const ys = nodes.map((n) => n.y ?? 0);
-    const minX = Math.min(...xs);
-    const maxX = Math.max(...xs);
-    const minY = Math.min(...ys);
-    const maxY = Math.max(...ys);
-    const scaleX = (W - 2 * PAD) / Math.max(1, maxX - minX);
-    const scaleY = (H - 2 * PAD) / Math.max(1, maxY - minY);
-    const fit = Math.min(scaleX, scaleY, 3);
-    const offX = (W - (maxX - minX) * fit) / 2;
-    const offY = (H - (maxY - minY) * fit) / 2;
-    for (const n of nodes) {
-      n.x = offX + ((n.x ?? 0) - minX) * fit;
-      n.y = offY + ((n.y ?? 0) - minY) * fit;
-    }
-
-    const maxDegree = Math.max(1, ...nodes.map((n) => n.degree));
-    const radius = scaleSqrt().domain([0, maxDegree]).range([7, 20]);
-
-    // 标签策略：小图全标（径向放置避免压线），大图只标中心和度数前 12 的节点
-    const ranked = [...nodes].sort((a, b) => b.degree - a.degree);
-    const topIds = new Set(ranked.slice(0, 12).map((n) => n.id));
-    const showLabel = (n: SimNode) => nodes.length <= 30 || n.is_center || topIds.has(n.id);
-
-    return {
-      nodes,
-      links: links as unknown as DrawnLink[],
-      radius: (n: SimNode) => (n.is_center ? Math.max(14, radius(n.degree)) : radius(n.degree)),
-      showLabel,
-      unlinked: payload.edges.length - links.length,
+  function startPan(event: ReactPointerEvent<HTMLDivElement>) {
+    if ((event.target as Element).closest(".graph-node")) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    panStart.current = {
+      pointerId: event.pointerId,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      transform: viewTransform,
     };
+    setPanning(true);
+  }
+
+  function movePan(event: ReactPointerEvent<HTMLDivElement>) {
+    const start = panStart.current;
+    if (!start || start.pointerId !== event.pointerId) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const dx = (event.clientX - start.clientX) * W / Math.max(1, rect.width) / start.transform.scale;
+    const dy = (event.clientY - start.clientY) * H / Math.max(1, rect.height) / start.transform.scale;
+    setViewTransform({ ...start.transform, x: start.transform.x + dx, y: start.transform.y + dy });
+  }
+
+  function endPan(event: ReactPointerEvent<HTMLDivElement>) {
+    if (panStart.current?.pointerId !== event.pointerId) return;
+    panStart.current = null;
+    setPanning(false);
+  }
+
+  function zoomGraph(event: WheelEvent) {
+    event.preventDefault();
+    const factor = Math.exp(-event.deltaY * 0.0012);
+    setViewTransform((current) => {
+      const scale = Math.max(0.55, Math.min(3.5, current.scale * factor));
+      const ratio = scale / current.scale;
+      return {
+        x: W / 2 - (W / 2 - current.x) * ratio,
+        y: H / 2 - (H / 2 - current.y) * ratio,
+        scale,
+      };
+    });
+  }
+
+  useEffect(() => {
+    const stage = graphStageRef.current;
+    if (!stage) return;
+    stage.addEventListener("wheel", zoomGraph, { passive: false });
+    return () => stage.removeEventListener("wheel", zoomGraph);
   }, [payload]);
+
+  const layout = useMemo(() => buildLayout(payload), [payload]);
+
+  useEffect(() => {
+    if (!layout) return;
+    const previous = previousLayout.current;
+    if (previous && previous !== layout) {
+      setLeavingLayout(previous);
+      const timer = window.setTimeout(() => setLeavingLayout(null), TRANSITION_MS);
+      previousLayout.current = layout;
+      return () => window.clearTimeout(timer);
+    }
+    previousLayout.current = layout;
+  }, [layout]);
 
   const typeCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -184,6 +328,130 @@ export function RelationGraph() {
     }
     return [...counts.entries()].sort((a, b) => b[1] - a[1]);
   }, [payload]);
+
+  function renderLayer(graphLayout: GraphLayout, className: string, interactive: boolean) {
+    const levelOpacity = [1, 0.94, 0.66, 0.42];
+    return (
+      <g
+        key={`layout-${graphLayout.id}`}
+        className={className}
+        pointerEvents={interactive ? "auto" : "none"}
+      >
+        <g>
+          {graphLayout.links.map((edge, index) => {
+            const derived = edge.derivation.startsWith("adapter:");
+            const midpoint = edgeMidpoint(edge);
+            const edgeId = `${edge.source.id}\u0000${edge.target.id}\u0000${edge.relation}\u0000${edge.derivation}`;
+            const active = interactive && hoveredEdge === edgeId;
+            const opacity = levelOpacity[Math.min(Math.max(edge.source.level, edge.target.level), 3)];
+            return (
+              <g
+                key={`edge-${index}`}
+                className="graph-edge"
+                onMouseEnter={interactive ? () => setHoveredEdge(edgeId) : undefined}
+                onMouseLeave={interactive ? () => setHoveredEdge(null) : undefined}
+                onFocus={interactive ? () => setHoveredEdge(edgeId) : undefined}
+                onBlur={interactive ? () => setHoveredEdge(null) : undefined}
+                tabIndex={interactive ? 0 : -1}
+                aria-label={`${edge.relation}，证据 ${edge.evidence_count} 条`}
+              >
+                <title>{`${edge.relation} · ${edge.evidence_count} 条证据`}</title>
+                <path
+                  d={edgePath(edge)}
+                  fill="none"
+                  stroke="transparent"
+                  strokeWidth={14}
+                  pointerEvents="stroke"
+                />
+                <path
+                  d={edgePath(edge)}
+                  fill="none"
+                  stroke={derived ? colors.warn : colors.textMuted}
+                  strokeOpacity={opacity * (active ? 0.9 : 0.48)}
+                  strokeWidth={active ? 2.2 : edge.evidence_count > 50 ? 2 : 1}
+                  strokeDasharray={derived ? "4 3" : undefined}
+                  markerEnd={derived ? "url(#arrow-dashed)" : "url(#arrow-solid)"}
+                  pointerEvents="none"
+                />
+                {active && (
+                  <g className="graph-edge-label" pointerEvents="none">
+                    <rect
+                      x={midpoint.x - Math.min(105, edge.relation.length * 3.2 + 12)}
+                      y={midpoint.y - 17}
+                      width={Math.min(210, edge.relation.length * 6.4 + 24)}
+                      height={22}
+                      rx={4}
+                      fill={colors.panel}
+                      stroke={colors.border}
+                    />
+                    <text x={midpoint.x} y={midpoint.y - 2} textAnchor="middle" fontSize={10} fill={colors.text}>
+                      {edge.relation.length > 28 ? `${edge.relation.slice(0, 27)}…` : edge.relation}
+                    </text>
+                  </g>
+                )}
+              </g>
+            );
+          })}
+        </g>
+        <g>
+          {graphLayout.nodes.map((node) => {
+            const opacity = levelOpacity[Math.min(node.level, 3)];
+            const showLabel = graphLayout.showLabel(node) || hoveredNode === node.id;
+            return (
+              <g
+                key={node.id}
+                className="graph-node"
+                opacity={opacity}
+                onClick={interactive ? () => focusEntity(node.id) : undefined}
+                onMouseEnter={interactive ? () => setHoveredNode(node.id) : undefined}
+                onMouseLeave={interactive ? () => setHoveredNode(null) : undefined}
+                role={interactive ? "button" : undefined}
+                tabIndex={interactive ? 0 : -1}
+                onKeyDown={interactive ? (event) => {
+                  if (event.key === "Enter" || event.key === " ") focusEntity(node.id);
+                } : undefined}
+              >
+                <title>{`${node.label}\n${TYPE_LABEL[node.entity_type] ?? node.entity_type} · ${node.level} 跳 · 度数 ${node.degree}`}</title>
+                <circle
+                  cx={node.x}
+                  cy={node.y}
+                  r={graphLayout.radius(node)}
+                  fill={colors.categories[(TYPE_COLOR_INDEX[node.entity_type] ?? 8) - 1]}
+                  fillOpacity={node.is_center ? 0.95 : 0.8}
+                  stroke={node.is_center ? colors.accent : colors.panel}
+                  strokeWidth={node.is_center ? 3 : 1.5}
+                />
+                {showLabel && (node.is_center ? (
+                  <text
+                    x={node.x}
+                    y={(node.y ?? 0) - graphLayout.radius(node) - 8}
+                    fontSize={11}
+                    fontWeight={600}
+                    fill={colors.text}
+                    textAnchor="middle"
+                    pointerEvents="none"
+                  >
+                    {node.label.length > 22 ? `${node.label.slice(0, 21)}…` : node.label}
+                  </text>
+                ) : (
+                  <text
+                    x={(node.x ?? 0) + ((node.x ?? 0) >= W / 2 ? 1 : -1) * (graphLayout.radius(node) + 5)}
+                    y={(node.y ?? 0) + 3.5}
+                    fontSize={10}
+                    fill={colors.textMuted}
+                    textAnchor={(node.x ?? 0) >= W / 2 ? "start" : "end"}
+                    pointerEvents="none"
+                  >
+                    {node.label.length > 20 ? `${node.label.slice(0, 19)}…` : node.label}
+                  </text>
+                ))}
+              </g>
+            );
+          })}
+        </g>
+      </g>
+    );
+  }
 
   if (!focusedEntityId) {
     return (
@@ -210,6 +478,15 @@ export function RelationGraph() {
     return <div className="empty-state"><p className="muted">正在构建子图…</p></div>;
   }
 
+  if (payload.nodes.length === 0 || layout.nodes.length === 0) {
+    return (
+      <div className="empty-state">
+        <h2>这个实体没有可绘制的关系</h2>
+        <p>聚焦实体 <code>{payload.center}</code> 没有返回关系节点。可以在证据侧栏选择其他参与者后继续调查。</p>
+      </div>
+    );
+  }
+
   return (
     <div className="graph">
       <div className="graph-head">
@@ -223,7 +500,7 @@ export function RelationGraph() {
         </div>
         <div className="graph-tools">
           <div className="seg">
-            {[1, 2].map((d) => (
+            {[1, 2, 3].map((d) => (
               <button
                 key={d}
                 type="button"
@@ -235,6 +512,9 @@ export function RelationGraph() {
               </button>
             ))}
           </div>
+          <button type="button" className="btn btn-quiet" onClick={() => setViewTransform({ x: 0, y: 0, scale: 1 })} title="重置关系图缩放与位置">
+            重置视图
+          </button>
         </div>
       </div>
 
@@ -248,7 +528,14 @@ export function RelationGraph() {
         </div>
       )}
 
-      <div className="graph-stage">
+      <div
+        ref={graphStageRef}
+        className={`graph-stage${panning ? " graph-panning" : ""}`}
+        onPointerDown={startPan}
+        onPointerMove={movePan}
+        onPointerUp={endPan}
+        onPointerCancel={endPan}
+      >
         <svg
           viewBox={`0 0 ${W} ${H}`}
           role="img"
@@ -280,98 +567,43 @@ export function RelationGraph() {
             </marker>
           </defs>
 
-          <g>
-            {layout.links.map((e, i) => {
-              const derived = e.derivation.startsWith("adapter:");
-              return (
-                <line
-                  key={`e${i}`}
-                  x1={e.source.x}
-                  y1={e.source.y}
-                  x2={e.target.x}
-                  y2={e.target.y}
-                  stroke={derived ? colors.warn : colors.textMuted}
-                  strokeOpacity={0.5}
-                  strokeWidth={e.evidence_count > 50 ? 2 : 1}
-                  strokeDasharray={derived ? "4 3" : undefined}
-                  markerEnd={derived ? "url(#arrow-dashed)" : "url(#arrow-solid)"}
-                />
-              );
-            })}
-          </g>
-
-          {layout.links.length <= 26 && (
-            <g>
-              {layout.links.map((e, i) => (
-                <text
-                  key={`l${i}`}
-                  x={((e.source.x ?? 0) + (e.target.x ?? 0)) / 2}
-                  y={((e.source.y ?? 0) + (e.target.y ?? 0)) / 2 - 3}
-                  fontSize={9}
-                  fill={colors.textFaint}
-                  textAnchor="middle"
-                >
-                  {e.relation}
-                </text>
-              ))}
-            </g>
-          )}
-
-          <g>
-            {layout.nodes.map((n) => (
-              <g
-                key={n.id}
-                className="graph-node"
-                onClick={() => focusEntity(n.id)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(ev) => {
-                  if (ev.key === "Enter" || ev.key === " ") focusEntity(n.id);
-                }}
+          <g transform={`translate(${viewTransform.x} ${viewTransform.y}) scale(${viewTransform.scale})`}>
+          {[1, 2, 3].filter((level) => level <= payload.depth).map((level) => (
+            <g key={`ring-${level}`}>
+              <circle
+                cx={W / 2}
+                cy={H / 2}
+                r={LAYER_RADIUS[level]}
+                fill="none"
+                stroke={colors.border}
+                strokeOpacity={0.48}
+                strokeDasharray="2 6"
+              />
+              <text
+                x={W / 2 + 7}
+                y={H / 2 - LAYER_RADIUS[level] + 14}
+                fontSize={9}
+                fill={colors.textFaint}
               >
-                <title>
-                  {`${n.label}\n${TYPE_LABEL[n.entity_type] ?? n.entity_type} · 度数 ${n.degree}`}
-                </title>
-                <circle
-                  cx={n.x}
-                  cy={n.y}
-                  r={layout.radius(n)}
-                  fill={colors.categories[(TYPE_COLOR_INDEX[n.entity_type] ?? 8) - 1]}
-                  fillOpacity={n.is_center ? 0.95 : 0.8}
-                  stroke={n.is_center ? colors.accent : colors.panel}
-                  strokeWidth={n.is_center ? 3 : 1.5}
-                />
-                {layout.showLabel(n) &&
-                  (n.is_center ? (
-                    <text
-                      x={n.x}
-                      y={(n.y ?? 0) - layout.radius(n) - 8}
-                      fontSize={11}
-                      fontWeight={600}
-                      fill={colors.text}
-                      textAnchor="middle"
-                    >
-                      {n.label.length > 22 ? `${n.label.slice(0, 21)}…` : n.label}
-                    </text>
-                  ) : (
-                    // 外圈标签朝背离中心的一侧排，减少与连线、彼此的重叠
-                    <text
-                      x={(n.x ?? 0) + ((n.x ?? 0) >= W / 2 ? 1 : -1) * (layout.radius(n) + 5)}
-                      y={(n.y ?? 0) + 3.5}
-                      fontSize={10}
-                      fill={colors.textMuted}
-                      textAnchor={(n.x ?? 0) >= W / 2 ? "start" : "end"}
-                    >
-                      {n.label.length > 20 ? `${n.label.slice(0, 19)}…` : n.label}
-                    </text>
-                  ))}
-              </g>
-            ))}
+                {level} 跳
+              </text>
+            </g>
+          ))}
+
+          {leavingLayout && renderLayer(leavingLayout, "graph-layout-leave", false)}
+          {renderLayer(layout, "graph-layout-enter", true)}
           </g>
         </svg>
       </div>
 
       <div className="graph-legend">
+        {[0, 1, 2, 3].filter((level) => level <= payload.depth).map((level) => (
+          <span key={`level-${level}`} className="legend-item">
+            <span className={`level-swatch level-${level}`} />
+            {level === 0 ? "中心" : `${level} 跳`}
+            {` ${payload.nodes.filter((node) => node.level === level).length}`}
+          </span>
+        ))}
         {typeCounts.map(([type, count]) => (
           <span key={type} className="legend-item">
             <span

@@ -10,6 +10,7 @@ import fs from "node:fs";
 const URL = process.argv[2] ?? "http://127.0.0.1:8000";
 const OUT = path.resolve("..", "build");
 const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+const TEST_NOTE = `UI 自检生成的测试笔记 ${Date.now()}`;
 
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -60,6 +61,55 @@ await wait(600);
 await measureLayout("light");
 await page.screenshot({ path: path.join(OUT, "ui-light.png") });
 
+console.log("== 工作区布局交互 ==");
+const dockLabels = ["底部", "左侧", "右侧"];
+for (const label of dockLabels) {
+  await page.evaluate((text) => {
+    const button = [...document.querySelectorAll(".dock-switch button")].find((node) => node.textContent?.trim() === text);
+    button?.click();
+  }, label);
+  await wait(250);
+  const dockState = await page.evaluate(() => ({
+    selected: document.querySelector(".dock-switch [aria-pressed='true']")?.textContent?.trim(),
+    panel: !!document.querySelector(".event-dock"),
+  }));
+  if (dockState.selected !== label || !dockState.panel) throw new Error(`事件流未能停靠到${label}`);
+  console.log(`[停靠 ${label}]`, JSON.stringify(dockState));
+}
+await page.evaluate(() => {
+  const handle = document.querySelector(".dock-resizer-left");
+  handle?.focus();
+  handle?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+});
+const resized = await page.$eval(".dock-resizer-left", (node) => node.getAttribute("aria-valuenow"));
+if (!resized) throw new Error("右侧事件面板尺寸控制不可用");
+await page.evaluate(() => {
+  const slider = document.querySelector(".timebrush-slider");
+  if (!(slider instanceof HTMLInputElement)) throw new Error("时间滑块未渲染");
+  slider.focus();
+});
+await page.keyboard.press("Home");
+await wait(250);
+const sliderState = await page.evaluate(() => {
+  const thumb = document.querySelector(".timebrush-thumb");
+  return {
+    value: document.querySelector(".timebrush-slider")?.value,
+    thumb: thumb ? getComputedStyle(thumb).backgroundColor : "",
+  };
+});
+if (!sliderState.value || sliderState.thumb === "rgba(0, 0, 0, 0)") throw new Error("时间滑块未显示或无法操作");
+console.log("[尺寸 / 时间滑块]", JSON.stringify({ resized, ...sliderState }));
+await page.setViewport({ width: 390, height: 844 });
+const mobileBounds = await page.evaluate(() => ({
+  body: document.body.scrollWidth,
+  viewport: window.innerWidth,
+  controlbar: Math.round(document.querySelector(".controlbar")?.getBoundingClientRect().height ?? 0),
+}));
+if (mobileBounds.body > mobileBounds.viewport + 1) throw new Error(`窄屏出现横向溢出：${JSON.stringify(mobileBounds)}`);
+console.log("[窄屏]", JSON.stringify(mobileBounds));
+await page.setViewport({ width: 1600, height: 1000 });
+await page.evaluate(() => document.querySelector(".dock-switch button")?.click());
+
 await page.goto(`${URL}/?theme=dark`, { waitUntil: "networkidle0" });
 await page.waitForSelector(".chart-wrap canvas", { timeout: 20000 });
 await wait(600);
@@ -84,7 +134,6 @@ await page.evaluate(() => {
 await wait(800);
 const anchorState = await page.evaluate(() => ({
   summary: document.querySelector(".status-summary")?.textContent,
-  mode: document.querySelector(".mode-chip")?.textContent,
   rows: document.querySelectorAll(".stream-row").length,
 }));
 console.log("[锚点后]", JSON.stringify(anchorState));
@@ -171,12 +220,12 @@ await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
 await page.waitForSelector(".anchor-chip", { timeout: 20000 });
 await page.evaluate(() => document.querySelector(".anchor-chip")?.click());
 await wait(900);
-// 走左侧「比较」章节，顺带验证章节与视图的联动
+// 通过主画布视图标签打开基线比较
 await page.evaluate(() => {
-  const ch = [...document.querySelectorAll(".chapter")].find((c) =>
+  const tab = [...document.querySelectorAll(".view-tab")].find((c) =>
     c.textContent?.includes("比较"),
   );
-  ch?.click();
+  tab?.click();
 });
 await page.waitForSelector(".compare-row", { timeout: 15000 });
 await wait(700);
@@ -203,7 +252,7 @@ await page.evaluate(() => {
   tab?.click();
 });
 await page.waitForSelector(".notes-editor textarea", { timeout: 10000 });
-await page.type(".notes-editor textarea", "UI 自检写入的笔记：验证前端到后端的完整链路。", { delay: 0 });
+await page.type(".notes-editor textarea", TEST_NOTE, { delay: 0 });
 await page.evaluate(() => {
   const btn = [...document.querySelectorAll(".notes-actions .btn")].find((b) =>
     b.textContent?.includes("保存笔记"),
@@ -234,10 +283,13 @@ await wait(600);
 const afterReload = await page.evaluate(() => document.querySelectorAll(".note-item").length);
 console.log(`[刷新后] 笔记数 ${afterReload}`);
 
-// 清理
-await page.evaluate(() => {
-  document.querySelectorAll(".note-del").forEach((b) => b.click());
-});
+// 仅清理本次运行生成的测试笔记，保留用户已有笔记。
+await page.evaluate((testNote) => {
+  const item = [...document.querySelectorAll(".note-item")].find((node) =>
+    node.querySelector(".note-body")?.textContent === testNote,
+  );
+  item?.querySelector(".note-del")?.click();
+}, TEST_NOTE);
 await wait(800);
 const cleaned = await page.evaluate(() => document.querySelectorAll(".note-item").length);
 console.log(`[清理后] 笔记数 ${cleaned}`);

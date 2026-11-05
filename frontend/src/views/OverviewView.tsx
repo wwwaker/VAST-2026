@@ -11,7 +11,6 @@ import {
   type DatasetInfo,
   type OverviewPayload,
 } from "../data/api";
-import { EventStream } from "../components/EventStream";
 
 const PAD = { top: 18, right: 16, bottom: 26, left: 46 };
 const CAT_COUNT = CATEGORIES.length;
@@ -439,7 +438,6 @@ export function OverviewView() {
 
       {reducedMotion && <p className="muted small">已开启减少动态效果，图表仅静态重绘。</p>}
 
-      <EventStream allTypes={overview.types.map((t) => t.type)} />
     </div>
   );
 }

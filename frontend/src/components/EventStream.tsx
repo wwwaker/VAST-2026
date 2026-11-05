@@ -1,13 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useWorkspace } from "../state/workspace";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useWorkspace, type Filters } from "../state/workspace";
 import { useTheme } from "../theme/theme";
 import { categoryOf } from "../theme/categories";
-import { fetchEvents, formatUtc, type EventItem } from "../data/api";
+import { fetchEvents, fetchOverview, formatUtc, type EventItem } from "../data/api";
 
 const PAGE = 50;
 
-export function EventStream({ allTypes }: { allTypes: string[] }) {
-  const { dataset, filters, selectedEventId, selectEvent } = useWorkspace();
+export function EventStream({ dataset, filters }: {
+  dataset: string;
+  filters: Filters;
+}) {
+  const { selectedEventId, selectEvent } = useWorkspace();
   const { colors } = useTheme();
 
   const [items, setItems] = useState<EventItem[]>([]);
@@ -17,11 +20,22 @@ export function EventStream({ allTypes }: { allTypes: string[] }) {
   /** 仅 MC1 有内部审议，其余数据集不显示该开关 */
   const [onlyDeliberation, setOnlyDeliberation] = useState(false);
   const requestId = useRef(0);
+  const [allTypes, setAllTypes] = useState<string[]>([]);
 
-  const activeTypes =
-    filters.categories.length === 0
+  useEffect(() => {
+    let cancelled = false;
+    fetchOverview(dataset, { granularity: "day", topTypes: 24 })
+      .then((payload) => { if (!cancelled) setAllTypes(payload.types.map((type) => type.type)); })
+      .catch(() => { if (!cancelled) setAllTypes([]); });
+    return () => { cancelled = true; };
+  }, [dataset]);
+
+  const activeTypes = useMemo(
+    () => filters.categories.length === 0
       ? undefined
-      : allTypes.filter((t) => filters.categories.includes(categoryOf(t).id));
+      : allTypes.filter((t) => filters.categories.includes(categoryOf(t).id)),
+    [allTypes, filters.categories],
+  );
 
   const load = useCallback(
     async (nextCursor: string | null, append: boolean) => {

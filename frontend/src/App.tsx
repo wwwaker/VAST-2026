@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { ThemeProvider } from "./theme/theme";
-import { WorkspaceProvider, useWorkspace, type CanvasView } from "./state/workspace";
-import { ChapterNav, QuestionBar, StatusBar, TopBar } from "./components/Shell";
+import { WorkspaceProvider, useWorkspace, type CanvasView, type Filters } from "./state/workspace";
+import { StatusBar, TopBar } from "./components/Shell";
 import { TimeBrush } from "./components/TimeBrush";
 import { EvidenceDrawer } from "./components/EvidenceDrawer";
+import { EventStream } from "./components/EventStream";
 import { OverviewView } from "./views/OverviewView";
 import { RelationGraph } from "./views/RelationGraph";
 import { CompareView } from "./views/CompareView";
@@ -16,6 +17,10 @@ const VIEWS: { key: CanvasView; label: string; hint: string }[] = [
   { key: "graph", label: "关系图", hint: "以选中实体为中心展开邻接" },
   { key: "compare", label: "基线比较", hint: "把刷选窗口与前一等长窗口对比" },
 ];
+
+const readLayout = (key: string, fallback: string) => {
+  try { return localStorage.getItem(`mas-workspace.${key}`) ?? fallback; } catch { return fallback; }
+};
 
 function ViewTabs() {
   const { canvasView, setCanvasView } = useWorkspace();
@@ -41,8 +46,41 @@ function ViewTabs() {
 function Workspace() {
   const [showBench, setShowBench] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const { canvasView } = useWorkspace();
+  const [eventOpen, setEventOpen] = useState(() => readLayout("event-open", "true") === "true");
+  const [evidenceSize, setEvidenceSize] = useState(() => Math.max(280, Math.min(560, Number(readLayout("evidence-size", "392")) || 392)));
+  const [eventSize, setEventSize] = useState(() => Math.max(240, Math.min(520, Number(readLayout("event-size", "320")) || 320)));
+  const { canvasView, dataset, filters, evidenceOpen, setEvidenceOpen } = useWorkspace();
   useHotkeys(() => setShowHelp((v) => !v));
+
+  const persist = (key: string, value: string) => {
+    try { localStorage.setItem(`mas-workspace.${key}`, value); } catch { /* storage is optional */ }
+  };
+  const resizePanel = (panel: "evidence" | "event", event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const start = event.clientX;
+    const initial = panel === "evidence" ? evidenceSize : eventSize;
+    const move = (next: globalThis.PointerEvent) => {
+      const delta = panel === "evidence" ? next.clientX - start : start - next.clientX;
+      const size = panel === "evidence"
+        ? Math.max(280, Math.min(560, initial + delta))
+        : Math.max(240, Math.min(520, initial + delta));
+      if (panel === "evidence") {
+        setEvidenceSize(size);
+        persist("evidence-size", String(size));
+      } else {
+        setEventSize(size);
+        persist("event-size", String(size));
+      }
+    };
+    const end = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end, { once: true });
+    window.addEventListener("pointercancel", end, { once: true });
+  };
 
   return (
     <div className="app">
@@ -50,29 +88,61 @@ function Workspace() {
         showBench={showBench}
         onToggleBench={() => setShowBench((v) => !v)}
         onShowHelp={() => setShowHelp(true)}
+        evidenceOpen={evidenceOpen}
+        onToggleEvidence={() => setEvidenceOpen(!evidenceOpen)}
+        eventOpen={eventOpen}
+        onToggleEvent={() => {
+          const next = !eventOpen;
+          setEventOpen(next);
+          persist("event-open", String(next));
+        }}
       />
-      <QuestionBar />
-      <div className="body">
-        <ChapterNav />
-        <main className="canvas-area">
+      <div className="workbench" style={{ "--event-size": `${eventSize}px`, "--evidence-size": `${evidenceSize}px` } as CSSProperties}>
+        <div className={`body${eventOpen ? " body-dock-right" : ""}${evidenceOpen ? " body-evidence-open" : ""}`}>
+          {evidenceOpen && <div className="evidence-dock">
+            <div className="dock-resizer dock-resizer-right" role="separator" tabIndex={0} aria-valuemin={280} aria-valuemax={560} aria-valuenow={evidenceSize} aria-orientation="vertical" aria-label="调整证据面板宽度" onPointerDown={(e) => resizePanel("evidence", e)} onKeyDown={(e) => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); const next = Math.max(280, Math.min(560, evidenceSize + (e.key === "ArrowRight" ? 16 : -16))); setEvidenceSize(next); persist("evidence-size", String(next)); } }} />
+            <EvidenceDrawer />
+          </div>}
+          <main className="canvas-area">
           {showBench ? (
             <RenderBenchView />
           ) : (
             <>
-              <ViewTabs />
+              <div className="canvas-toolbar">
+                <ViewTabs />
+              </div>
               {canvasView === "timeline" && <OverviewView />}
               {canvasView === "graph" && <RelationGraph />}
               {canvasView === "compare" && <CompareView />}
             </>
           )}
-        </main>
-        <EvidenceDrawer />
+          </main>
+          {eventOpen && (
+            <aside className="event-dock event-dock-right">
+              <div className="dock-resizer dock-resizer-left" role="separator" tabIndex={0} aria-valuemin={240} aria-valuemax={520} aria-valuenow={eventSize} aria-orientation="vertical" aria-label="调整事件面板宽度" onPointerDown={(e) => resizePanel("event", e)} onKeyDown={(e) => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); const next = Math.max(240, Math.min(520, eventSize + (e.key === "ArrowLeft" ? 16 : -16))); setEventSize(next); persist("event-size", String(next)); } }} />
+              <EventPanel dataset={dataset} filters={filters} onClose={() => { setEventOpen(false); persist("event-open", "false"); }} />
+            </aside>
+          )}
+        </div>
       </div>
-      <TimeBrush />
-      <StatusBar />
+      <div className="controlbar"><TimeBrush /><StatusBar /></div>
       {showHelp && <ShortcutsHelp onClose={() => setShowHelp(false)} />}
     </div>
   );
+}
+
+function EventPanel({ dataset, filters, onClose }: {
+  dataset: string;
+  filters: Filters;
+  onClose: () => void;
+}) {
+  return <div className="event-panel">
+    <div className="event-panel-toolbar">
+      <span className="dock-label">事件流</span>
+      <button type="button" className="btn btn-quiet" onClick={onClose} title="收起事件流">收起</button>
+    </div>
+    <EventStream dataset={dataset} filters={filters} />
+  </div>;
 }
 
 export default function App() {

@@ -4,7 +4,7 @@ import { useTheme } from "../theme/theme";
 import { fetchDatasets, formatUtc, toEpoch } from "../data/api";
 
 export function TimeBrush() {
-  const { dataset, cursor, setCursor, playing, togglePlaying, stepCursor, masking, setMasking, filters, setFilters } =
+  const { dataset, cursor, setCursor, playing, togglePlaying, stepCursor, masking, setMasking, setFilters } =
     useWorkspace();
   const { reducedMotion } = useTheme();
   const [range, setRange] = useState<[number, number] | null>(null);
@@ -58,14 +58,30 @@ export function TimeBrush() {
           +1h
         </button>
 
-        <div className="timebrush-track" aria-hidden="true">
+        <div className="timebrush-track">
           <div className="timebrush-fill" style={{ width: `${Math.min(100, Math.max(0, progress * 100))}%` }} />
+          <span className="timebrush-thumb" style={{ left: `${Math.min(100, Math.max(0, progress * 100))}%` }} aria-hidden="true" />
+          {range && (
+            <input
+              className="timebrush-slider"
+              type="range"
+              min={range[0]}
+              max={range[1]}
+              step={3600}
+              value={Math.min(range[1], Math.max(range[0], cursor ?? range[1]))}
+              aria-label="回放时间"
+              aria-valuetext={cursor != null ? formatUtc(cursor) : "最新"}
+              onChange={(event) => setCursor(Number(event.target.value))}
+            />
+          )}
         </div>
 
         <span className="timebrush-readout">
           {cursor != null ? formatUtc(cursor) : "—"}
-          <span className="muted"> / 源时区 {dataset === "MC1" ? "未知" : "UTC"}</span>
+          <span className="muted"> / {dataset === "MC1" ? "源时区未知" : "UTC"}</span>
         </span>
+
+        <button type="button" className="info-button" title={masking ? "游标之后的记录不显示；游标之前的记录始终可查。" : "关闭遮蔽后，当前展示全量数据，不代表游标时刻状态。"} aria-label={masking ? "回放遮蔽说明：游标之后的记录不显示" : "回放遮蔽已关闭说明：当前展示全量数据"}>i</button>
 
         <label className="check">
           <input type="checkbox" checked={masking} onChange={(e) => setMasking(e.target.checked)} />
@@ -84,12 +100,6 @@ export function TimeBrush() {
         </button>
       </div>
 
-      <div className="timebrush-hint muted small">
-        {masking
-          ? "游标之后的记录不显示，游标之前始终全量可查；关闭遮蔽后界面会明确标注。"
-          : "已关闭回放遮蔽：当前可见的是全量数据，不是某一时刻的状态。"}
-        {filters.from != null && " · 当前有刷选窗口"}
-      </div>
     </div>
   );
 }
