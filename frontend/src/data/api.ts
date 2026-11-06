@@ -701,6 +701,170 @@ export function fetchRunComparison(
   );
 }
 
+// ---------------------------------------------------------------- CUSTOM 冻结案例
+
+export type CaseStatus = "ok" | "stale" | "mismatch" | "missing_run";
+
+export interface CaseRunSummary {
+  run_id: string;
+  model: string | null;
+  fixture: string | null;
+  scenario: string | null;
+  observed: boolean;
+  event_count: number;
+  start_us: number | null;
+  end_us: number | null;
+}
+
+export interface CaseDiff {
+  field: string;
+  expected: unknown;
+  actual: unknown;
+}
+
+export interface CaseEvidenceEvent {
+  role: string;
+  event_id: string;
+  event_type?: string;
+  time_us?: number;
+  actor_id?: string | null;
+  version?: number | null;
+  missing: boolean;
+}
+
+export interface CaseItem {
+  case_id: string;
+  title: string;
+  scenario: string | null;
+  note: string | null;
+  run_id: string;
+  baseline_run_id: string | null;
+  model: string | null;
+  fixture: string | null;
+  expected: Record<string, number>;
+  evidence: Record<string, string>;
+  run?: CaseRunSummary;
+  baseline?: CaseRunSummary;
+  audit?: Record<string, number>;
+  loops?: { path: string[]; event_ids: string[] }[];
+  status: CaseStatus;
+  computed_status?: CaseStatus;
+  status_label: string;
+  diffs: CaseDiff[];
+  evidence_events?: CaseEvidenceEvent[];
+}
+
+export interface CaseListPayload {
+  meta: { scope: string; read_only: boolean };
+  dataset_id: string;
+  file_data_version: string | null;
+  data_version: string;
+  stale: boolean;
+  schema_version: number | null;
+  note: string | null;
+  items: CaseItem[];
+  total: number;
+  status_counts: Record<string, number>;
+  /** 用户保存的案例（来自 notes.db），与预置案例分开返回 */
+  user_items: {
+    case_id: string;
+    dataset_id: string;
+    title: string;
+    data_version: string;
+    created_at: string;
+    updated_at: string;
+    kind: "user";
+    status: CaseStatus;
+    status_label: string;
+  }[];
+}
+
+export interface CaseRecord {
+  case_id: string;
+  dataset_id: string;
+  title: string;
+  data_version: string;
+  snapshot: Record<string, unknown>;
+  status: CaseStatus;
+  status_label: string;
+  stale?: boolean;
+  kind: "user" | "preset";
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface EvidenceInput {
+  reference_id: string;
+  role: "support" | "counter" | "uncertain";
+  reference_kind?: "event";
+  excerpt?: string | null;
+  field_pointer?: string | null;
+}
+
+export interface FindingRecord {
+  finding_id: string;
+  case_id: string;
+  claim: string;
+  status: "hypothesis" | "supported" | "inconclusive";
+  explanation: string;
+  limitations: string | null;
+  created_at: string;
+  updated_at: string;
+  evidence: {
+    dataset_id: string;
+    reference_kind: string;
+    reference_id: string;
+    role: "support" | "counter" | "uncertain";
+    field_pointer: string | null;
+    excerpt: string | null;
+    source_hash: string;
+  }[];
+}
+
+export function createCase(payload: {
+  dataset_id: string;
+  title: string;
+  snapshot: Record<string, unknown>;
+}): Promise<CaseRecord> {
+  return sendJson("/api/cases", "POST", payload) as Promise<CaseRecord>;
+}
+
+export function fetchCaseById(caseId: string, signal?: AbortSignal): Promise<CaseRecord> {
+  return getJson(`/api/cases/${encodeURIComponent(caseId)}`, undefined, signal);
+}
+
+export function createFinding(payload: {
+  case_id: string;
+  claim: string;
+  status: FindingRecord["status"];
+  explanation: string;
+  limitations?: string | null;
+  evidence: EvidenceInput[];
+}): Promise<FindingRecord> {
+  return sendJson("/api/findings", "POST", payload) as Promise<FindingRecord>;
+}
+
+export function fetchFindings(caseId: string, signal?: AbortSignal): Promise<{
+  case_id: string;
+  items: FindingRecord[];
+  total: number;
+  status_counts: Record<string, number>;
+}> {
+  return getJson("/api/findings", { case_id: caseId }, signal);
+}
+
+export function deleteFinding(findingId: string): Promise<null> {
+  return sendJson(`/api/findings/${encodeURIComponent(findingId)}`, "DELETE");
+}
+
+export function fetchCases(signal?: AbortSignal): Promise<CaseListPayload> {
+  return getJson("/api/cases", { dataset: "CUSTOM" }, signal);
+}
+
+export function fetchCase(caseId: string, signal?: AbortSignal): Promise<CaseItem> {
+  return getJson(`/api/cases/${encodeURIComponent(caseId)}`, { dataset: "CUSTOM" }, signal);
+}
+
 // ---------------------------------------------------------------- MC2 文件与来源链
 
 export type ContentStatus = "available" | "metadata_only" | "unresolved";
@@ -811,6 +975,173 @@ export function fetchTrace(
     }),
     signal,
   );
+}
+
+export interface PatternStage {
+  stage: string;
+  label: string;
+  status: "present" | "missing" | "unknown";
+  support_kind?: string;
+  link_basis?: string;
+  event_ids?: string[];
+  sample_event_ids?: string[];
+  nearest_event_id?: string | null;
+  nearest_actor?: string | null;
+  nearest_lag_us?: number | null;
+  total?: number;
+  first_us?: number | null;
+  actor_labels?: string[];
+  note?: string;
+}
+
+export interface PatternChain {
+  post_event_id: string;
+  post_time_us: number;
+  post_actor_id: string | null;
+  post_actor_label: string | null;
+  content_file: { file_id: string; path: string; content_status: ContentStatus } | null;
+  instruction_file: { file_id: string; path: string } | null;
+  link_basis: string | null;
+  stages: PatternStage[];
+  matched_stages: number;
+  missing_stages: string[];
+  stage_total: number;
+  actor_count: number;
+  window_us: { start_us: number; end_us: number };
+  duration_us: number;
+}
+
+export interface PatternPayload {
+  dataset_id: string;
+  scope: string;
+  items: PatternChain[];
+  total: number;
+  stage_dictionary: { stage: string; label: string }[];
+  ordering: string;
+  link_basis_note: string;
+  note: string;
+}
+
+export interface InterventionPayload {
+  dataset_id: string;
+  position: string;
+  label: string;
+  predicate: { event_type: string; fields: string[]; condition: string; checkable_from_log: boolean };
+  coverage: {
+    post_event_id: string;
+    content_file: string | null;
+    present: boolean;
+    nearest_event_id: string | null;
+    nearest_actor: string | null;
+    nearest_lag_us: number | null;
+    relay_total: number;
+    partial_chain: boolean;
+    missing_stages: string[];
+  }[];
+  coverage_summary: { covered: number; denominator: number; partial_chains: number };
+  evidence_event_ids: string[];
+  impact: {
+    queue_events_total: number;
+    queue_events_with_file_path: number;
+    events_on_target_files: number;
+    events_on_other_files: number;
+    distinct_senders: number;
+    samples: { event_id: string; time_us: number; actor_label: string | null; path: string | null }[];
+    note: string;
+  };
+  cut_analysis: { deterministic_path_exists: boolean; explicit_parent_edges: number; statement: string };
+  limitations: string[];
+  extra_info_needed: string[];
+  constraint: string;
+}
+
+export interface SystemGroup {
+  group_id: string;
+  entity_type: string;
+  label: string;
+  member_count: number;
+  participation_count: number;
+  event_count?: number;
+  aggregated: boolean;
+  unresolved?: boolean;
+}
+
+export interface SystemEdge {
+  source: string;
+  target: string;
+  relation: string;
+  event_count: number;
+  sample_event_id: string | null;
+}
+
+export interface OrgEdge {
+  source: string;
+  target: string;
+  relation: string;
+  source_label: string;
+  target_label: string;
+  source_type: string | null;
+  target_type: string | null;
+  provenance_kind: string;
+  temporal_status: string;
+}
+
+export interface SystemOverviewPayload {
+  meta: Meta & { cache_hit: boolean; note: string };
+  dataset_id: string;
+  groups: SystemGroup[];
+  interaction_edges: SystemEdge[];
+  org_edges: OrgEdge[];
+  spotlight: { root_event_id: string; entities: { entity_id: string; role: string; entity_type: string | null; label: string; group_id: string }[]; groups: string[] } | null;
+  scale: {
+    events_total: number;
+    entities_total: number;
+    group_count: number;
+    unresolved_endpoints: number;
+    unresolved_event_count: number;
+    files_aggregated: number;
+    interaction_edges_total: number;
+    interaction_edges_returned: number;
+    org_edges_returned: number;
+    truncated: boolean;
+    reasons: string[];
+  };
+  notes: string[];
+}
+
+export interface GroupMembers {
+  dataset_id: string;
+  group_id: string;
+  entity_type: string;
+  members: { entity_id: string; label: string; event_count: number; group_id: string }[];
+  truncated: boolean;
+}
+
+export function fetchSystemOverview(traceRootId: string | null, signal?: AbortSignal): Promise<SystemOverviewPayload> {
+  return getJson(
+    "/api/system-overview",
+    { dataset: "MC2", trace_root_id: traceRootId ?? undefined },
+    signal,
+  );
+}
+
+export function fetchGroupMembers(
+  entityType: string,
+  limit = 20,
+  signal?: AbortSignal,
+): Promise<GroupMembers> {
+  return getJson("/api/system-overview/members", { dataset: "MC2", entity_type: entityType, limit }, signal);
+}
+
+export function fetchFilePostPatterns(beforeUs?: number | null, signal?: AbortSignal): Promise<PatternPayload> {
+  return getJson("/api/patterns/file-posts", { dataset: "MC2", before_us: beforeUs ?? undefined }, signal);
+}
+
+export function fetchIntervention(
+  position = "relay_queue",
+  signal?: AbortSignal,
+): Promise<InterventionPayload> {
+  return getJson("/api/interventions", { dataset: "MC2", position }, signal);
 }
 
 export function searchFiles(

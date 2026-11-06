@@ -24,6 +24,45 @@ CREATE TABLE IF NOT EXISTS notes (
     created_at     TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_notes_dataset ON notes(dataset_id, note_id DESC);
+
+-- 案例快照：保存一次分析的筛选、画布状态与固定证据，用于恢复
+CREATE TABLE IF NOT EXISTS case_snapshots (
+    case_id        TEXT PRIMARY KEY,
+    dataset_id     TEXT NOT NULL,
+    title          TEXT NOT NULL,
+    schema_version INTEGER NOT NULL,
+    data_version   TEXT NOT NULL,
+    snapshot_json  TEXT NOT NULL,
+    created_at     TEXT NOT NULL,
+    updated_at     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_cases_dataset ON case_snapshots(dataset_id, updated_at DESC);
+
+-- 结构化结论：一句主张 + 状态 + 解释 + 局限
+CREATE TABLE IF NOT EXISTS findings (
+    finding_id   TEXT PRIMARY KEY,
+    case_id      TEXT NOT NULL,
+    claim        TEXT NOT NULL,
+    status       TEXT NOT NULL,
+    explanation  TEXT NOT NULL,
+    limitations  TEXT,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_findings_case ON findings(case_id, finding_id);
+
+-- 多证据引用：support / counter / uncertain，引用主库事件时记录 source_hash
+CREATE TABLE IF NOT EXISTS finding_evidence (
+    finding_id     TEXT NOT NULL,
+    dataset_id     TEXT NOT NULL,
+    reference_kind TEXT NOT NULL,
+    reference_id   TEXT NOT NULL,
+    role           TEXT NOT NULL,
+    field_pointer  TEXT,
+    excerpt        TEXT,
+    source_hash    TEXT NOT NULL,
+    PRIMARY KEY (finding_id, dataset_id, reference_kind, reference_id, role)
+);
 """
 
 

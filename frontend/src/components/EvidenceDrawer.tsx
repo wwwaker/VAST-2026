@@ -4,6 +4,7 @@ import { fetchDatasets, fetchEvent, type EventDetail } from "../data/api";
 import { annotationBadge, badgeClass } from "../data/labels";
 import { DualChannel } from "./DualChannel";
 import { NotesPanel } from "./NotesPanel";
+import { EvidenceBasket } from "./EvidenceBasket";
 
 /** 证据分层标签：把"数据里记了什么"和"我们推断出什么"分开呈现 */
 function ProvenanceTag({ kind }: { kind: "observed" | "derived" | "hint" | "conclusion" }) {
@@ -31,6 +32,7 @@ export function EvidenceDrawer() {
     removeNote,
     focusEntity,
     openTrace,
+    addToBasket,
   } = useWorkspace();
 
   const [event, setEvent] = useState<EventDetail | null>(null);
@@ -96,6 +98,7 @@ export function EvidenceDrawer() {
           { key: "message", label: "消息" },
           { key: "related", label: "关联" },
           { key: "raw", label: "原始记录" },
+          { key: "basket", label: "证据篮" },
           { key: "notes", label: "笔记" },
         ].map((t) => (
           <button
@@ -112,7 +115,9 @@ export function EvidenceDrawer() {
       </div>
 
       <div className="drawer-body">
-        {evidenceTab === "notes" ? (
+        {evidenceTab === "basket" ? (
+          <EvidenceBasket />
+        ) : evidenceTab === "notes" ? (
           <NotesPanel
             notes={notes}
             loading={notesLoading}
@@ -165,6 +170,35 @@ export function EvidenceDrawer() {
                 </>
               )}
             </dl>
+
+            <div className="basket-add">
+              <span className="muted small">加入证据篮：</span>
+              {(
+                [
+                  { role: "support", label: "支持" },
+                  { role: "counter", label: "反证" },
+                  { role: "uncertain", label: "待核实" },
+                ] as const
+              ).map((item) => (
+                <button
+                  key={item.role}
+                  type="button"
+                  className="btn btn-quiet"
+                  onClick={() =>
+                    addToBasket({
+                      event_id: event.event_id,
+                      dataset,
+                      role: item.role,
+                      label: event.event_type,
+                      excerpt: (event.outgoing_text ?? "").slice(0, 120),
+                    })
+                  }
+                  title="加入后可切到「证据篮」写结论"
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
 
             {dataset === "MC1" ? (
               <DualChannel event={event} coverage={coverage} />

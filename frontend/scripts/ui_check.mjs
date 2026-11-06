@@ -170,6 +170,49 @@ const customState = await page.evaluate(() => ({
 console.log("[CUSTOM]", JSON.stringify(customState));
 await page.screenshot({ path: path.join(OUT, "ui-custom.png") });
 
+console.log("== CUSTOM 冻结案例 ==");
+await page.waitForSelector(".case-chip", { timeout: 15000 });
+const caseState = await page.evaluate(() => {
+  const chips = [...document.querySelectorAll(".case-chip")];
+  const bad = [...document.querySelectorAll(".case-chip .tag-warn, .case-chip .tag-risk")];
+  return {
+    count: chips.length,
+    ok: document.querySelectorAll(".case-chip .tag-ok").length,
+    titles: chips.map((chip) => chip.querySelector(".case-title")?.textContent?.trim()),
+    flagged: bad.map((node) => node.textContent?.trim()),
+  };
+});
+if (caseState.count !== 5) throw new Error(`冻结案例应为 5 条，实际 ${caseState.count}`);
+if (caseState.ok !== 5) throw new Error(`案例状态不是全部一致：${JSON.stringify(caseState)}`);
+console.log("[冻结案例]", JSON.stringify(caseState));
+await page.screenshot({ path: path.join(OUT, "ui-cases.png") });
+
+// 点“审批绕过”必须直接进入它冻结的对照，而不是自动挑一个别的正常运行
+await page.evaluate(() => {
+  const chip = [...document.querySelectorAll(".case-chip")].find((node) =>
+    node.textContent?.includes("审批绕过"),
+  );
+  chip?.click();
+});
+await page.waitForSelector(".run-compare", { timeout: 20000 });
+await wait(600);
+const caseCompare = await page.evaluate(() => ({
+  pair: document.querySelector(".run-compare .run-detail-head p")?.textContent?.trim() ?? "",
+  auto: (document.querySelector(".run-compare .run-detail-head p")?.textContent ?? "").includes("自动选择"),
+}));
+if (!caseCompare.pair.includes("run-06309bfc") || !caseCompare.pair.includes("run-93d3d84d")) {
+  throw new Error(`案例对照未使用冻结配对：${caseCompare.pair}`);
+}
+console.log("[案例对照]", JSON.stringify(caseCompare));
+await page.screenshot({ path: path.join(OUT, "ui-case-compare.png") });
+
+// 回到运行列表，继续测运行级筛选
+await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
+await page.waitForSelector(".stream-row", { timeout: 20000 });
+await page.select(".topbar select", "CUSTOM");
+await page.waitForSelector(".run-row-button", { timeout: 15000 });
+await wait(600);
+
 console.log("== CUSTOM 运行级筛选 ==");
 await page.evaluate(() => document.querySelector(".run-row-button")?.click());
 await page.waitForSelector(".run-detail-head", { timeout: 15000 });
@@ -263,6 +306,41 @@ const graph2 = await page.evaluate(() => document.querySelector(".graph-head p")
 console.log("[切换中心]", graph2);
 await page.screenshot({ path: path.join(OUT, "ui-graph2.png") });
 
+console.log("== MC2 系统背景 ==");
+await page.evaluate(() => {
+  const btn = [...document.querySelectorAll(".canvas-subbar .seg-item")].find((b) =>
+    b.textContent?.includes("系统背景"),
+  );
+  btn?.click();
+});
+await page.waitForSelector(".system-canvas", { timeout: 20000 });
+await wait(900);
+const systemMap = await page.evaluate(() => ({
+  nodes: document.querySelectorAll(".system-node").length,
+  edges: document.querySelectorAll(".system-canvas path").length,
+  caption: document.querySelector(".system-map .trace-head .muted")?.textContent?.trim(),
+  spotlight: !!document.querySelector(".system-map .callout .role-chip"),
+  orgItems: document.querySelectorAll(".org-list li").length,
+}));
+if (systemMap.nodes < 8) throw new Error(`系统背景应聚合出至少 8 个组，实际 ${systemMap.nodes}`);
+if (!systemMap.caption?.includes("聚合成")) throw new Error(`缺少聚合说明：${systemMap.caption}`);
+console.log("[系统背景]", JSON.stringify(systemMap));
+await page.screenshot({ path: path.join(OUT, "ui-system-map.png") });
+
+// 展开一个组：只返回真实实体 ID，成员数与聚合数一致
+await page.evaluate(() => {
+  const nodes = [...document.querySelectorAll(".system-node")];
+  const target = nodes.find((n) => n.textContent?.includes("Agent 执行者")) ?? nodes[0];
+  target?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+});
+await page.waitForSelector(".system-side .trace-item", { timeout: 15000 });
+const expanded = await page.evaluate(() => ({
+  members: document.querySelectorAll(".system-side .trace-item").length,
+  first: document.querySelector(".system-side .trace-item .mono")?.textContent?.trim(),
+}));
+console.log("[展开组]", JSON.stringify(expanded));
+await page.screenshot({ path: path.join(OUT, "ui-system-expand.png") });
+
 console.log("== MC2 来源链 ==");
 await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
 await page.waitForSelector(".stream-row", { timeout: 20000 });
@@ -271,13 +349,13 @@ await page.evaluate(() => {
   tab?.click();
 });
 await page.waitForSelector(".trace-view", { timeout: 15000 });
-await page.waitForSelector(".canvas-subbar .seg-item", { timeout: 15000 });
+await page.waitForSelector(".trace-roots .seg-item", { timeout: 15000 });
 // 用第一个日志明确记录的 content_source 事件作为链根
-await page.evaluate(() => document.querySelector(".canvas-subbar .seg-item")?.click());
+await page.evaluate(() => document.querySelector(".trace-roots .seg-item")?.click());
 await page.waitForSelector(".trace-lanes", { timeout: 15000 });
 await wait(600);
 const traceState = await page.evaluate(() => ({
-  chips: document.querySelectorAll(".canvas-subbar .seg-item").length,
+  chips: document.querySelectorAll(".trace-roots .seg-item").length,
   hasCandidate: !!document.querySelector(".trace-chain .tag-warn"),
   status: [...document.querySelectorAll(".trace-chain .callout code")].map((n) => n.textContent?.trim()),
   recorded: document.querySelector(".trace-head .muted")?.textContent?.trim(),
@@ -305,6 +383,44 @@ const fileTrack = await page.evaluate(() => ({
 if (fileTrack.status !== "仅有元数据") throw new Error(`文件轨迹状态文案异常：${fileTrack.status}`);
 console.log("[文件轨迹]", JSON.stringify(fileTrack));
 await page.screenshot({ path: path.join(OUT, "ui-file-track.png") });
+
+console.log("== MC2 历史实例与干预论证 ==");
+await page.evaluate(() => {
+  const btn = [...document.querySelectorAll(".canvas-subbar .seg-item")].find((b) =>
+    b.textContent?.includes("历史实例"),
+  );
+  btn?.click();
+});
+await page.waitForSelector(".pattern-table", { timeout: 15000 });
+await wait(500);
+const patterns = await page.evaluate(() => ({
+  columns: document.querySelectorAll(".pattern-table thead th").length,
+  rows: document.querySelectorAll(".pattern-table tbody tr").length,
+  missing: document.querySelectorAll(".pattern-missing").length,
+  present: document.querySelectorAll(".pattern-present").length,
+}));
+if (patterns.columns !== 4) throw new Error(`历史实例应有 3 条链 + 阶段列，实际 ${patterns.columns}`);
+if (patterns.missing < 2) throw new Error(`应保留缺失阶段单元格，实际 ${patterns.missing}`);
+console.log("[历史实例]", JSON.stringify(patterns));
+await page.screenshot({ path: path.join(OUT, "ui-patterns.png") });
+
+await page.evaluate(() => {
+  const btn = [...document.querySelectorAll(".canvas-subbar .seg-item")].find((b) =>
+    b.textContent?.includes("干预论证"),
+  );
+  btn?.click();
+});
+await page.waitForSelector(".intervention-view", { timeout: 15000 });
+await wait(600);
+const intervention = await page.evaluate(() => ({
+  coverage: document.querySelector(".intervention-view h3")?.textContent ?? "",
+  cut: document.querySelector(".intervention-view .callout-warn strong")?.textContent ?? "",
+  rows: document.querySelectorAll(".intervention-view .pattern-table tbody tr").length,
+}));
+if (!intervention.coverage.includes("3/3")) throw new Error(`覆盖应为 3/3：${intervention.coverage}`);
+if (!intervention.cut.includes("无法")) throw new Error(`切断证明应明确拒绝：${intervention.cut}`);
+console.log("[干预论证]", JSON.stringify(intervention));
+await page.screenshot({ path: path.join(OUT, "ui-intervention.png") });
 
 // 切到 MC1 时来源链标签必须消失，避免把 MC2 的链画到别的数据集上
 await page.select(".topbar select", "MC1");
@@ -443,6 +559,78 @@ await page.keyboard.press("/");
 await wait(300);
 const focused = await page.evaluate(() => document.activeElement?.tagName + ":" + document.activeElement?.getAttribute("type"));
 console.log(`[/] 焦点=${focused}`);
+
+console.log("== 证据篮与结论导出 ==");
+await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
+await page.waitForSelector(".stream-row", { timeout: 20000 });
+const caseTitle = `自检案例 ${Date.now()}`;
+let caseId = null;
+try {
+  const rows5 = await page.$$(".stream-row");
+  await rows5[0].click();
+  await wait(500);
+  // 加入证据篮（支持）
+  await page.waitForSelector(".basket-add .btn", { timeout: 10000 });
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll(".basket-add .btn")].find((b) => b.textContent?.includes("支持"));
+    btn?.click();
+  });
+  // 切到证据篮页
+  await page.evaluate(() => {
+    const tab = [...document.querySelectorAll(".tabs .tab")].find((t) => t.textContent?.includes("证据篮"));
+    tab?.click();
+  });
+  await page.waitForSelector(".basket", { timeout: 10000 });
+  const basketCount = await page.evaluate(() => document.querySelectorAll(".basket .trace-list li").length);
+  if (basketCount < 1) throw new Error("证据篮里没有条目");
+
+  // 保存案例
+  await page.type(".basket > .callout input.text-input", caseTitle);
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll(".basket .btn")].find((b) => b.textContent?.includes("保存当前案例"));
+    btn?.click();
+  });
+  await page.waitForFunction(
+    () => document.querySelector(".basket .callout strong")?.textContent?.includes("自检案例"),
+    { timeout: 15000 },
+  );
+  caseId = await page.evaluate(() => document.querySelector(".basket .callout .mono")?.textContent?.trim() ?? "");
+  if (!caseId.startsWith("case-")) throw new Error(`案例 ID 异常：${caseId}`);
+
+  // 写结论
+  await page.type(".finding-form input.text-input", "自检主张：来源文件可追踪");
+  await page.type(".finding-form textarea", "证据来自 post_content_source 关系");
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll(".finding-form .btn")].find((b) => b.textContent?.includes("保存结论"));
+    btn?.click();
+  });
+  await page.waitForFunction(
+    (text) => [...document.querySelectorAll(".finding-list strong")].some((n) => n.textContent?.includes(text)),
+    { timeout: 15000 },
+    "自检主张",
+  );
+  const findingState = await page.evaluate(() => ({
+    findings: document.querySelectorAll(".finding-list li").length,
+    message: document.querySelector(".basket > p.muted")?.textContent?.trim() ?? "",
+    evidence: document.querySelector(".finding-list li .muted")?.textContent?.trim() ?? "",
+  }));
+  console.log("[证据篮]", JSON.stringify({ basketCount, caseId, ...findingState }));
+  await page.screenshot({ path: path.join(OUT, "ui-basket.png") });
+
+  // 导出 Markdown 必须包含主张、证据与数据版本
+  const response = await fetch(`${URL}/api/cases/${caseId}/export?format=md`);
+  const markdown = await response.text();
+  if (!markdown.includes("自检主张")) throw new Error("导出缺少主张");
+  if (!markdown.includes("数据版本")) throw new Error("导出缺少数据版本");
+  if (!markdown.includes("MC2:event:")) throw new Error("导出缺少证据引用");
+  console.log(`[导出] ${response.status} · ${markdown.length} 字符 · 含主张/版本/证据`);
+} finally {
+  // 自检产生的用户案例必须清掉，避免污染 notes.db
+  if (caseId) {
+    const removed = await fetch(`${URL}/api/cases/${caseId}`, { method: "DELETE" });
+    console.log(`[清理] 删除自检案例 ${caseId} → ${removed.status}`);
+  }
+}
 
 console.log("== 渲染基准 ==");
 await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });

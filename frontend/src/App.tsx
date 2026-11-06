@@ -11,12 +11,12 @@ import { TimeBrush } from "./components/TimeBrush";
 import { EvidenceDrawer } from "./components/EvidenceDrawer";
 import { EventStream } from "./components/EventStream";
 import { OverviewView } from "./views/OverviewView";
-import { RelationGraph } from "./views/RelationGraph";
 import { CompareView } from "./views/CompareView";
 import { ShortcutsHelp } from "./components/ShortcutsHelp";
 import { useHotkeys } from "./hooks/useHotkeys";
 import { RenderBenchView } from "./views/RenderBenchView";
 import { CustomWorkspace } from "./views/custom/CustomWorkspace";
+import { GraphWorkspace } from "./views/GraphWorkspace";
 import { SourceTrace } from "./views/mc2/SourceTrace";
 
 const VIEWS: { key: CanvasView; label: string; hint: string; only?: DatasetId[] }[] = [
@@ -122,7 +122,7 @@ function Workspace() {
               </div>
               {canvasView === "timeline" &&
                 (dataset === "CUSTOM" ? <CustomWorkspace /> : <OverviewView />)}
-              {canvasView === "graph" && <RelationGraph />}
+              {canvasView === "graph" && <GraphWorkspace />}
               {canvasView === "compare" && <CompareView />}
               {canvasView === "trace" && dataset === "MC2" && <SourceTrace />}
             </>

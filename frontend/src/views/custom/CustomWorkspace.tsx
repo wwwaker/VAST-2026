@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useWorkspace } from "../../state/workspace";
 import { OverviewView } from "../OverviewView";
+import { CasePicker } from "./CasePicker";
 import { RunOverview } from "./RunOverview";
 import { RunTimeline } from "./RunTimeline";
 import { RunCompare } from "./RunCompare";
@@ -9,36 +10,29 @@ type Mode = "runs" | "run" | "compare";
 
 /** CUSTOM：默认按运行浏览；系统总览保留为可切换的全量背景。 */
 export function CustomWorkspace() {
-  const { clearFilters, filters, setFilters, setCursor, selectEvent } = useWorkspace();
+  const { clearFilters, setCursor, selectEvent, setFilters } = useWorkspace();
   const [mode, setMode] = useState<Mode>("runs");
   const [runId, setRunId] = useState<string | null>(null);
+  const [baselineRunId, setBaselineRunId] = useState<string | null>(null);
   const [showOverview, setShowOverview] = useState(false);
 
-  const openRun = (id: string) => {
-    // 进入运行即建立该运行的上下文：清掉局部筛选与事件选择，再把 run_id 写进统一筛选。
-    // 写进筛选而不是只存本地 state，右侧事件流、概览、关系图才会与画布同域。
+  const openRun = (id: string, baseline: string | null = null) => {
+    // 进入运行即建立该运行的上下文：清掉旧条件，并把 run_id 写进统一筛选，
+    // 否则画布只看这一次运行、右侧事件流仍是全量，两个口径会对不上
     clearFilters();
     setFilters({ runId: id });
     selectEvent(null);
     setCursor(null);
     setRunId(id);
-    setMode("run");
+    setBaselineRunId(baseline);
+    setMode(baseline ? "compare" : "run");
   };
 
   const backToList = () => {
     setMode("runs");
     setRunId(null);
-    setFilters({ runId: null });
-    setCursor(null);
+    setBaselineRunId(null);
   };
-
-  // 外部清空筛选（状态栏、“清空筛选”）时退出运行，避免画布与事件流口径不一致
-  useEffect(() => {
-    if (filters.runId == null && mode !== "runs") {
-      setMode("runs");
-      setRunId(null);
-    }
-  }, [filters.runId, mode]);
 
   return (
     <div className="custom-workspace">
@@ -68,22 +62,31 @@ export function CustomWorkspace() {
 
       {showOverview ? (
         <OverviewView />
-      ) : mode === "runs" ? (
-        <RunOverview onOpen={openRun} />
-      ) : mode === "compare" && runId ? (
-        <RunCompare runId={runId} onBack={() => setMode("run")} />
-      ) : runId ? (
-        <RunTimeline
-          runId={runId}
-          onBack={backToList}
-          onCompare={(id) => {
-            setRunId(id);
-            setFilters({ runId: id });
-            setMode("compare");
-          }}
-        />
       ) : (
-        <div className="empty-state"><p className="muted">请选择一个运行。</p></div>
+        <>
+          <CasePicker onOpen={openRun} />
+          {mode === "runs" ? (
+            <RunOverview onOpen={openRun} />
+          ) : mode === "compare" && runId ? (
+            <RunCompare
+              runId={runId}
+              baselineRunId={baselineRunId}
+              onBack={() => setMode("run")}
+            />
+          ) : runId ? (
+            <RunTimeline
+              runId={runId}
+              onBack={backToList}
+              onCompare={(id) => {
+                setRunId(id);
+                setBaselineRunId(null);
+                setMode("compare");
+              }}
+            />
+          ) : (
+            <div className="empty-state"><p className="muted">请选择一个运行。</p></div>
+          )}
+        </>
       )}
     </div>
   );

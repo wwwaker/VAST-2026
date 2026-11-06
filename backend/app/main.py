@@ -17,15 +17,19 @@ from .config import DB_PATH, FRONTEND_DIST
 from .ingest import schema
 from .notes_store import ensure_schema as ensure_notes_schema
 from .routers import (
+    cases,
     compare,
     datasets,
     entities,
     events,
     files,
+    findings,
     graph,
     notes,
+    patterns,
     runs,
     search,
+    system_overview,
     traces,
 )
 
@@ -52,6 +56,10 @@ app.include_router(search.router)
 app.include_router(runs.router)
 app.include_router(files.router)
 app.include_router(traces.router)
+app.include_router(patterns.router)
+app.include_router(system_overview.router)
+app.include_router(cases.router)
+app.include_router(findings.router)
 
 # 笔记存在独立的库文件里，启动时建表即可，与数据导入互不影响
 ensure_notes_schema()

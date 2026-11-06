@@ -2300,3 +2300,296 @@ code {
   flex-wrap: wrap;
   margin-top: 6px;
 }
+
+/* ---------------------------------------------------------------- MC2 历史实例与干预 */
+
+.pattern-view,
+.intervention-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.pattern-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.pattern-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+
+.pattern-table th,
+.pattern-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--grid);
+  text-align: left;
+  vertical-align: top;
+}
+
+.pattern-table thead th {
+  background: var(--panel);
+  position: sticky;
+  top: 0;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pattern-table tbody th {
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.pattern-table tbody tr:last-child th,
+.pattern-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.pattern-missing {
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.pattern-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 120px;
+}
+
+.pattern-present {
+  color: var(--ok);
+  font-size: 11px;
+}
+
+.pattern-events {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.pattern-event {
+  font-size: 10.5px;
+  padding: 0 4px;
+}
+
+.compare-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-2);
+}
+
+.intervention-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+/* ---------------------------------------------------------------- MC2 系统背景地图 */
+
+.graph-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.system-map {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.system-map-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+
+/* 画布宽度会随两侧停靠板变化，地图固定在上、说明在下，避免 svg 被压到读不出字 */
+.system-side {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-2) var(--space-4);
+  align-items: start;
+}
+
+.system-side > h3,
+.system-side > p {
+  grid-column: 1 / -1;
+}
+
+.system-canvas {
+  width: 100%;
+  height: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.system-node {
+  cursor: pointer;
+}
+
+.system-node:focus-visible circle {
+  outline: 2px solid var(--accent);
+}
+
+.system-side h3 {
+  margin: var(--space-2) 0 0;
+  font-size: 12.5px;
+}
+
+.org-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ---------------------------------------------------------------- CUSTOM 冻结案例 */
+
+.case-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  background: var(--panel);
+}
+
+.case-picker-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.case-chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-2);
+}
+
+.case-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+  padding: 6px 8px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.case-chip:hover,
+.case-chip:focus-visible {
+  background: var(--selection);
+}
+
+.case-chip-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.case-title {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.case-meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ---------------------------------------------------------------- 证据篮与结论 */
+
+.basket {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  overflow: auto;
+}
+
+.basket h3 {
+  margin: var(--space-2) 0 0;
+  font-size: 12.5px;
+}
+
+.basket-add {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--grid);
+  border-bottom: 1px solid var(--grid);
+}
+
+.finding-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.finding-form .text-input {
+  width: 100%;
+  font: inherit;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  resize: vertical;
+}
+
+.finding-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.finding-list li {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.finding-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.basket a.btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}

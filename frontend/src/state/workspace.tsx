@@ -22,7 +22,21 @@ export type { Filters };
 /** 主画布视图：共享同一套筛选与选中状态；trace 仅 MC2 可用 */
 export type CanvasView = "timeline" | "graph" | "compare" | "trace";
 
-export type EvidenceTab = "message" | "related" | "raw" | "notes";
+export type EvidenceTab = "message" | "related" | "raw" | "notes" | "basket";
+
+/** 证据篮条目：只保存引用与角色，不复制事件内容 */
+export interface BasketItem {
+  event_id: string;
+  dataset: DatasetId;
+  role: "support" | "counter" | "uncertain";
+  label: string;
+  excerpt: string;
+}
+
+export interface ActiveCase {
+  case_id: string;
+  title: string;
+}
 
 interface WorkspaceValue {
   dataset: DatasetId;
@@ -64,6 +78,14 @@ interface WorkspaceValue {
   masking: boolean;
   setMasking: (on: boolean) => void;
 
+  /** 证据篮与当前案例：结论必须挂在一个案例上，证据来自篮内引用 */
+  basket: BasketItem[];
+  addToBasket: (item: BasketItem) => void;
+  removeFromBasket: (eventId: string, role: BasketItem["role"]) => void;
+  clearBasket: () => void;
+  activeCase: ActiveCase | null;
+  setActiveCase: (value: ActiveCase | null) => void;
+
   /** 笔记存在后端，刷新页面不丢 */
   notes: NoteItem[];
   notesLoading: boolean;
@@ -93,6 +115,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [masking, setMasking] = useState(true);
   const [notes, setNotes] = useState<NoteItem[]>([]);
   const [notesLoading, setNotesLoading] = useState(false);
+  const [basket, setBasket] = useState<BasketItem[]>([]);
+  const [activeCase, setActiveCase] = useState<ActiveCase | null>(null);
 
   /** 切换数据集必须清空调查状态：时间轴不可比，旧的焦点/运行/游标会串到新数据集 */
   const setDataset = useCallback((id: DatasetId) => {
@@ -103,6 +127,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setFocusedEntityId(null);
     setTraceRootId(null);
     setTraceFileId(null);
+    // 一条结论只能用一个数据集的证据，换数据集时清空篮子与当前案例
+    setBasket([]);
+    setActiveCase(null);
     setEvidenceOpen(false);
     setCursor(null);
     setPlaying(false);
@@ -120,6 +147,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setSelectedEventAt(id ? (atUs ?? null) : null);
     if (id) setEvidenceOpen(true);
   }, []);
+
+  const addToBasket = useCallback((item: BasketItem) => {
+    setBasket((prev) => {
+      const exists = prev.some((entry) => entry.event_id === item.event_id && entry.role === item.role);
+      return exists ? prev : [...prev, item];
+    });
+  }, []);
+
+  const removeFromBasket = useCallback((eventId: string, role: BasketItem["role"]) => {
+    setBasket((prev) => prev.filter((entry) => !(entry.event_id === eventId && entry.role === role)));
+  }, []);
+
+  const clearBasket = useCallback(() => setBasket([]), []);
 
   const focusEntity = useCallback(
     (id: string | null, options?: { switchView?: boolean }) => {
@@ -204,6 +244,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       traceRootId,
       traceFileId,
       openTrace,
+      basket,
+      addToBasket,
+      removeFromBasket,
+      clearBasket,
+      activeCase,
+      setActiveCase,
       evidenceOpen,
       setEvidenceOpen,
       evidenceTab,
@@ -238,6 +284,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       traceRootId,
       traceFileId,
       openTrace,
+      basket,
+      addToBasket,
+      removeFromBasket,
+      clearBasket,
+      activeCase,
       evidenceOpen,
       evidenceTab,
       cursor,

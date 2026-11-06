@@ -7,14 +7,23 @@ function value(value: unknown): string {
   return String(value);
 }
 
-export function RunCompare({ runId, onBack }: { runId: string; onBack: () => void }) {
+export function RunCompare({
+  runId,
+  baselineRunId = null,
+  onBack,
+}: {
+  runId: string;
+  /** 冻结案例会指定对照；为空时后端按 run_pairs 自动选已核验的正常对照 */
+  baselineRunId?: string | null;
+  onBack: () => void;
+}) {
   const [payload, setPayload] = useState<RunComparisonPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
     setError(null);
-    fetchRunComparison(runId, null, controller.signal)
+    fetchRunComparison(runId, baselineRunId, controller.signal)
       .then((data) => {
         if (!controller.signal.aborted) setPayload(data);
       })
@@ -22,7 +31,7 @@ export function RunCompare({ runId, onBack }: { runId: string; onBack: () => voi
         if (!controller.signal.aborted) setError(err instanceof Error ? err.message : "读取失败");
       });
     return () => controller.abort();
-  }, [runId]);
+  }, [runId, baselineRunId]);
 
   if (error) {
     return (

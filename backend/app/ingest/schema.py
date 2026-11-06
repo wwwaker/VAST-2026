@@ -201,10 +201,14 @@ CREATE INDEX IF NOT EXISTS idx_part_entity      ON participants(dataset_id, enti
 CREATE INDEX IF NOT EXISTS idx_part_entity_us   ON participants(dataset_id, entity_id, time_sort_us);
 CREATE INDEX IF NOT EXISTS idx_part_event       ON participants(dataset_id, event_id);
 CREATE INDEX IF NOT EXISTS idx_part_event_entity ON participants(dataset_id, event_id, entity_id);
+-- 按实体统计去重事件数；缺它时每条 participants 都要回表（实测 875 ms）
+CREATE INDEX IF NOT EXISTS idx_part_entity_event ON participants(dataset_id, entity_id, event_id);
 CREATE INDEX IF NOT EXISTS idx_rel_src          ON relations(dataset_id, src_id);
 CREATE INDEX IF NOT EXISTS idx_rel_dst          ON relations(dataset_id, dst_id);
 -- 事件详情按事件取关系边，缺索引会退化为全表扫描（实测 1.1s）
 CREATE INDEX IF NOT EXISTS idx_rel_event        ON relations(dataset_id, event_id);
+-- 按关系类型筛选文件轨迹/来源链；缺索引时每次全扫 relations（实测 40–60 ms/次）
+CREATE INDEX IF NOT EXISTS idx_rel_relation     ON relations(dataset_id, relation);
 -- 允许用 source_record_id 反查事件（MC1 的 responding_to 就指向它）
 CREATE INDEX IF NOT EXISTS idx_events_srcid     ON events(dataset_id, source_record_id);
 CREATE INDEX IF NOT EXISTS idx_events_file      ON events(dataset_id, source_file);

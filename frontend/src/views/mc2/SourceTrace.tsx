@@ -12,6 +12,16 @@ import {
 } from "../../data/api";
 import { filterKey } from "../../data/filterContext";
 import { FileTrack } from "./FileTrack";
+import { PatternCompare } from "./PatternCompare";
+import { InterventionPanel } from "./InterventionPanel";
+
+type TraceMode = "chain" | "patterns" | "intervention";
+
+const MODES: { key: TraceMode; label: string }[] = [
+  { key: "chain", label: "目标链" },
+  { key: "patterns", label: "历史实例" },
+  { key: "intervention", label: "干预论证" },
+];
 
 const W = 1000;
 const H = 190;
@@ -40,6 +50,7 @@ export function SourceTrace() {
   const [payload, setPayload] = useState<TracePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<TraceMode>("chain");
 
   const rootId = traceRootId ?? selectedEventId;
 
@@ -111,6 +122,27 @@ export function SourceTrace() {
   return (
     <div className="trace-view">
       <div className="canvas-subbar">
+        <div className="seg" role="tablist" aria-label="来源链子模式">
+          {MODES.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              className={`seg-item${mode === item.key ? " seg-active" : ""}`}
+              onClick={() => setMode(item.key)}
+              aria-pressed={mode === item.key}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {mode === "patterns" && <PatternCompare />}
+      {mode === "intervention" && <InterventionPanel />}
+
+      {mode === "chain" && (
+        <>
+      <div className="canvas-subbar trace-roots">
         <div className="seg">
           {roots.map((item) => (
             <button
@@ -360,6 +392,8 @@ export function SourceTrace() {
               )}
             </div>
           </div>
+        </>
+      )}
         </>
       )}
     </div>
