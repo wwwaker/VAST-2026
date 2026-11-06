@@ -18,6 +18,7 @@ import { RenderBenchView } from "./views/RenderBenchView";
 import { CustomWorkspace } from "./views/custom/CustomWorkspace";
 import { GraphWorkspace } from "./views/GraphWorkspace";
 import { SourceTrace } from "./views/mc2/SourceTrace";
+import { Mc1Workspace } from "./views/mc1/Mc1Workspace";
 
 const VIEWS: { key: CanvasView; label: string; hint: string; only?: DatasetId[] }[] = [
   { key: "timeline", label: "事件时间线", hint: "按时间建立基线，刷选时段" },
@@ -121,7 +122,13 @@ function Workspace() {
                 <ViewTabs />
               </div>
               {canvasView === "timeline" &&
-                (dataset === "CUSTOM" ? <CustomWorkspace /> : <OverviewView />)}
+                (dataset === "CUSTOM" ? (
+                  <CustomWorkspace />
+                ) : dataset === "MC1" ? (
+                  <Mc1Workspace />
+                ) : (
+                  <OverviewView />
+                ))}
               {canvasView === "graph" && <GraphWorkspace />}
               {canvasView === "compare" && <CompareView />}
               {canvasView === "trace" && dataset === "MC2" && <SourceTrace />}

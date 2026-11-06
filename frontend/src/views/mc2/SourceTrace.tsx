@@ -14,13 +14,15 @@ import { filterKey } from "../../data/filterContext";
 import { FileTrack } from "./FileTrack";
 import { PatternCompare } from "./PatternCompare";
 import { InterventionPanel } from "./InterventionPanel";
+import { TransitionMatrix } from "./TransitionMatrix";
 
-type TraceMode = "chain" | "patterns" | "intervention";
+type TraceMode = "chain" | "patterns" | "intervention" | "matrix";
 
 const MODES: { key: TraceMode; label: string }[] = [
   { key: "chain", label: "目标链" },
   { key: "patterns", label: "历史实例" },
   { key: "intervention", label: "干预论证" },
+  { key: "matrix", label: "转移矩阵" },
 ];
 
 const W = 1000;
@@ -139,6 +141,7 @@ export function SourceTrace() {
 
       {mode === "patterns" && <PatternCompare />}
       {mode === "intervention" && <InterventionPanel />}
+      {mode === "matrix" && <TransitionMatrix />}
 
       {mode === "chain" && (
         <>

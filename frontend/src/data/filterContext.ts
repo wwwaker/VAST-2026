@@ -13,6 +13,8 @@ export interface Filters {
   participantId: string | null;
   /** 仅 CUSTOM */
   runId: string | null;
+  /** 精确 channel_id；MC1 的公开/内部渠道切换走这里 */
+  channels: string[];
   keyword: string;
 }
 
@@ -24,6 +26,7 @@ export const EMPTY_FILTERS: Filters = {
   actorId: null,
   participantId: null,
   runId: null,
+  channels: [],
   keyword: "",
 };
 
@@ -39,6 +42,7 @@ export function toApiFilters(filters: Filters): Record<string, QueryValue> {
     actor: filters.actorId ?? undefined,
     participant: filters.participantId ?? undefined,
     run_id: filters.runId ?? undefined,
+    channels: filters.channels.length ? filters.channels.join(",") : undefined,
     q: keyword || undefined,
   };
 }
@@ -57,6 +61,7 @@ export function hasActiveFilters(filters: Filters): boolean {
       filters.actorId ||
       filters.participantId ||
       filters.runId ||
+      filters.channels.length ||
       filters.keyword.trim(),
   );
 }
@@ -74,6 +79,9 @@ export function describeFilters(filters: Filters): string {
   if (filters.participantId) parts.push(`参与者 ${filters.participantId}`);
   // 运行 ID 很长（run-<32 位>），摘要里只显示可辨认的前 8 位
   if (filters.runId) parts.push(`运行 ${filters.runId.replace(/^run-/, "").slice(0, 8)}`);
+  if (filters.channels.length) {
+    parts.push(`渠道 ${filters.channels.map((item) => item.split(":").pop()).join("/")}`);
+  }
   if (filters.keyword.trim()) parts.push(`关键词「${filters.keyword.trim()}」`);
   return parts.length ? parts.join(" · ") : "无筛选（全量数据）";
 }

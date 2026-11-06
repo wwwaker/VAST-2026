@@ -234,12 +234,51 @@ if (!Number.isFinite(laneEvents) || streamMatched !== laneEvents) {
 }
 console.log(`[运行级筛选] 摘要=${runState.summary} · 画布 ${laneEvents} 条 = 事件流 ${streamMatched} 条`);
 await page.screenshot({ path: path.join(OUT, "ui-custom-run.png") });
+
+// 「与正常对照比较」入口：必须能从有已核验配对的运行进入对照
 await page.evaluate(() => {
   const back = [...document.querySelectorAll(".run-detail-tools .btn")].find((b) =>
     b.textContent?.includes("返回运行列表"),
   );
   back?.click();
 });
+await page.waitForSelector(".run-row-button", { timeout: 15000 });
+const runsPayload = await (await fetch(`${URL}/api/runs?dataset=CUSTOM`)).json();
+const pairedRun = (runsPayload.items ?? []).find((item) => item.has_pair);
+if (!pairedRun) throw new Error("没有可用于「与正常对照比较」的已核验配对运行");
+await page.evaluate((runId) => {
+  const row = [...document.querySelectorAll(".run-row-button")].find((n) =>
+    (n.getAttribute("title") ?? "").includes(runId),
+  );
+  row?.click();
+}, pairedRun.run_id);
+await page.waitForSelector(".run-detail-head", { timeout: 15000 });
+await wait(800);
+const compareEntry = await page.evaluate(() => {
+  const btn = [...document.querySelectorAll(".run-detail-tools .btn")].find((b) =>
+    b.textContent?.includes("与正常对照比较"),
+  );
+  return btn ? { text: btn.textContent?.trim(), title: btn.getAttribute("title"), disabled: btn.disabled } : null;
+});
+if (!compareEntry) throw new Error("运行详情缺少「与正常对照比较」入口");
+if (compareEntry.disabled) throw new Error(`已核验配对的运行入口仍被禁用：${compareEntry.title}`);
+await page.evaluate(() => {
+  const btn = [...document.querySelectorAll(".run-detail-tools .btn")].find((b) =>
+    b.textContent?.includes("与正常对照比较"),
+  );
+  btn?.click();
+});
+await page.waitForSelector(".run-compare", { timeout: 20000 });
+await wait(600);
+const compareEntryState = await page.evaluate(() => ({
+  pair: document.querySelector(".run-compare .run-detail-head p")?.textContent?.trim() ?? "",
+  normal: document.querySelectorAll(".run-compare .pattern-table").length,
+}));
+if (!compareEntryState.pair.includes(pairedRun.normal_run_id)) {
+  throw new Error(`「与正常对照比较」未进入该运行的已核验配对：${compareEntryState.pair}`);
+}
+console.log("[对照入口]", JSON.stringify({ ...compareEntry, run: pairedRun.run_id, ...compareEntryState }));
+await page.screenshot({ path: path.join(OUT, "ui-compare-entry.png") });
 
 console.log("== MC1 双声道 ==");
 await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
@@ -422,12 +461,84 @@ if (!intervention.cut.includes("无法")) throw new Error(`切断证明应明确
 console.log("[干预论证]", JSON.stringify(intervention));
 await page.screenshot({ path: path.join(OUT, "ui-intervention.png") });
 
+console.log("== MC2 转移矩阵 ==");
+await page.evaluate(() => {
+  const btn = [...document.querySelectorAll(".canvas-subbar .seg-item")].find((b) =>
+    b.textContent?.includes("转移矩阵"),
+  );
+  btn?.click();
+});
+await page.waitForSelector(".transition-table", { timeout: 20000 });
+await wait(600);
+const matrixState = await page.evaluate(() => {
+  const cells = [...document.querySelectorAll(".transition-cell")].filter(
+    (n) => !n.classList.contains("transition-cell-empty"),
+  );
+  const first = cells[0];
+  return {
+    cells: cells.length,
+    types: document.querySelectorAll(".transition-table thead th").length - 1,
+    lowSample: document.querySelectorAll(".transition-cell-low").length,
+    text: document.querySelector(".transition-view")?.textContent ?? "",
+    firstTitle: first?.getAttribute("title") ?? "",
+  };
+});
+if (matrixState.cells < 10) throw new Error(`转移矩阵非空格过少：${matrixState.cells}`);
+if (!matrixState.text.includes("不表示因果")) throw new Error("转移矩阵缺少“不表示因果”说明");
+if (matrixState.text.includes("13.78")) throw new Error("未实现校正前不得展示 13.78 倍");
+await page.evaluate(() => {
+  const cell = [...document.querySelectorAll(".transition-cell")].find(
+    (n) => !n.classList.contains("transition-cell-empty"),
+  );
+  cell?.click();
+});
+await page.waitForSelector(".transition-evidence", { timeout: 15000 });
+await wait(500);
+const matrixEvidence = await page.evaluate(() => ({
+  header: document.querySelector(".transition-evidence .trace-head")?.textContent?.trim() ?? "",
+  pairs: document.querySelectorAll(".transition-evidence .transition-pair").length,
+  twoSides: (document.querySelector(".transition-pair")?.querySelectorAll(".trace-item").length ?? 0) === 2,
+}));
+const supportN = Number((matrixState.firstTitle.match(/(\d+)\s*对/) ?? [])[1] ?? NaN);
+const evidenceN = Number((matrixEvidence.header.match(/支持\s*([\d,]+)\s*对/) ?? [])[1]?.replace(/,/g, "") ?? NaN);
+if (!Number.isFinite(supportN) || supportN !== evidenceN) {
+  throw new Error(`矩阵格与证据列表口径不一致：格 ${supportN} 对，列表 ${evidenceN} 对`);
+}
+if (!matrixEvidence.twoSides) throw new Error("相邻对列表应同时展示源与后继两条事件");
+console.log("[转移矩阵]", JSON.stringify({ ...matrixState, firstTitle: undefined, evidenceN }));
+await page.screenshot({ path: path.join(OUT, "ui-transitions.png") });
+
 // 切到 MC1 时来源链标签必须消失，避免把 MC2 的链画到别的数据集上
 await page.select(".topbar select", "MC1");
 await wait(900);
 const mc1Tabs = await page.$$eval(".view-tab", (ns) => ns.map((n) => n.textContent?.trim()));
 if (mc1Tabs.includes("来源链")) throw new Error("MC1 下不应出现来源链标签");
 console.log("[数据集隔离]", JSON.stringify(mc1Tabs));
+
+console.log("== MC1 活动矩阵与决策泳道 ==");
+await page.waitForSelector(".mc1-workspace", { timeout: 20000 });
+await page.waitForSelector(".activity-table tbody tr", { timeout: 20000 });
+await page.waitForSelector(".mc1-lanes", { timeout: 20000 });
+await wait(800);
+const mc1Workspace = await page.evaluate(() => ({
+  agents: document.querySelectorAll(".activity-table tbody tr").length,
+  columns: document.querySelectorAll(".activity-table thead th").length - 1,
+  emptyCells: document.querySelectorAll(".activity-cell-empty").length,
+  anchors: document.querySelectorAll(".mc1-anchor").length,
+  messages: document.querySelectorAll(".mc1-lanes circle").length,
+  releases: document.querySelectorAll(".mc1-lanes rect").length,
+  candidates: document.querySelectorAll(".mc1-candidate").length,
+  pending: document.querySelector(".mc1-workspace")?.textContent?.includes("待确认预期") ?? false,
+  audit: document.querySelector(".mc1-audit")?.textContent ?? "",
+}));
+if (mc1Workspace.agents !== 7) throw new Error(`MC1 活动矩阵应有 7 个 agent，实际 ${mc1Workspace.agents}`);
+if (mc1Workspace.columns < 2) throw new Error(`MC1 活动矩阵缺少时间列：${mc1Workspace.columns}`);
+if (mc1Workspace.anchors !== 3) throw new Error(`决策泳道应并置 3 个锚点，实际 ${mc1Workspace.anchors}`);
+if (mc1Workspace.messages < 10) throw new Error(`决策泳道消息点过少：${mc1Workspace.messages}`);
+if (!mc1Workspace.audit.includes("future")) throw new Error("缺少回复分类计数（future）");
+if (!mc1Workspace.pending) throw new Error("没有制度依据的规则应显示“待确认预期”");
+console.log("[MC1 工作区]", JSON.stringify(mc1Workspace));
+await page.screenshot({ path: path.join(OUT, "ui-mc1.png") });
 
 console.log("== 基线比较 ==");
 await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });

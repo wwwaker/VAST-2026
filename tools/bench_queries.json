@@ -1,0 +1,106 @@
+{
+  "schema_version": 2,
+  "notes": [
+    "每条查询预热 3 次后采样 30 次；每个查询的第一次请求单独作为冷启动记录，不混入 p50/p95。",
+    "必须覆盖高连接度实体、稀有关键词、空结果、时间局部窗与最大预算 trace；不能只测最快路径。",
+    "目标值来自 docs/可视分析任务完成度审查与完善路线.md §15.3，是验收目标而不是历史实测。"
+  ],
+  "queries": [
+    {
+      "name": "events_page_mc2",
+      "kind": "page",
+      "path": "/api/events",
+      "params": { "dataset": "MC2", "limit": "50", "order": "desc" },
+      "target_p95_ms": 300
+    },
+    {
+      "name": "event_detail_target",
+      "kind": "detail",
+      "path": "/api/events/MC2:event:373902",
+      "params": { "dataset": "MC2" },
+      "target_p95_ms": 300
+    },
+    {
+      "name": "entity_high_degree_file_system",
+      "kind": "high_degree_entity",
+      "path": "/api/entities/MC2:system:system:file_system/events",
+      "params": { "dataset": "MC2", "limit": "100" },
+      "target_p95_ms": 800
+    },
+    {
+      "name": "rare_keyword_swiftwren",
+      "kind": "rare_keyword",
+      "path": "/api/events",
+      "params": { "dataset": "MC2", "q": "SwiftWren", "limit": "50" },
+      "target_p95_ms": 300
+    },
+    {
+      "name": "empty_result",
+      "kind": "empty_result",
+      "path": "/api/events",
+      "params": { "dataset": "MC2", "q": "zzzz-no-such-token", "limit": "50" },
+      "target_p95_ms": 300
+    },
+    {
+      "name": "time_local_window_1h",
+      "kind": "time_window",
+      "path": "/api/events",
+      "params": {
+        "dataset": "MC2",
+        "start_us": "2410167600000000",
+        "end_us": "2410171200000000",
+        "limit": "50"
+      },
+      "target_p95_ms": 300
+    },
+    {
+      "name": "trace_max_budget_500",
+      "kind": "trace_max_budget",
+      "path": "/api/traces",
+      "params": { "dataset": "MC2", "root_event_id": "MC2:event:373902", "max_events": "500" },
+      "target_p95_ms": 1000
+    },
+    {
+      "name": "graph_high_degree_depth2",
+      "kind": "graph",
+      "path": "/api/graph",
+      "params": { "dataset": "MC2", "center": "MC2:system:system:file_system", "depth": "2" },
+      "target_p95_ms": 1000
+    },
+    {
+      "name": "transitions_matrix_5m",
+      "kind": "aggregate",
+      "path": "/api/transitions",
+      "params": { "dataset": "MC2", "window_minutes": "5" },
+      "target_p95_ms": 800
+    },
+    {
+      "name": "mc1_decision_context",
+      "kind": "aggregate",
+      "path": "/api/mc1/context",
+      "params": { "dataset": "MC1" },
+      "target_p95_ms": 800
+    },
+    {
+      "name": "mc1_activity_day",
+      "kind": "aggregate",
+      "path": "/api/mc1/activity",
+      "params": { "dataset": "MC1", "granularity": "day" },
+      "target_p95_ms": 800
+    },
+    {
+      "name": "custom_runs",
+      "kind": "aggregate",
+      "path": "/api/runs",
+      "params": { "dataset": "CUSTOM" },
+      "target_p95_ms": 800
+    },
+    {
+      "name": "system_overview",
+      "kind": "first_screen",
+      "path": "/api/system-overview",
+      "params": { "dataset": "MC2" },
+      "target_p95_ms": 1200
+    }
+  ]
+}

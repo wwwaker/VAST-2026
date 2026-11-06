@@ -1182,6 +1182,393 @@ export function fetchFileTrack(
   );
 }
 
+// ---------------------------------------------------------------- 转移矩阵（MC2）
+
+export interface TransitionCell {
+  source_type: string;
+  next_type: string;
+  support: number;
+  actor_count: number;
+  low_sample: boolean;
+  min_lag_us: number;
+  max_lag_us: number;
+}
+
+export interface TransitionPayload {
+  meta: Meta;
+  dataset_id: string;
+  available: boolean;
+  window_minutes: 5 | 30;
+  lag_max_us: number;
+  types: string[];
+  cells: TransitionCell[];
+  totals: {
+    installed_pairs: number;
+    within_window_pairs: number;
+    matched_pairs: number;
+    source_type_count: number;
+    next_type_count: number;
+    cell_count: number;
+  };
+  actor_coverage: {
+    actors_in_window: number;
+    actors_matched: number;
+    coverage_ratio: number | null;
+  };
+  excluded: Record<string, number>;
+  low_sample_threshold: number;
+  supports_lift: boolean;
+  method_notes: string[];
+  legend: Record<string, string>;
+}
+
+export interface TransitionEventRef {
+  event_id: string;
+  time_us: number;
+  timestamp_raw: string;
+  event_type: string;
+  actor_id: string | null;
+  actor_label: string | null;
+  channel_id: string | null;
+  preview: string;
+}
+
+export interface TransitionEvidenceItem {
+  source: TransitionEventRef;
+  next: TransitionEventRef;
+  lag_us: number;
+  actor_id: string | null;
+  provenanceKind: ProvenanceKind;
+  ruleId: string;
+}
+
+export interface TransitionEvidencePayload {
+  meta: Meta;
+  dataset_id: string;
+  source_type: string;
+  next_type: string;
+  window_minutes: number;
+  lag_max_us: number;
+  total: number;
+  offset: number;
+  limit: number;
+  has_more: boolean;
+  items: TransitionEvidenceItem[];
+  note: string;
+  cell: { source_type: string; next_type: string; total: number };
+}
+
+export function fetchTransitions(
+  params: {
+    windowMinutes: 5 | 30;
+    filters: Filters;
+    cursorUs?: number | null;
+    masking?: boolean;
+  },
+  signal?: AbortSignal,
+): Promise<TransitionPayload> {
+  return getJson<TransitionPayload>(
+    "/api/transitions",
+    withFilters(params.filters, {
+      dataset: "MC2",
+      window_minutes: params.windowMinutes,
+      cursor_us: params.cursorUs ?? undefined,
+      masking: params.masking ? "true" : undefined,
+    }),
+    signal,
+  );
+}
+
+export function fetchTransitionEvidence(
+  params: {
+    windowMinutes: 5 | 30;
+    sourceType: string;
+    nextType: string;
+    filters: Filters;
+    limit?: number;
+    offset?: number;
+    cursorUs?: number | null;
+    masking?: boolean;
+  },
+  signal?: AbortSignal,
+): Promise<TransitionEvidencePayload> {
+  return getJson<TransitionEvidencePayload>(
+    "/api/transitions/evidence",
+    withFilters(params.filters, {
+      dataset: "MC2",
+      window_minutes: params.windowMinutes,
+      source_type: params.sourceType,
+      next_type: params.nextType,
+      limit: params.limit,
+      offset: params.offset,
+      cursor_us: params.cursorUs ?? undefined,
+      masking: params.masking ? "true" : undefined,
+    }),
+    signal,
+  );
+}
+
+// ---------------------------------------------------------------- MC1 决策与先兆
+
+export interface Mc1AgentRef {
+  agent_id: string;
+  label: string | null;
+  scope: string;
+}
+
+export interface Mc1Bucket {
+  key: string;
+  label: string;
+  start_us: number | null;
+  end_us: number | null;
+  matched_events: number;
+}
+
+export interface Mc1ActivityCell {
+  agent_id: string;
+  agent_label: string | null;
+  bucket: string;
+  public: number;
+  internal: number;
+  other: number;
+  channels: Record<string, number>;
+  empty: boolean;
+}
+
+export interface Mc1ActivityPayload {
+  meta: Meta;
+  dataset_id: string;
+  granularity: "day" | "hour" | "round";
+  agents: Mc1AgentRef[];
+  columns: Mc1Bucket[];
+  cells: Mc1ActivityCell[];
+  channel_totals: Record<string, number>;
+  matched_messages: number;
+  public_messages: number;
+  internal_messages: number;
+  notes: string[];
+  views_available: boolean;
+}
+
+export interface Mc1EventRef {
+  event_id: string;
+  source_record_id?: string | null;
+  time_us: number;
+  timestamp_raw: string;
+  event_type: string;
+  actor_id: string | null;
+  actor_label: string | null;
+  channel?: string;
+  channel_scope?: string;
+  channel_id?: string | null;
+  reply_class?: string | null;
+  reply_target_event_id?: string | null;
+  preview: string;
+  relation_reason?: string;
+  usable_as_history?: boolean;
+  delta_us?: number;
+}
+
+export interface Mc1EnvironmentRecord {
+  context_id: string;
+  kind: string;
+  round_index: number | null;
+  time_us: number;
+  round_start_us: number | null;
+  round_end_us: number | null;
+  time_precision: string | null;
+  value: string;
+  source_pointer: string | null;
+  provenanceKind: ProvenanceKind;
+  track?: string;
+  constraint_basis?: string;
+}
+
+export interface Mc1AnalystMarker {
+  context_id: string;
+  kind: string;
+  time_us: number;
+  time_precision: string | null;
+  label: string;
+  message_ids: string[];
+  evidence_agent_ids: string[];
+  source_pointers: string[];
+  provenanceKind: ProvenanceKind;
+}
+
+export interface Mc1ReplyAudit {
+  counts: Record<string, number>;
+  reply_edges: number;
+  mention_edges: number;
+  text_reference_total: number;
+  derived_baseline: Record<string, number> | null;
+  baseline_compatible: boolean | null;
+  mapping_note: string;
+}
+
+export interface Mc1IndicatorRule {
+  rule_id: string;
+  version: string;
+  description: string;
+  applies_to: string;
+  expected_behavior_source_ids: string[];
+  expected_basis: string;
+  keywords: string[];
+  limitations: string;
+}
+
+export interface Mc1IndicatorCandidate {
+  rule_id: string;
+  rule_version: string;
+  provenanceKind: ProvenanceKind;
+  event_id: string | null;
+  context_id: string | null;
+  time_us: number;
+  timestamp_raw: string | null;
+  actor_id: string | null;
+  channel: string;
+  event_type: string;
+  excerpt: string;
+  hit_keywords: string[];
+  evidence_event_ids?: string[];
+  expected_basis: string;
+  expected_behavior_source_ids: string[];
+  source_pointers: string[];
+  similarity: string;
+  difference: string;
+  limitations: string;
+}
+
+export interface Mc1IndicatorsPayload {
+  target_window: { start_us: number | null; end_us: number | null; source: string };
+  scan_scope: string;
+  rules: Mc1IndicatorRule[];
+  candidates: Mc1IndicatorCandidate[];
+  pending_rules: Mc1IndicatorRule[];
+  summary: {
+    candidate_count: number;
+    rules_with_candidates: number;
+    rule_count: number;
+    pending_rule_count: number;
+    has_evidence_based_candidate: boolean;
+  };
+  notes: string[];
+}
+
+export interface Mc1DecisionPayload {
+  meta: Meta;
+  dataset_id: string;
+  window: { start_us: number; end_us: number; source: string };
+  anchors: {
+    external_report: Mc1EnvironmentRecord | null;
+    first_internal_confirmation: Mc1EventRef | null;
+    formal_lift: Mc1EventRef | null;
+    note: string;
+  };
+  tracks: {
+    environment: Mc1EnvironmentRecord[];
+    constraints: Mc1EnvironmentRecord[];
+    messages: Mc1EventRef[];
+    releases: Mc1EventRef[];
+    markers: Mc1AnalystMarker[];
+  };
+  counts: {
+    environment_records: number;
+    constraint_records: number;
+    messages: number;
+    public_releases: number;
+    analyst_markers: number;
+  };
+  reply_audit: Mc1ReplyAudit;
+  leading_indicators: Mc1IndicatorsPayload;
+  notes: string[];
+  lane_limit: number;
+  truncated: boolean;
+  views_available: boolean;
+}
+
+export function fetchMc1Activity(
+  params: {
+    granularity: "day" | "hour" | "round";
+    filters: Filters;
+    cursorUs?: number | null;
+    masking?: boolean;
+  },
+  signal?: AbortSignal,
+): Promise<Mc1ActivityPayload> {
+  return getJson<Mc1ActivityPayload>(
+    "/api/mc1/activity",
+    withFilters(params.filters, {
+      dataset: "MC1",
+      granularity: params.granularity,
+      cursor_us: params.cursorUs ?? undefined,
+      masking: params.masking ? "true" : undefined,
+    }),
+    signal,
+  );
+}
+
+export function fetchMc1Context(
+  params: { filters: Filters; cursorUs?: number | null; masking?: boolean },
+  signal?: AbortSignal,
+): Promise<Mc1DecisionPayload> {
+  return getJson<Mc1DecisionPayload>(
+    "/api/mc1/context",
+    withFilters(params.filters, {
+      dataset: "MC1",
+      cursor_us: params.cursorUs ?? undefined,
+      masking: params.masking ? "true" : undefined,
+    }),
+    signal,
+  );
+}
+
+export interface Mc1EventCursorEntry {
+  event_id: string | null;
+  source_record_id: string;
+}
+
+export interface Mc1EventContextPayload {
+  meta: Meta;
+  dataset_id: string;
+  event: Mc1EventRef;
+  round: { round_index: number; start_us: number; end_us: number; label: string } | null;
+  explicit_parent: (Mc1EventRef & { relation_reason: string; usable_as_history: boolean }) | null;
+  replies: { valid: Mc1EventRef[]; future_reference: Mc1EventRef[]; counts: { valid: number; future_reference: number }; note: string };
+  mentions: { entity_id: string; label: string | null; relation_reason: string }[];
+  same_actor: Mc1EventRef[];
+  same_channel: Mc1EventRef[];
+  environment_context: Mc1EnvironmentRecord[];
+  derived_neighbors: {
+    parent_message_id: string | null;
+    reply_message_ids: Mc1EventCursorEntry[];
+    same_round_neighbor_ids: Mc1EventCursorEntry[];
+    same_agent_neighbor_ids: Mc1EventCursorEntry[];
+    same_channel_neighbor_ids: Mc1EventCursorEntry[];
+    thread_id: string | null;
+    provenanceKind: ProvenanceKind;
+    relation_reason: string;
+  } | null;
+  notes: string[];
+  views_available: boolean;
+}
+
+export function fetchMc1EventContext(
+  eventId: string,
+  params: { filters: Filters; cursorUs?: number | null; masking?: boolean },
+  signal?: AbortSignal,
+): Promise<Mc1EventContextPayload> {
+  return getJson<Mc1EventContextPayload>(
+    `/api/events/${encodeURIComponent(eventId)}/context`,
+    withFilters(params.filters, {
+      dataset: "MC1",
+      cursor_us: params.cursorUs ?? undefined,
+      masking: params.masking ? "true" : undefined,
+    }),
+    signal,
+  );
+}
+
 export function formatUtc(timeUs: number): string {
   const iso = new Date(timeUs / 1000).toISOString();
   return `${iso.slice(0, 10)} ${iso.slice(11, 16)}`;

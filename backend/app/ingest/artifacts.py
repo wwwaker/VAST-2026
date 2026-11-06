@@ -162,6 +162,65 @@ def persist(conn, bundle: ArtifactBundle) -> None:
     )
 
 
+def verify_manifest_file(relative: str) -> dict:
+    """校验 manifest 内某个文件的哈希；未声明的路径一律视为不可用。
+
+    与 load_bundle 不同，这里不解析 JSON，只按字节核对，供大体积 jsonl 派生文件
+    （例如 transition_pairs）在导入前做完整性检查。
+    """
+    manifest = read_manifest()
+    if manifest is None:
+        return {"status": "missing", "detail": f"缺少 {MANIFEST_REL}", "path": relative}
+    declared = next(
+        (item for item in manifest.get("files", []) if item.get("path") == relative),
+        None,
+    )
+    if declared is None:
+        return {"status": "not_declared", "detail": f"manifest 未声明 {relative}", "path": relative}
+    try:
+        path = _resolve(relative)
+    except ValueError as exc:
+        return {"status": "outside_root", "detail": str(exc), "path": relative}
+    if not os.path.exists(path):
+        return {"status": "missing", "detail": f"缺少派生文件 {relative}", "path": relative}
+    actual = _sha256(path)
+    expected = declared.get("sha256")
+    if expected and expected != actual:
+        return {
+            "status": "hash_mismatch",
+            "detail": f"{relative} 哈希与 manifest 不一致",
+            "path": relative,
+            "sha256": actual,
+            "expected": expected,
+        }
+    return {
+        "status": "ok",
+        "detail": f"{relative} 哈希核验通过",
+        "path": relative,
+        "sha256": actual,
+        "expected": expected,
+        "bytes": declared.get("bytes"),
+    }
+
+
+def persist_source(conn, dataset_id: str, relative: str, sha256: str, status: str) -> None:
+    """把单个派生文件的核验结果写入 artifact_sources。"""
+    conn.execute(
+        "INSERT OR REPLACE INTO artifact_sources "
+        "(artifact_id, dataset_id, relative_path, sha256, method_version, status, verified_at) "
+        "VALUES (?,?,?,?,?,?,?)",
+        (
+            f"{dataset_id}:{relative}",
+            dataset_id,
+            relative,
+            sha256,
+            METHOD_VERSION,
+            status,
+            datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        ),
+    )
+
+
 def status_of(conn, dataset_id: str) -> dict:
     row = conn.execute(
         "SELECT status, relative_path, sha256, verified_at FROM artifact_sources "

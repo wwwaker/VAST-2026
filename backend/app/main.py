@@ -25,12 +25,14 @@ from .routers import (
     files,
     findings,
     graph,
+    mc1,
     notes,
     patterns,
     runs,
     search,
     system_overview,
     traces,
+    transitions,
 )
 
 app = FastAPI(
@@ -60,6 +62,8 @@ app.include_router(patterns.router)
 app.include_router(system_overview.router)
 app.include_router(cases.router)
 app.include_router(findings.router)
+app.include_router(transitions.router)
+app.include_router(mc1.router)
 
 # 笔记存在独立的库文件里，启动时建表即可，与数据导入互不影响
 ensure_notes_schema()

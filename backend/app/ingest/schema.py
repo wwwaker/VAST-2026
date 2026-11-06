@@ -1,16 +1,18 @@
-"""建库 DDL（schema v2）。
+"""建库 DDL（schema v3）。
 
-v2 相对 v1 的变化：
-- events 增加微秒排序键 time_sort_us、运行维度 run_id、目标 target_id、版本 version、
-  渠道 channel_id、来源文件 source_file、源行序 source_ordinal。
-- participants 增加 time_sort_us，避免实体时间线仍按秒排序。
+v3 相对 v2 的变化：
+- events 增加 reply_class / reply_target_event_id：MC1 的 responding_to 在入库时分类为
+  reply_valid / reply_future_reference / mention / unresolved_reference / empty_reference，
+  原始 details_json 保持不变，未来引用不得进入历史传播主链。
+- 新增 transition_pairs：经 manifest 哈希核验的 MC2 相邻操作对，供转移矩阵查询；
+  lag_us 为整数微秒，查询按 5/30 分钟两个子集过滤。
 - datasets 增加 data_version（源事件文件 SHA-256）与 schema_version。
 - time_sort_key 继续保存“整数秒”，只服务 time_buckets 等旧聚合，新查询一律走 time_sort_us。
 """
 
 import re
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 TABLES = """
 CREATE TABLE datasets (
@@ -26,7 +28,7 @@ CREATE TABLE datasets (
     deliberation_count INTEGER NOT NULL DEFAULT 0,
     import_version   TEXT NOT NULL,
     data_version     TEXT NOT NULL DEFAULT '',
-    schema_version   INTEGER NOT NULL DEFAULT 2,
+    schema_version   INTEGER NOT NULL DEFAULT 3,
     imported_at      TEXT NOT NULL
 );
 
@@ -57,6 +59,9 @@ CREATE TABLE events (
     source_json_pointer  TEXT,
     source_missing_id    INTEGER NOT NULL DEFAULT 0,
     has_deliberation     INTEGER NOT NULL DEFAULT 0,
+    -- MC1 回复引用分类（仅 MC1 填充）；原始 details_json.responding_to 不做改写
+    reply_class          TEXT,
+    reply_target_event_id TEXT,
     PRIMARY KEY (dataset_id, event_id)
 );
 
@@ -186,6 +191,19 @@ CREATE TABLE event_links (
     artifact_id     TEXT,
     PRIMARY KEY (dataset_id, source_event_id, target_event_id, relation, derivation)
 );
+
+-- MC2 相邻操作对（manifest 哈希核验后导入）。同执行者的时间相邻不等于因果。
+CREATE TABLE transition_pairs (
+    dataset_id      TEXT NOT NULL,
+    actor_id        TEXT,
+    source_event_id TEXT NOT NULL,
+    next_event_id   TEXT NOT NULL,
+    source_type     TEXT NOT NULL,
+    next_type       TEXT NOT NULL,
+    lag_us          INTEGER NOT NULL,
+    artifact_id     TEXT,
+    PRIMARY KEY (dataset_id, source_event_id, next_event_id)
+);
 """
 
 INDEXES = """
@@ -215,6 +233,10 @@ CREATE INDEX IF NOT EXISTS idx_events_file      ON events(dataset_id, source_fil
 CREATE INDEX IF NOT EXISTS idx_anno_event       ON annotation_events(dataset_id, event_id);
 CREATE INDEX IF NOT EXISTS idx_links_target     ON event_links(dataset_id, target_event_id);
 CREATE INDEX IF NOT EXISTS idx_runs_scenario    ON runs(dataset_id, scenario, model, fixture);
+-- 转移矩阵主索引：先按类型对与时间上限裁剪，再统计 actor
+CREATE INDEX IF NOT EXISTS idx_transition_matrix ON transition_pairs(dataset_id, source_type, next_type, lag_us, actor_id);
+-- MC1 回复分类审计
+CREATE INDEX IF NOT EXISTS idx_events_reply_class ON events(dataset_id, reply_class);
 CREATE INDEX IF NOT EXISTS idx_fts_dataset      ON event_fts(dataset_id);
 CREATE INDEX IF NOT EXISTS idx_bucket           ON time_buckets(dataset_id, granularity, bucket_key);
 CREATE VIRTUAL TABLE IF NOT EXISTS event_fts_idx USING fts5(
@@ -224,7 +246,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS event_fts_idx USING fts5(
 
 POST = """
 INSERT INTO event_fts_idx(event_fts_idx) VALUES('rebuild');
-PRAGMA user_version=2;
+PRAGMA user_version=3;
 ANALYZE;
 """
 

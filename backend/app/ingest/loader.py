@@ -62,6 +62,8 @@ _EVENT_COLUMNS = (
     "source_json_pointer",
     "source_missing_id",
     "has_deliberation",
+    "reply_class",
+    "reply_target_event_id",
 )
 
 _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
@@ -270,6 +272,7 @@ def load_dataset(conn, manifest: DatasetManifest) -> DatasetStats:
         "run_pairs",
         "event_links",
         "artifact_sources",
+        "transition_pairs",
     ):
         conn.execute(f"DELETE FROM {table} WHERE dataset_id=?", (dataset_id,))
     conn.execute("DELETE FROM annotations WHERE dataset_id=?", (dataset_id,))
@@ -388,6 +391,9 @@ def load_dataset(conn, manifest: DatasetManifest) -> DatasetStats:
                     obj.get("source_json_pointer"),
                     int(missing_id),
                     deliberation,
+                    # MC1 回复分类在全部事件落库后由 _classify_mc1_replies 回填
+                    None,
+                    None,
                 )
             )
 
@@ -493,6 +499,9 @@ def load_dataset(conn, manifest: DatasetManifest) -> DatasetStats:
 
     flush()
 
+    if dataset_id == "MC1":
+        _classify_mc1_replies(conn, stats, role_map, alias)
+
     # 关系边由实体组织边和逐事件派生边共同构成，统一以库内实际行数计
     stats.relations = conn.execute(
         "SELECT COUNT(*) FROM relations WHERE dataset_id=?", (dataset_id,)
@@ -526,6 +535,9 @@ def load_dataset(conn, manifest: DatasetManifest) -> DatasetStats:
     # 派生数据依赖已入库事件与标签：哈希核验通过才写 runs / run_pairs / event_links
     if manifest.dataset_id == "CUSTOM":
         derived.load_custom(conn, stats)
+    # MC2 转移对同样要求哈希核验通过；端点必须已在本库
+    if manifest.dataset_id == "MC2":
+        derived.load_mc2(conn, stats)
 
     conn.execute(
         "INSERT INTO datasets (dataset_id,name,question,timezone_status,event_count,entity_count,"
@@ -550,6 +562,87 @@ def load_dataset(conn, manifest: DatasetManifest) -> DatasetStats:
 
     _run_checks(conn, manifest, stats)
     return stats
+
+
+MC1_REFERENCE_CLASSES = (
+    "reply_valid",
+    "reply_future_reference",
+    "mention",
+    "unresolved_reference",
+    "empty_reference",
+)
+
+
+def _classify_mc1_replies(conn, stats: DatasetStats, role_map: dict[str, str], alias: dict[str, str]) -> None:
+    """把 MC1 的 details.responding_to 分类回填到 events.reply_class。
+
+    - 记录 ID 且目标时间不晚于本消息：reply_valid；晚于本消息：reply_future_reference。
+    - 文本式 @称呼：能由 roles/manifest 别名映射到实体时记 mention，否则 unresolved_reference。
+    - 缺省/空串：empty_reference。
+    原始 details_json 不改写；未来引用保留在 reply_to 关系里，但接口默认不把它当历史主链。
+    """
+    rows = conn.execute(
+        "SELECT event_id, source_record_id, time_sort_us, details_json FROM events "
+        "WHERE dataset_id='MC1'"
+    ).fetchall()
+    time_by_event = {row["event_id"]: row["time_sort_us"] for row in rows}
+    event_by_record = {
+        str(row["source_record_id"]): row["event_id"]
+        for row in rows
+        if row["source_record_id"] is not None
+    }
+    name_to_entity = {**alias, **role_map}
+
+    counts: Counter[str] = Counter()
+    updates = []
+    for row in rows:
+        try:
+            details = json.loads(row["details_json"] or "{}")
+        except json.JSONDecodeError:
+            details = {}
+        reference = details.get("responding_to") if isinstance(details, dict) else None
+        target_event_id = None
+        if not isinstance(reference, str) or not reference.strip():
+            reply_class = "empty_reference"
+        else:
+            token = reference.strip()
+            if token in event_by_record:
+                target_event_id = event_by_record[token]
+                if time_by_event[target_event_id] <= row["time_sort_us"]:
+                    reply_class = "reply_valid"
+                else:
+                    reply_class = "reply_future_reference"
+            else:
+                names = [part.lstrip("@") for part in token.replace(",", " ").split() if part.startswith("@")]
+                if any(name in name_to_entity for name in names):
+                    reply_class = "mention"
+                else:
+                    reply_class = "unresolved_reference"
+        counts[reply_class] += 1
+        updates.append((reply_class, target_event_id, row["event_id"]))
+
+    conn.executemany(
+        "UPDATE events SET reply_class=?, reply_target_event_id=? "
+        "WHERE dataset_id='MC1' AND event_id=?",
+        updates,
+    )
+    for key in MC1_REFERENCE_CLASSES:
+        conn.execute(
+            "INSERT OR REPLACE INTO stat_counts (dataset_id, kind, key, cnt) VALUES ('MC1','mc1_reply_class',?,?)",
+            (key, counts[key]),
+        )
+
+    total = sum(counts.values())
+    stats.check(
+        "MC1 回复引用分类覆盖全部事件",
+        total == stats.events,
+        f"{total}/{stats.events} 条；{', '.join(f'{k}={counts[k]}' for k in MC1_REFERENCE_CLASSES)}",
+    )
+    stats.check(
+        "MC1 有效回复与未来引用可分离",
+        counts["reply_valid"] > 0 and counts["reply_future_reference"] > 0,
+        f"valid={counts['reply_valid']} / future={counts['reply_future_reference']}",
+    )
 
 
 def _load_annotations(conn, manifest: DatasetManifest, stats: DatasetStats) -> None:

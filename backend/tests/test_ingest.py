@@ -12,7 +12,7 @@ from app.domain import event_types
 
 
 class IngestContractTest(unittest.TestCase):
-    """D-01：v2 导入后的事件规模、主键唯一与微秒精度。"""
+    """D-01：v3 导入后的事件规模、主键唯一与微秒精度。"""
 
     def setUp(self) -> None:
         self.path = helpers.require_db(self)
@@ -20,7 +20,7 @@ class IngestContractTest(unittest.TestCase):
     def test_schema_version_and_counts(self) -> None:
         conn = sqlite3.connect(f"file:{self.path}?mode=ro", uri=True)
         try:
-            self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 2)
+            self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 3)
             events = dict(conn.execute("SELECT dataset_id, event_count FROM datasets"))
             self.assertEqual(events, {"MC1": 912, "MC2": 185147, "CUSTOM": 1103})
             entities = dict(conn.execute("SELECT dataset_id, entity_count FROM datasets"))

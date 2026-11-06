@@ -65,6 +65,7 @@ cd frontend && npm run dev        # http://localhost:5173
 | `python -m app.ingest.cli --all --fresh` | 全量重建数据库 |
 | `python -m app.ingest.cli --dataset MC1` | 只重导一个数据集 |
 | `python tools/bench_sqlite.py --dataset MC2` | SQLite 导入与查询基准 |
+| `python tools/bench_api.py --base http://127.0.0.1:8000` | API 性能基准（预热 3 / 采样 30），写 `build/api-bench-v2.json` |
 | `python tools/audit_mc2_content.py` | MC2 内容可用性审计，写 `build/mc2-content-audit.json` |
 | `cd frontend && npm run check:ui -- http://127.0.0.1:8000` | 无头浏览器自检：布局、交互、键盘、截图、渲染基准、控制台错误 |
 | `python tools/check_contrast.py --strict` | 双主题对比度验收（WCAG 2.1），有失败项时退出码非 0 |
@@ -80,8 +81,9 @@ backend/app/ingest/      manifest、adapter、导入命令行
 backend/app/domain/      类型字典、CUSTOM 审计规则、MC2 文件与来源链
 backend/app/routers/     查询接口
 frontend/src/            工作区前端（theme / state / components / views）
-frontend/src/views/mc2/  来源链与文件轨迹（仅 MC2）
-tools/                   基准脚本、对比度检查、MC2 内容审计
+frontend/src/views/mc2/  来源链、文件轨迹、转移矩阵（仅 MC2）
+frontend/src/views/mc1/  活动矩阵、决策泳道、先兆候选（仅 MC1）
+tools/                   基准脚本、对比度检查、MC2 内容审计、API 基准
 build/                   数据库与截图产物（不入库）
 docs/                    计划书、数据适配规则、基准与接口说明
 ```
@@ -126,8 +128,10 @@ MC2 还在 manifest 里记录了**候选干预点**：`SwiftWren_further_instruc
 - 服务为单进程、每请求一个只读连接，未做并发压测。
 - 关系图支持 1–3 跳，默认 80 节点 / 300 边；任何裁剪都会返回具体原因。
 - MC2 帖子正文不在数据集内（官方包也没有文件附件）：来源链能确认“来源文件 + 文件操作”，内容状态显示 `metadata_only`，不能还原正文含义。可核查的字段差异是：108 条 `saidit_post` 里 105 条带标题级 `content`，三条异常帖没有。
-- CUSTOM 已有运行列表、单次流程泳道、审计重算、配对比较与五条冻结案例；案例可另存为用户案例并导出 Markdown/JSON。MC1 决策泳道与操作转移矩阵尚未实现（S4 / M2-04 后半）。
-- MC2 已有系统背景地图（类型级聚合 + 目标事件高亮）、历史实例阶段对齐与单点干预论证；操作转移矩阵尚未实现，干预位置只有一个候选，不宣称是唯一入口。
+- CUSTOM 已有运行列表、单次流程泳道、审计重算、配对比较与五条冻结案例；案例可另存为用户案例并导出 Markdown/JSON。
+- MC1 已有回复分类、7 agent 活动矩阵、决策泳道与先兆候选。`reply_future_reference`（174 条）保留原始关系但默认不进入历史传播主链；环境叙事与人工标记单独标注 `provenanceKind`，同轮共现不改称因果。没有制度依据的“发布前审核”规则显示“待确认预期”，不生成候选。
+- MC2 已有系统背景地图、历史实例阶段对齐、单点干预论证与操作转移矩阵。矩阵只给支持对数与 actor 数；**未实现 actor 校正前不展示 lift/倍数**，同执行者相邻操作不表示因果。干预位置只有一个候选，不宣称是唯一入口。
+- 性能数字来自本机单用户顺序请求（预热 3 次、采样 30 次），`build/api-bench-v2.json` 中冷启动与缓存命中分开记录；未做并发压测。真实任务走查尚未执行，模板见 `docs/任务走查记录模板.md`。
 
 ---
 

@@ -47,6 +47,7 @@ class FilterContext(BaseModel):
     actor_id: str | None = None
     participant_id: str | None = None
     run_id: str | None = None
+    channels: list[str] = Field(default_factory=list)
     keyword: str = ""
     cursor_us: int | None = None
     masking: bool = False
@@ -60,6 +61,7 @@ class FilterContext(BaseModel):
             "actor_id": self.actor_id,
             "participant_id": self.participant_id,
             "run_id": self.run_id,
+            "channels": sorted(self.channels),
             "keyword": self.keyword,
             "cursor_us": self.cursor_us,
             "masking": self.masking,
@@ -82,6 +84,7 @@ class RawFilter:
     participant: str | None = None
     run_id: str | None = None
     keyword: str | None = None
+    channels: str | None = None
     cursor_us: int | None = None
     masking: bool = False
 
@@ -95,6 +98,7 @@ class RawFilter:
             actor_id=self.actor or None,
             participant_id=self.participant or None,
             run_id=self.run_id or None,
+            channels=_split_strs(self.channels),
             keyword=(self.keyword or "").strip(),
             cursor_us=self.cursor_us,
             masking=bool(self.masking),
@@ -130,6 +134,7 @@ def filter_params(
     actor: str | None = Query(None, description="执行者必须相等"),
     participant: str | None = Query(None, description="任一参与者命中"),
     run_id: str | None = Query(None, description="仅 CUSTOM 支持"),
+    channels: str | None = Query(None, description="逗号分隔的 channel_id"),
     q: str | None = Query(None, description="关键词，普通文本检索"),
     cursor_us: int | None = Query(None, ge=0, description="回放截止时间（微秒）"),
     masking: bool = Query(False, description="是否按游标遮蔽未来记录"),
@@ -142,6 +147,7 @@ def filter_params(
         actor=actor,
         participant=participant,
         run_id=run_id,
+        channels=channels,
         keyword=q,
         cursor_us=cursor_us,
         masking=masking,
@@ -195,7 +201,29 @@ def _effective_range(ctx: FilterContext) -> tuple[int | None, int | None]:
     return start, end
 
 
-def build_selection(ctx: FilterContext) -> EventSelection:
+def resolve_types(ctx: FilterContext) -> set[str] | None:
+    """类别 + 显式类型合并后的类型集合；None 表示不限类型，空集表示必然零结果。
+
+    单独抽出来供时间线上的成对查询复用，避免另写一套类型解析。
+    """
+    type_set: set[str] | None = None
+    if ctx.categories:
+        type_set = event_types.types_in_categories(ctx.dataset, ctx.categories)
+        if not type_set:
+            return set()
+    if ctx.event_types:
+        explicit = set(ctx.event_types)
+        type_set = explicit if type_set is None else (type_set & explicit)
+    return type_set
+
+
+def build_selection(ctx: FilterContext, alias: str = "e") -> EventSelection:
+    """生成统一 WHERE。
+
+    alias 允许同一份筛选条件同时约束两条事件（如转移矩阵的源与后继），
+    避免在 router 里各写一套 WHERE。参数名保持不变，因此两个 selection 的
+    params 可以直接合并（值相同）。
+    """
     if ctx.dataset not in event_types.TYPES:
         raise FilterError(f"未知数据集 {ctx.dataset}", 404)
     if ctx.start_us is not None and ctx.end_us is not None and ctx.start_us >= ctx.end_us:
@@ -206,26 +234,17 @@ def build_selection(ctx: FilterContext) -> EventSelection:
     start, end = _effective_range(ctx)
     zero = start is not None and end is not None and start >= end
 
-    where = ["e.dataset_id = :f_dataset"]
+    where = [f"{alias}.dataset_id = :f_dataset"]
     params: dict[str, Any] = {"f_dataset": ctx.dataset}
 
     if start is not None:
-        where.append("e.time_sort_us >= :f_start")
+        where.append(f"{alias}.time_sort_us >= :f_start")
         params["f_start"] = start
     if end is not None:
-        where.append("e.time_sort_us < :f_end")
+        where.append(f"{alias}.time_sort_us < :f_end")
         params["f_end"] = end
 
-    type_set: set[str] | None = None
-    if ctx.categories:
-        type_set = event_types.types_in_categories(ctx.dataset, ctx.categories)
-        if not type_set:
-            zero = True
-    if ctx.event_types:
-        explicit = set(ctx.event_types)
-        type_set = explicit if type_set is None else (type_set & explicit)
-        if not type_set:
-            zero = True
+    type_set = resolve_types(ctx)
     if type_set is not None:
         if not type_set:
             zero = True
@@ -236,30 +255,42 @@ def build_selection(ctx: FilterContext) -> EventSelection:
                 key = f"f_type_{index}"
                 params[key] = name
                 placeholders.append(f":{key}")
-            where.append("e.event_type IN (" + ",".join(placeholders) + ")")
+            where.append(f"{alias}.event_type IN (" + ",".join(placeholders) + ")")
 
     if ctx.actor_id:
-        where.append("e.actor_id = :f_actor")
+        where.append(f"{alias}.actor_id = :f_actor")
         params["f_actor"] = ctx.actor_id
 
     if ctx.participant_id:
         # 用 EXISTS 而不是 JOIN participants，避免一个事件命中多个角色导致重复计数
         where.append(
             "EXISTS (SELECT 1 FROM participants p "
-            "WHERE p.dataset_id = e.dataset_id AND p.event_id = e.event_id "
+            f"WHERE p.dataset_id = {alias}.dataset_id AND p.event_id = {alias}.event_id "
             "AND p.entity_id = :f_participant)"
         )
         params["f_participant"] = ctx.participant_id
 
     if ctx.run_id:
-        where.append("e.run_id = :f_run")
+        where.append(f"{alias}.run_id = :f_run")
         params["f_run"] = ctx.run_id
 
+    if ctx.channels:
+        names = sorted(set(ctx.channels))
+        placeholders = []
+        for index, name in enumerate(names):
+            key = f"f_channel_{index}"
+            params[key] = name
+            placeholders.append(f":{key}")
+        where.append(f"{alias}.channel_id IN (" + ",".join(placeholders) + ")")
+
     if ctx.keyword:
+        # 不做按事件逐行的 MATCH：先由 FTS 取出命中 event_id，再按主键回查。
+        # 旧写法对 185k 事件每个都跑一次 MATCH，稀有词实测约 400 ms。
         where.append(
-            "EXISTS (SELECT 1 FROM event_fts f "
-            "WHERE f.dataset_id = e.dataset_id AND f.event_id = e.event_id "
-            "AND f.rowid IN (SELECT rowid FROM event_fts_idx WHERE event_fts_idx MATCH :f_q))"
+            f"{alias}.event_id IN ("
+            "SELECT f.event_id FROM event_fts_idx "
+            "JOIN event_fts f ON f.rowid = event_fts_idx.rowid "
+            "WHERE event_fts_idx MATCH :f_q AND f.dataset_id = :f_dataset)"
         )
         params["f_q"] = fts_match_query(ctx.keyword)
 

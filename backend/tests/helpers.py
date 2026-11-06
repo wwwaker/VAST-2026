@@ -1,6 +1,6 @@
 """测试公共工具。
 
-默认使用 build/mas.v2.db（或 MAS_DB 指定的库）。测试必须先导入本模块，
+默认使用 build/mas.db（或 MAS_DB 指定的库）。测试必须先导入本模块，
 让 MAS_DB 在 app.config 导入前生效。
 """
 
@@ -18,7 +18,7 @@ BACKEND = os.path.join(ROOT, "backend")
 if BACKEND not in sys.path:
     sys.path.insert(0, BACKEND)
 
-DB_PATH = os.environ.get("MAS_DB") or os.path.join(ROOT, "build", "mas.v2.db")
+DB_PATH = os.environ.get("MAS_DB") or os.path.join(ROOT, "build", "mas.db")
 os.environ.setdefault("MAS_DB", DB_PATH)
 
 from app.ingest import schema  # noqa: E402

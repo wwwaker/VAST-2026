@@ -2593,3 +2593,346 @@ code {
   display: inline-flex;
   align-items: center;
 }
+
+/* ---------- 转移矩阵（MC2） ---------- */
+
+.transition-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+}
+
+.transition-grid-wrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  padding: var(--space-2);
+}
+
+.transition-table {
+  border-collapse: separate;
+  border-spacing: 2px;
+  font-size: 11px;
+}
+
+.transition-table caption {
+  caption-side: top;
+  text-align: left;
+  padding-bottom: var(--space-2);
+}
+
+.transition-table th {
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.transition-table thead th:first-child,
+.transition-table tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--panel);
+  text-align: right;
+  padding-right: var(--space-2);
+  white-space: nowrap;
+}
+
+.transition-table thead th span {
+  display: inline-block;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  max-height: 120px;
+  text-align: left;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.transition-cell {
+  width: 40px;
+  height: 30px;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.transition-cell:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.transition-cell:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.transition-cell-low {
+  border-style: dashed;
+  border-color: var(--warn);
+}
+
+.transition-cell-empty {
+  color: var(--text-faint);
+  background: transparent;
+  cursor: default;
+}
+
+.transition-cell-active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--accent-soft);
+}
+
+.transition-cell-n {
+  font-weight: 600;
+}
+
+.transition-cell-actors {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.transition-evidence {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border-top: 1px solid var(--grid);
+  padding-top: var(--space-3);
+}
+
+.transition-pair {
+  display: grid;
+  grid-template-columns: 92px 1fr 1fr;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.transition-pair .trace-item {
+  width: 100%;
+}
+
+.tight-list {
+  margin: 2px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 2px;
+}
+
+/* ---------- MC1 活动矩阵与决策泳道 ---------- */
+
+.mc1-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  overflow: auto;
+  padding-bottom: var(--space-5);
+}
+
+.mc1-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  padding: var(--space-3);
+}
+
+.activity-grid-wrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.activity-table {
+  border-collapse: separate;
+  border-spacing: 1px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-table th {
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 2px 4px;
+  white-space: nowrap;
+}
+
+.activity-table thead th {
+  font-weight: 500;
+}
+
+.activity-table tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--panel);
+  text-align: right;
+  padding-right: var(--space-2);
+}
+
+.activity-cell {
+  min-width: 30px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.activity-cell:hover {
+  border-color: var(--accent);
+}
+
+.activity-cell:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.activity-cell-empty {
+  color: var(--text-faint);
+  background: transparent;
+  border-style: dotted;
+}
+
+.activity-count {
+  min-width: 13px;
+  padding: 0 2px;
+  border-radius: 3px;
+  font-size: 10px;
+  line-height: 15px;
+  text-align: center;
+}
+
+.activity-public {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.activity-internal {
+  background: var(--panel);
+  color: var(--text-muted);
+  border: 1px solid var(--border-strong);
+}
+
+.mc1-anchors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.mc1-anchor {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 11px;
+}
+
+.mc1-anchor-env {
+  border-color: var(--warn);
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.mc1-anchor-agent {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.mc1-anchor-lift {
+  border-color: var(--border-strong);
+  color: var(--text-muted);
+}
+
+.mc1-lanes {
+  width: 100%;
+  min-height: 200px;
+  border: 1px solid var(--grid);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+}
+
+.mc1-lane-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.mc1-detail .callout {
+  margin: 0;
+}
+
+.mc1-audit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  align-items: baseline;
+  border-top: 1px dashed var(--grid);
+  padding-top: var(--space-2);
+}
+
+.mc1-candidate-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.mc1-candidate {
+  border: 1px solid var(--warn);
+  border-left-width: 3px;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  background: var(--warn-soft);
+}
+
+.mc1-candidate-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mc1-candidate-excerpt {
+  margin: 4px 0;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mc1-rules {
+  border-top: 1px dashed var(--grid);
+  padding-top: var(--space-2);
+}
+
+.mc1-rule-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+@media (max-width: 1100px) {
+  .transition-pair {
+    grid-template-columns: 1fr;
+  }
+}
