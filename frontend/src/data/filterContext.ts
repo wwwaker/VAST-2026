@@ -72,7 +72,8 @@ export function describeFilters(filters: Filters): string {
   if (filters.eventTypes.length) parts.push(`类型 ${filters.eventTypes.join("、")}`);
   if (filters.actorId) parts.push(`执行者 ${filters.actorId}`);
   if (filters.participantId) parts.push(`参与者 ${filters.participantId}`);
-  if (filters.runId) parts.push(`运行 ${filters.runId}`);
+  // 运行 ID 很长（run-<32 位>），摘要里只显示可辨认的前 8 位
+  if (filters.runId) parts.push(`运行 ${filters.runId.replace(/^run-/, "").slice(0, 8)}`);
   if (filters.keyword.trim()) parts.push(`关键词「${filters.keyword.trim()}」`);
   return parts.length ? parts.join(" · ") : "无筛选（全量数据）";
 }

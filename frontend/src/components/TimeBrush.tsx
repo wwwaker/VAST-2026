@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useWorkspace } from "../state/workspace";
 import { useTheme } from "../theme/theme";
-import { HOUR_US, SECOND_US, fetchDatasets, formatUtc } from "../data/api";
+import { HOUR_US, SECOND_US, fetchDatasets, fetchRun, formatUtc } from "../data/api";
 
 export function TimeBrush() {
   const {
     dataset,
+    filters,
     cursor,
     setCursor,
     playing,
@@ -18,31 +19,51 @@ export function TimeBrush() {
   } = useWorkspace();
   const { reducedMotion } = useTheme();
   const [range, setRange] = useState<[number, number] | null>(null);
+  /** CUSTOM 选中运行后，回放范围收窄到该运行的精确起止 */
+  const runId = dataset === "CUSTOM" ? filters.runId : null;
 
   /** CUSTOM 的运行以秒级流程为主，其余数据集保留小时步进 */
   const stepUs = dataset === "CUSTOM" ? SECOND_US : HOUR_US;
 
   useEffect(() => {
     let cancelled = false;
-    fetchDatasets()
-      .then((datasets) => {
-        if (cancelled) return;
-        const info = datasets.find((d) => d.dataset_id === dataset);
-        if (!info || info.start_us == null || info.end_us == null) {
-          setRange(null);
-          return;
-        }
-        setRange([info.start_us, info.end_us]);
-        // 只在游标为空时初始化到数据末尾；恢复案例或用户已定位时不覆盖
-        if (cursor == null) setCursor(info.end_us);
-      })
-      .catch(() => setRange(null));
+    const controller = new AbortController();
+    const apply = (start: number | null, end: number | null) => {
+      if (start == null || end == null) {
+        setRange(null);
+        return;
+      }
+      setRange([start, end]);
+      // 只在游标为空时初始化到末尾；恢复案例或用户已定位时不覆盖
+      setCursor((prev) => (prev == null ? end : prev));
+    };
+
+    if (runId) {
+      fetchRun(runId, {}, controller.signal)
+        .then((detail) => {
+          if (!cancelled) apply(detail.run.start_us, detail.run.end_us);
+        })
+        .catch(() => {
+          if (!cancelled) setRange(null);
+        });
+    } else {
+      fetchDatasets(controller.signal)
+        .then((datasets) => {
+          if (cancelled) return;
+          const info = datasets.find((d) => d.dataset_id === dataset);
+          apply(info?.start_us ?? null, info?.end_us ?? null);
+        })
+        .catch(() => {
+          if (!cancelled) setRange(null);
+        });
+    }
+
     return () => {
       cancelled = true;
+      controller.abort();
     };
-    // cursor 故意不入依赖：它只用于首次初始化判断
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataset, setCursor]);
+  }, [dataset, runId, setCursor]);
+
 
   useEffect(() => {
     if (!playing || !range) return;

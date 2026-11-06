@@ -8,6 +8,8 @@ v2 相对 v1 的变化：
 - time_sort_key 继续保存“整数秒”，只服务 time_buckets 等旧聚合，新查询一律走 time_sort_us。
 """
 
+import re
+
 SCHEMA_VERSION = 2
 
 TABLES = """
@@ -221,3 +223,14 @@ INSERT INTO event_fts_idx(event_fts_idx) VALUES('rebuild');
 PRAGMA user_version=2;
 ANALYZE;
 """
+
+_TABLE_RE = re.compile(r"CREATE TABLE\s+(\w+)", re.IGNORECASE)
+
+
+def required_tables() -> set[str]:
+    """TABLES 里声明的表名。
+
+    只比对 user_version 不足以发现“版本号已写成 2、但缺 runs 等新表”的半成品库：
+    这种库会让 /api/health 显示正常，而 /api/runs 直接 500。启动时用本函数比对。
+    """
+    return {match.group(1) for match in _TABLE_RE.finditer(TABLES)}

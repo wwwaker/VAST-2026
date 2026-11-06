@@ -30,6 +30,7 @@ export function EvidenceDrawer() {
     addNote,
     removeNote,
     focusEntity,
+    openTrace,
   } = useWorkspace();
 
   const [event, setEvent] = useState<EventDetail | null>(null);
@@ -182,14 +183,29 @@ export function EvidenceDrawer() {
                   界面不能凭空补全内容，也不能据此断言帖子的含义。
                 </p>
                 {dataset === "MC2" && (
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => focusEntity(`MC2:file_path:${details.content_source}`, { switchView: true })}
-                    title="在关系图中查看该文件的操作轨迹"
-                  >
-                    查看文件轨迹
-                  </button>
+                  <div className="drawer-actions">
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() =>
+                        openTrace({
+                          rootEventId: event?.event_id ?? null,
+                          fileId: `MC2:file_path:${details.content_source}`,
+                        })
+                      }
+                      title="在来源链中打开该文件的完整操作轨迹"
+                    >
+                      查看文件轨迹
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-quiet"
+                      onClick={() => focusEntity(`MC2:file_path:${details.content_source}`, { switchView: true })}
+                      title="在关系图中聚焦该文件实体"
+                    >
+                      在关系图中聚焦
+                    </button>
+                  </div>
                 )}
               </div>
             )}

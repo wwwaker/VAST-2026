@@ -6,9 +6,11 @@
 import puppeteer from "puppeteer-core";
 import path from "node:path";
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const URL = process.argv[2] ?? "http://127.0.0.1:8000";
-const OUT = path.resolve("..", "build");
+// 输出路径按脚本自身位置定位，避免 npm --prefix 与直接 node 调用时落到不同目录
+const OUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "build");
 const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 const TEST_NOTE = `UI 自检生成的测试笔记 ${Date.now()}`;
 
@@ -27,7 +29,12 @@ page.on("console", (m) => {
   if (m.type() === "error") errors.push(m.text());
 });
 page.on("pageerror", (e) => errors.push(String(e)));
-page.on("requestfailed", (r) => errors.push(`请求失败 ${r.url()}`));
+page.on("requestfailed", (r) => {
+  // 组件主动取消的旧请求（AbortController）不算失败，否则每次换游标都会误报
+  const reason = r.failure()?.errorText ?? "";
+  if (reason === "net::ERR_ABORTED") return;
+  errors.push(`请求失败 ${r.url()} (${reason})`);
+});
 page.on("response", (r) => {
   if (r.status() >= 400) errors.push(`HTTP ${r.status()} ${r.url()}`);
 });
@@ -61,20 +68,34 @@ await wait(600);
 await measureLayout("light");
 await page.screenshot({ path: path.join(OUT, "ui-light.png") });
 
-console.log("== 工作区布局交互 ==");
-const dockLabels = ["底部", "左侧", "右侧"];
-for (const label of dockLabels) {
-  await page.evaluate((text) => {
-    const button = [...document.querySelectorAll(".dock-switch button")].find((node) => node.textContent?.trim() === text);
-    button?.click();
-  }, label);
-  await wait(250);
-  const dockState = await page.evaluate(() => ({
-    selected: document.querySelector(".dock-switch [aria-pressed='true']")?.textContent?.trim(),
-    panel: !!document.querySelector(".event-dock"),
+console.log("== 侧栏开关与宽度 ==");
+const dockButton = (label) =>
+  `[...document.querySelectorAll(".topbar-docks button")].find((n) => n.textContent?.trim() === "${label}")`;
+const dockState = () =>
+  page.evaluate(() => ({
+    event: !!document.querySelector(".event-dock"),
+    evidence: !!document.querySelector(".evidence-dock"),
+    eventPressed: document
+      .querySelectorAll(".topbar-docks button")[1]
+      ?.getAttribute("aria-pressed"),
   }));
-  if (dockState.selected !== label || !dockState.panel) throw new Error(`事件流未能停靠到${label}`);
-  console.log(`[停靠 ${label}]`, JSON.stringify(dockState));
+
+const dockInitial = await dockState();
+if (!dockInitial.event) throw new Error("右侧事件流侧栏默认未显示");
+// 两个侧栏默认开合状态不同（事件流开、证据关），按各自初始状态验证“翻转一次再还原”
+for (const [label, key] of [
+  ["事件流", "event"],
+  ["证据", "evidence"],
+]) {
+  await page.evaluate(`(${dockButton(label)}).click()`);
+  await wait(250);
+  const toggled = await dockState();
+  if (toggled[key] === dockInitial[key]) throw new Error(`${label}侧栏开关无效`);
+  await page.evaluate(`(${dockButton(label)}).click()`);
+  await wait(250);
+  const restored = await dockState();
+  if (restored[key] !== dockInitial[key]) throw new Error(`${label}侧栏未能还原`);
+  console.log(`[侧栏 ${label}] 初始=${dockInitial[key]} 切换后=${toggled[key]} 还原=${restored[key]}`);
 }
 await page.evaluate(() => {
   const handle = document.querySelector(".dock-resizer-left");
@@ -108,7 +129,6 @@ const mobileBounds = await page.evaluate(() => ({
 if (mobileBounds.body > mobileBounds.viewport + 1) throw new Error(`窄屏出现横向溢出：${JSON.stringify(mobileBounds)}`);
 console.log("[窄屏]", JSON.stringify(mobileBounds));
 await page.setViewport({ width: 1600, height: 1000 });
-await page.evaluate(() => document.querySelector(".dock-switch button")?.click());
 
 await page.goto(`${URL}/?theme=dark`, { waitUntil: "networkidle0" });
 await page.waitForSelector(".chart-wrap canvas", { timeout: 20000 });
@@ -149,6 +169,34 @@ const customState = await page.evaluate(() => ({
 }));
 console.log("[CUSTOM]", JSON.stringify(customState));
 await page.screenshot({ path: path.join(OUT, "ui-custom.png") });
+
+console.log("== CUSTOM 运行级筛选 ==");
+await page.evaluate(() => document.querySelector(".run-row-button")?.click());
+await page.waitForSelector(".run-detail-head", { timeout: 15000 });
+await wait(1500);
+const runState = await page.evaluate(() => ({
+  summary: document.querySelector(".status-summary")?.textContent ?? "",
+  lane: document.querySelector(".run-detail-head")?.textContent ?? "",
+  stream: document.querySelector(".stream-head .muted")?.textContent ?? "",
+}));
+const laneEvents = Number(
+  (runState.lane.match(/([\d,]+)\s*条事件/) ?? [])[1]?.replace(/,/g, "") ?? NaN,
+);
+const streamMatched = Number(
+  (runState.stream.match(/([\d,]+)\s*条匹配/) ?? [])[1]?.replace(/,/g, "") ?? NaN,
+);
+if (!/运行/.test(runState.summary)) throw new Error(`选中运行后筛选摘要未写入 run_id：${runState.summary}`);
+if (!Number.isFinite(laneEvents) || streamMatched !== laneEvents) {
+  throw new Error(`运行画布与事件流口径不一致：画布 ${laneEvents} 条，事件流 ${streamMatched} 条`);
+}
+console.log(`[运行级筛选] 摘要=${runState.summary} · 画布 ${laneEvents} 条 = 事件流 ${streamMatched} 条`);
+await page.screenshot({ path: path.join(OUT, "ui-custom-run.png") });
+await page.evaluate(() => {
+  const back = [...document.querySelectorAll(".run-detail-tools .btn")].find((b) =>
+    b.textContent?.includes("返回运行列表"),
+  );
+  back?.click();
+});
 
 console.log("== MC1 双声道 ==");
 await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
@@ -214,6 +262,56 @@ await wait(900);
 const graph2 = await page.evaluate(() => document.querySelector(".graph-head p")?.textContent?.trim());
 console.log("[切换中心]", graph2);
 await page.screenshot({ path: path.join(OUT, "ui-graph2.png") });
+
+console.log("== MC2 来源链 ==");
+await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
+await page.waitForSelector(".stream-row", { timeout: 20000 });
+await page.evaluate(() => {
+  const tab = [...document.querySelectorAll(".view-tab")].find((t) => t.textContent?.includes("来源链"));
+  tab?.click();
+});
+await page.waitForSelector(".trace-view", { timeout: 15000 });
+await page.waitForSelector(".canvas-subbar .seg-item", { timeout: 15000 });
+// 用第一个日志明确记录的 content_source 事件作为链根
+await page.evaluate(() => document.querySelector(".canvas-subbar .seg-item")?.click());
+await page.waitForSelector(".trace-lanes", { timeout: 15000 });
+await wait(600);
+const traceState = await page.evaluate(() => ({
+  chips: document.querySelectorAll(".canvas-subbar .seg-item").length,
+  hasCandidate: !!document.querySelector(".trace-chain .tag-warn"),
+  status: [...document.querySelectorAll(".trace-chain .callout code")].map((n) => n.textContent?.trim()),
+  recorded: document.querySelector(".trace-head .muted")?.textContent?.trim(),
+}));
+if (traceState.chips < 3) throw new Error(`来源链根候选不足：${traceState.chips}`);
+if (!traceState.status.includes("metadata_only")) {
+  throw new Error(`目标文件内容状态应为 metadata_only，实际 ${JSON.stringify(traceState.status)}`);
+}
+console.log("[来源链]", JSON.stringify(traceState));
+await page.screenshot({ path: path.join(OUT, "ui-trace.png") });
+
+// 打开文件轨迹：事件数与内容状态必须与来源链一致
+await page.evaluate(() => {
+  const btn = [...document.querySelectorAll(".trace-chain .btn")].find((b) =>
+    b.textContent?.includes("查看文件轨迹"),
+  );
+  btn?.click();
+});
+await page.waitForSelector(".file-events .stream-row", { timeout: 15000 });
+const fileTrack = await page.evaluate(() => ({
+  rows: document.querySelectorAll(".file-events .stream-row").length,
+  status: document.querySelector(".file-track .tag")?.textContent?.trim(),
+  matched: document.querySelector(".file-track .muted")?.textContent?.trim(),
+}));
+if (fileTrack.status !== "仅有元数据") throw new Error(`文件轨迹状态文案异常：${fileTrack.status}`);
+console.log("[文件轨迹]", JSON.stringify(fileTrack));
+await page.screenshot({ path: path.join(OUT, "ui-file-track.png") });
+
+// 切到 MC1 时来源链标签必须消失，避免把 MC2 的链画到别的数据集上
+await page.select(".topbar select", "MC1");
+await wait(900);
+const mc1Tabs = await page.$$eval(".view-tab", (ns) => ns.map((n) => n.textContent?.trim()));
+if (mc1Tabs.includes("来源链")) throw new Error("MC1 下不应出现来源链标签");
+console.log("[数据集隔离]", JSON.stringify(mc1Tabs));
 
 console.log("== 基线比较 ==");
 await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });

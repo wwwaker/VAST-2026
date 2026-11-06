@@ -19,8 +19,8 @@ import {
 export type DatasetId = "MC1" | "MC2" | "CUSTOM";
 export type { Filters };
 
-/** 主画布视图：三个切面共享同一套筛选与选中状态 */
-export type CanvasView = "timeline" | "graph" | "compare";
+/** 主画布视图：共享同一套筛选与选中状态；trace 仅 MC2 可用 */
+export type CanvasView = "timeline" | "graph" | "compare" | "trace";
 
 export type EvidenceTab = "message" | "related" | "raw" | "notes";
 
@@ -43,6 +43,11 @@ interface WorkspaceValue {
   /** 关系图的聚焦实体；只是探索中心，不等于 participant 筛选 */
   focusedEntityId: string | null;
   focusEntity: (id: string | null, options?: { switchView?: boolean }) => void;
+
+  /** MC2 来源链：链根事件与被查看的文件；切换数据集时清空 */
+  traceRootId: string | null;
+  traceFileId: string | null;
+  openTrace: (options?: { rootEventId?: string | null; fileId?: string | null }) => void;
 
   evidenceOpen: boolean;
   setEvidenceOpen: (open: boolean) => void;
@@ -80,6 +85,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [canvasView, setCanvasView] = useState<CanvasView>("timeline");
   const [focusedEntityId, setFocusedEntityId] = useState<string | null>(null);
+  const [traceRootId, setTraceRootId] = useState<string | null>(null);
+  const [traceFileId, setTraceFileId] = useState<string | null>(null);
   const [evidenceTab, setEvidenceTab] = useState<EvidenceTab>("message");
   const [cursor, setCursor] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -94,10 +101,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setSelectedEventId(null);
     setSelectedEventAt(null);
     setFocusedEntityId(null);
+    setTraceRootId(null);
+    setTraceFileId(null);
     setEvidenceOpen(false);
     setCursor(null);
     setPlaying(false);
-  }, []);
+    if (canvasView === "trace") setCanvasView("timeline");
+  }, [canvasView]);
 
   const setFilters = useCallback((patch: Partial<Filters>) => {
     setFiltersState((prev) => ({ ...prev, ...patch }));
@@ -115,6 +125,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     (id: string | null, options?: { switchView?: boolean }) => {
       setFocusedEntityId(id);
       if (options?.switchView) setCanvasView("graph");
+    },
+    [],
+  );
+
+  /** 打开来源链：可同时指定链根与被查看文件；只切换视图而不改筛选 */
+  const openTrace = useCallback(
+    (options?: { rootEventId?: string | null; fileId?: string | null }) => {
+      if (options && "rootEventId" in options) setTraceRootId(options.rootEventId ?? null);
+      if (options && "fileId" in options) setTraceFileId(options.fileId ?? null);
+      setCanvasView("trace");
     },
     [],
   );
@@ -181,6 +201,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setCanvasView,
       focusedEntityId,
       focusEntity,
+      traceRootId,
+      traceFileId,
+      openTrace,
       evidenceOpen,
       setEvidenceOpen,
       evidenceTab,
@@ -212,6 +235,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       canvasView,
       focusedEntityId,
       focusEntity,
+      traceRootId,
+      traceFileId,
+      openTrace,
       evidenceOpen,
       evidenceTab,
       cursor,

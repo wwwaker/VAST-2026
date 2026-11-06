@@ -701,6 +701,156 @@ export function fetchRunComparison(
   );
 }
 
+// ---------------------------------------------------------------- MC2 文件与来源链
+
+export type ContentStatus = "available" | "metadata_only" | "unresolved";
+export type ProvenanceKind = "recorded" | "derived" | "candidate" | "analyst";
+
+export interface TraceRootItem {
+  event_id: string;
+  file_id: string;
+  file_path: string | null;
+  time_us: number;
+  actor_id: string | null;
+  actor_label: string | null;
+}
+
+export interface FileStatus {
+  file_id: string;
+  path: string;
+  label: string | null;
+  content_status: ContentStatus;
+  reason: string;
+  size_hint: number | null;
+  event_count: number;
+  event_type_counts: Record<string, number>;
+  first_us: number | null;
+  last_us: number | null;
+  content_sources: { event_id: string; field: string; length: number }[];
+  checked_sources?: string[];
+  missing_fields: string[];
+  supports: string[];
+  cannot_support: string[];
+  event_ids?: string[];
+  events_truncated?: boolean;
+}
+
+export interface TraceNode {
+  id: string;
+  kind: "event" | "entity";
+  role: "root" | "file" | "file_operation" | "candidate_file" | string;
+  label: string;
+  event_id?: string;
+  event_type?: string;
+  time_us?: number;
+  actor_id?: string | null;
+  actor_label?: string | null;
+  preview?: string;
+  path?: string;
+  relay_event_count?: number;
+}
+
+export interface TraceEdge {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  relation: string;
+  provenanceKind: ProvenanceKind;
+  temporalStatus: string;
+  evidenceEventIds: string[];
+  ruleId: string | null;
+  explanation: string;
+}
+
+export interface TracePayload {
+  meta: Meta;
+  dataset_id: string;
+  root_event_id: string;
+  nodes: TraceNode[];
+  edges: TraceEdge[];
+  recorded_edge_count: number;
+  candidate_edge_count: number;
+  files: FileStatus[];
+  candidates: { file_id: string; path: string; relay_event_count: number }[];
+  unresolved: { count: number; ids: string[] };
+  budget: { events: number; used: number; truncated: boolean; reasons: string[] };
+  legend: Record<string, string>;
+}
+
+export interface FileTrackPayload {
+  meta: Meta;
+  file: FileStatus;
+  relation_counts: Record<string, number>;
+  items: (EventItem & { file_relations: string[] })[];
+  next_cursor: string | null;
+  naming_note: string;
+}
+
+export function fetchTraceRoots(signal?: AbortSignal): Promise<{ dataset_id: string; items: TraceRootItem[]; note: string }> {
+  return getJson("/api/traces/roots", { dataset: "MC2" }, signal);
+}
+
+export function fetchTrace(
+  params: {
+    rootEventId: string;
+    filters: Filters;
+    cursorUs?: number | null;
+    masking?: boolean;
+    maxEvents?: number;
+  },
+  signal?: AbortSignal,
+): Promise<TracePayload> {
+  return getJson<TracePayload>(
+    "/api/traces",
+    withFilters(params.filters, {
+      dataset: "MC2",
+      root_event_id: params.rootEventId,
+      cursor_us: params.cursorUs ?? undefined,
+      masking: params.masking ? "true" : undefined,
+      max_events: params.maxEvents,
+    }),
+    signal,
+  );
+}
+
+export function searchFiles(
+  query: string,
+  signal?: AbortSignal,
+): Promise<{
+  dataset_id: string;
+  query: string;
+  count: number;
+  note: string;
+  items: { file_id: string; path: string; event_count: number; first_us: number | null; last_us: number | null; exact: boolean }[];
+}> {
+  return getJson("/api/files", { dataset: "MC2", q: query, limit: 20 }, signal);
+}
+
+export function fetchFileTrack(
+  params: {
+    fileId: string;
+    filters: Filters;
+    limit?: number;
+    cursor?: string | null;
+    cursorUs?: number | null;
+    masking?: boolean;
+  },
+  signal?: AbortSignal,
+): Promise<FileTrackPayload> {
+  return getJson<FileTrackPayload>(
+    "/api/file-track",
+    withFilters(params.filters, {
+      dataset: "MC2",
+      file_id: params.fileId,
+      limit: params.limit,
+      cursor: params.cursor ?? undefined,
+      cursor_us: params.cursorUs ?? undefined,
+      masking: params.masking ? "true" : undefined,
+    }),
+    signal,
+  );
+}
+
 export function formatUtc(timeUs: number): string {
   const iso = new Date(timeUs / 1000).toISOString();
   return `${iso.slice(0, 10)} ${iso.slice(11, 16)}`;

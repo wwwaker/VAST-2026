@@ -247,13 +247,6 @@ select:focus-visible {
   margin: 0;
 }
 
-.canvas-actions,
-.dock-switch {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
 .event-dock {
   position: relative;
   display: flex;
@@ -2162,4 +2155,148 @@ code {
 .audit-evidence-btn {
   font-size: 10px;
   padding: 0 4px;
+}
+
+/* ---------------------------------------------------------------- MC2 来源链 */
+
+.trace-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-3);
+}
+
+.trace-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.trace-lanes {
+  width: 100%;
+  height: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.trace-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (max-width: 1180px) {
+  .trace-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.trace-chain,
+.trace-file {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.trace-chain h3 {
+  margin: var(--space-2) 0 0;
+  font-size: 12.5px;
+}
+
+.trace-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.trace-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 5px var(--space-3);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--grid);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  flex-wrap: wrap;
+}
+
+.trace-item:hover,
+.trace-item:focus-visible {
+  background: var(--selection);
+}
+
+.trace-list li:last-child .trace-item {
+  border-bottom: none;
+}
+
+.file-track {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  background: var(--panel);
+  min-width: 0;
+}
+
+.file-track-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.file-track-head h3 {
+  margin: 0 0 2px;
+  font-size: 12.5px;
+  word-break: break-all;
+}
+
+.file-facts {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 4px var(--space-2);
+  margin: 0;
+  font-size: 11.5px;
+}
+
+.file-facts dt {
+  color: var(--text-muted);
+}
+
+.file-facts dd {
+  margin: 0;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.file-events .stream-row {
+  gap: 6px;
+}
+
+.drawer-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: 6px;
 }

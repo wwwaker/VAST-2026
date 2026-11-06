@@ -65,6 +65,7 @@ cd frontend && npm run dev        # http://localhost:5173
 | `python -m app.ingest.cli --all --fresh` | 全量重建数据库 |
 | `python -m app.ingest.cli --dataset MC1` | 只重导一个数据集 |
 | `python tools/bench_sqlite.py --dataset MC2` | SQLite 导入与查询基准 |
+| `python tools/audit_mc2_content.py` | MC2 内容可用性审计，写 `build/mc2-content-audit.json` |
 | `cd frontend && npm run check:ui -- http://127.0.0.1:8000` | 无头浏览器自检：布局、交互、键盘、截图、渲染基准、控制台错误 |
 | `python tools/check_contrast.py --strict` | 双主题对比度验收（WCAG 2.1），有失败项时退出码非 0 |
 | `curl http://127.0.0.1:8000/api/health` | 健康检查（含库大小） |
@@ -76,9 +77,11 @@ cd frontend && npm run dev        # http://localhost:5173
 ```text
 data/processed/          处理后数据（JSONL 事件表 + JSON 实体表 + labels.json）
 backend/app/ingest/      manifest、adapter、导入命令行
+backend/app/domain/      类型字典、CUSTOM 审计规则、MC2 文件与来源链
 backend/app/routers/     查询接口
 frontend/src/            工作区前端（theme / state / components / views）
-tools/bench_sqlite.py    SQLite 基准脚本
+frontend/src/views/mc2/  来源链与文件轨迹（仅 MC2）
+tools/                   基准脚本、对比度检查、MC2 内容审计
 build/                   数据库与截图产物（不入库）
 docs/                    计划书、数据适配规则、基准与接口说明
 ```
@@ -92,7 +95,7 @@ docs/                    计划书、数据适配规则、基准与接口说明
 | 数据集 | 主锚点 | 说明 |
 | --- | --- | --- |
 | MC1 | 17:25 首条确认帖（`first_confirm_post`） | 内部 agent 自己发的，可追到决策链；17:00 的第三方抢先发布仅作上下文 |
-| MC2 | 11:21Z 目标帖子（`target_post`） | 官方口径 04:21 为本地时间 |
+| MC2 | 11:21Z 目标帖子（`target_post`） | 官方口径 04:21 为本地时间；「来源链」标签可按 `post_content_source` 从帖子追到内容文件与文件操作 |
 | CUSTOM | 无（按 `run_id` 选运行） | 32 次运行，标签区分 scenario 与 observed |
 
 MC2 还在 manifest 里记录了**候选干预点**：`SwiftWren_further_instructions.md` 的任务接力环节。
@@ -122,7 +125,7 @@ MC2 还在 manifest 里记录了**候选干预点**：`SwiftWren_further_instruc
 - 窄屏布局（1180 px 以下）未做真机验证。
 - 服务为单进程、每请求一个只读连接，未做并发压测。
 - 关系图支持 1–3 跳，默认 80 节点 / 300 边；任何裁剪都会返回具体原因。
-- MC2 帖子正文不在数据集内，界面只能确认来源文件名，不能还原内容含义。
+- MC2 帖子正文不在数据集内（官方包也没有文件附件）：来源链能确认“来源文件 + 文件操作”，内容状态显示 `metadata_only`，不能还原正文含义。可核查的字段差异是：108 条 `saidit_post` 里 105 条带标题级 `content`，三条异常帖没有。
 - CUSTOM 已有运行列表、单次流程泳道、审计重算与配对比较；五条冻结案例配置与 MC1 决策泳道尚未实现（S2 剩余项 / S4）。
 
 ---

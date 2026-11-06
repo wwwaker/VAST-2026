@@ -16,7 +16,18 @@ from fastapi.staticfiles import StaticFiles
 from .config import DB_PATH, FRONTEND_DIST
 from .ingest import schema
 from .notes_store import ensure_schema as ensure_notes_schema
-from .routers import compare, datasets, entities, events, graph, notes, runs, search
+from .routers import (
+    compare,
+    datasets,
+    entities,
+    events,
+    files,
+    graph,
+    notes,
+    runs,
+    search,
+    traces,
+)
 
 app = FastAPI(
     title="多智能体系统异常行为调查 API",
@@ -39,6 +50,8 @@ app.include_router(compare.router)
 app.include_router(notes.router)
 app.include_router(search.router)
 app.include_router(runs.router)
+app.include_router(files.router)
+app.include_router(traces.router)
 
 # 笔记存在独立的库文件里，启动时建表即可，与数据导入互不影响
 ensure_notes_schema()
@@ -65,7 +78,22 @@ def health():
             payload["status"] = "schema_outdated"
             payload["hint"] = (
                 "旧版主库不再支持 v2 查询。请停止服务后执行："
-                "python -m app.ingest.cli --all --fresh"
+                "cd backend && python -m app.ingest.cli --all --fresh"
+            )
+            return payload
+        # user_version 相同也可能缺表（历史半成品库），必须按 DDL 逐表核对
+        existing = {
+            row[0]
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type IN ('table','view')")
+        }
+        missing = sorted(schema.required_tables() - existing)
+        if missing:
+            payload["status"] = "schema_incomplete"
+            payload["missing_tables"] = missing
+            payload["hint"] = (
+                "主库缺少 v2 必需的表，运行相关接口会失败。请停止服务后重建："
+                "cd backend && python -m app.ingest.cli --all --fresh"
+                "（或把 MAS_DB 指向已完整构建的库）"
             )
             return payload
         payload["datasets"] = {

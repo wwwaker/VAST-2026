@@ -1,6 +1,11 @@
 import { useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { ThemeProvider } from "./theme/theme";
-import { WorkspaceProvider, useWorkspace, type CanvasView } from "./state/workspace";
+import {
+  WorkspaceProvider,
+  useWorkspace,
+  type CanvasView,
+  type DatasetId,
+} from "./state/workspace";
 import { StatusBar, TopBar } from "./components/Shell";
 import { TimeBrush } from "./components/TimeBrush";
 import { EvidenceDrawer } from "./components/EvidenceDrawer";
@@ -12,11 +17,13 @@ import { ShortcutsHelp } from "./components/ShortcutsHelp";
 import { useHotkeys } from "./hooks/useHotkeys";
 import { RenderBenchView } from "./views/RenderBenchView";
 import { CustomWorkspace } from "./views/custom/CustomWorkspace";
+import { SourceTrace } from "./views/mc2/SourceTrace";
 
-const VIEWS: { key: CanvasView; label: string; hint: string }[] = [
+const VIEWS: { key: CanvasView; label: string; hint: string; only?: DatasetId[] }[] = [
   { key: "timeline", label: "事件时间线", hint: "按时间建立基线，刷选时段" },
   { key: "graph", label: "关系图", hint: "以选中实体为中心展开邻接" },
   { key: "compare", label: "基线比较", hint: "把刷选窗口与前一等长窗口对比" },
+  { key: "trace", label: "来源链", hint: "从发布事件追到内容文件与文件操作", only: ["MC2"] },
 ];
 
 const readLayout = (key: string, fallback: string) => {
@@ -24,10 +31,11 @@ const readLayout = (key: string, fallback: string) => {
 };
 
 function ViewTabs() {
-  const { canvasView, setCanvasView } = useWorkspace();
+  const { canvasView, setCanvasView, dataset } = useWorkspace();
+  const visible = VIEWS.filter((v) => !v.only || v.only.includes(dataset));
   return (
     <div className="view-tabs" role="tablist" aria-label="主画布视图">
-      {VIEWS.map((v) => (
+      {visible.map((v) => (
         <button
           key={v.key}
           type="button"
@@ -116,6 +124,7 @@ function Workspace() {
                 (dataset === "CUSTOM" ? <CustomWorkspace /> : <OverviewView />)}
               {canvasView === "graph" && <RelationGraph />}
               {canvasView === "compare" && <CompareView />}
+              {canvasView === "trace" && dataset === "MC2" && <SourceTrace />}
             </>
           )}
           </main>
