@@ -11,6 +11,7 @@ import { CompareView } from "./views/CompareView";
 import { ShortcutsHelp } from "./components/ShortcutsHelp";
 import { useHotkeys } from "./hooks/useHotkeys";
 import { RenderBenchView } from "./views/RenderBenchView";
+import { CustomWorkspace } from "./views/custom/CustomWorkspace";
 
 const VIEWS: { key: CanvasView; label: string; hint: string }[] = [
   { key: "timeline", label: "事件时间线", hint: "按时间建立基线，刷选时段" },
@@ -49,7 +50,7 @@ function Workspace() {
   const [eventOpen, setEventOpen] = useState(() => readLayout("event-open", "true") === "true");
   const [evidenceSize, setEvidenceSize] = useState(() => Math.max(280, Math.min(560, Number(readLayout("evidence-size", "392")) || 392)));
   const [eventSize, setEventSize] = useState(() => Math.max(240, Math.min(520, Number(readLayout("event-size", "320")) || 320)));
-  const { canvasView, evidenceOpen, setEvidenceOpen } = useWorkspace();
+  const { canvasView, dataset, evidenceOpen, setEvidenceOpen } = useWorkspace();
   useHotkeys(() => setShowHelp((v) => !v));
 
   const persist = (key: string, value: string) => {
@@ -111,7 +112,8 @@ function Workspace() {
               <div className="canvas-toolbar">
                 <ViewTabs />
               </div>
-              {canvasView === "timeline" && <OverviewView />}
+              {canvasView === "timeline" &&
+                (dataset === "CUSTOM" ? <CustomWorkspace /> : <OverviewView />)}
               {canvasView === "graph" && <RelationGraph />}
               {canvasView === "compare" && <CompareView />}
             </>

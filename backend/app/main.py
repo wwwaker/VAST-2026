@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import DB_PATH, FRONTEND_DIST
 from .ingest import schema
 from .notes_store import ensure_schema as ensure_notes_schema
-from .routers import compare, datasets, entities, events, graph, notes, search
+from .routers import compare, datasets, entities, events, graph, notes, runs, search
 
 app = FastAPI(
     title="多智能体系统异常行为调查 API",
@@ -38,6 +38,7 @@ app.include_router(graph.router)
 app.include_router(compare.router)
 app.include_router(notes.router)
 app.include_router(search.router)
+app.include_router(runs.router)
 
 # 笔记存在独立的库文件里，启动时建表即可，与数据导入互不影响
 ensure_notes_schema()

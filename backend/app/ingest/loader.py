@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 
 from ..config import DATA_DIR, IMPORT_VERSION
 from ..domain import event_types
-from . import schema
+from . import derived, schema
 from .manifest import DatasetManifest
 
 TEXT_KEYS = (
@@ -86,6 +86,10 @@ class DatasetStats:
     ts_max_us: int | None = None
     data_version: str = ""
     runs: int = 0
+    pairs: int = 0
+    parent_links: int = 0
+    artifact_status: str = "not_configured"
+    artifact_id: str | None = None
     unknown_types: list[str] = field(default_factory=list)
     checks: list[tuple[str, bool, str]] = field(default_factory=list)
 
@@ -255,7 +259,18 @@ def load_dataset(conn, manifest: DatasetManifest) -> DatasetStats:
     dataset_id = manifest.dataset_id
     tz = manifest.timezone_status
 
-    for table in ("events", "event_raw", "entities", "participants", "relations", "event_fts"):
+    for table in (
+        "events",
+        "event_raw",
+        "entities",
+        "participants",
+        "relations",
+        "event_fts",
+        "runs",
+        "run_pairs",
+        "event_links",
+        "artifact_sources",
+    ):
         conn.execute(f"DELETE FROM {table} WHERE dataset_id=?", (dataset_id,))
     conn.execute("DELETE FROM annotations WHERE dataset_id=?", (dataset_id,))
     conn.execute("DELETE FROM annotation_events WHERE dataset_id=?", (dataset_id,))
@@ -505,6 +520,13 @@ def load_dataset(conn, manifest: DatasetManifest) -> DatasetStats:
     stats.runs = len(runs)
     stats.unknown_types = event_types.unknown_types(dataset_id, list(type_counter))
 
+    if manifest.labels_file:
+        _load_annotations(conn, manifest, stats)
+
+    # 派生数据依赖已入库事件与标签：哈希核验通过才写 runs / run_pairs / event_links
+    if manifest.dataset_id == "CUSTOM":
+        derived.load_custom(conn, stats)
+
     conn.execute(
         "INSERT INTO datasets (dataset_id,name,question,timezone_status,event_count,entity_count,"
         "ts_min,ts_max,deliberation_count,import_version,data_version,schema_version,imported_at) "
@@ -525,9 +547,6 @@ def load_dataset(conn, manifest: DatasetManifest) -> DatasetStats:
             datetime.now(timezone.utc).isoformat(timespec="seconds"),
         ),
     )
-
-    if manifest.labels_file:
-        _load_annotations(conn, manifest, stats)
 
     _run_checks(conn, manifest, stats)
     return stats

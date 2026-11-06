@@ -5,6 +5,8 @@ import os
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA_DIR = os.path.join(ROOT, "data", "processed")
 BUILD_DIR = os.path.join(ROOT, "build")
+# 派生分析产物根目录；manifest 内路径相对它（不是相对 process/views）
+ARTIFACT_ROOT = os.environ.get("MAS_ARTIFACT_ROOT", os.path.join(ROOT, "final-data"))
 DB_PATH = os.environ.get("MAS_DB", os.path.join(BUILD_DIR, "mas.db"))
 # 人工笔记单独存放：mas.db 会被 --fresh 整体删除
 NOTES_DB = os.environ.get("MAS_NOTES_DB", os.path.join(BUILD_DIR, "notes.db"))

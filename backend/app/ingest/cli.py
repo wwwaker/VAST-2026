@@ -29,6 +29,7 @@ VALIDATION_REPORT = os.path.join(BUILD_DIR, "ingest-validation.json")
 
 def _connect(path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
     conn.executescript(
         """
         PRAGMA journal_mode=OFF;
@@ -151,7 +152,8 @@ def main() -> None:
             elapsed = time.perf_counter() - t0
             print(
                 f"  事件 {item.events:,} · 实体 {item.entities:,} · 参与者 {item.participants:,} "
-                f"· 关系 {item.relations:,} · 全文 {item.fts_rows:,} · 运行 {item.runs} · 耗时 {elapsed:.2f}s"
+                f"· 关系 {item.relations:,} · 全文 {item.fts_rows:,} · 运行 {item.runs} "
+                f"· 配对 {item.pairs} · 派生 {item.artifact_status} · 耗时 {elapsed:.2f}s"
             )
             if item.unresolved_refs:
                 print(f"  未解析引用 {item.unresolved_refs} 条（已计数，未丢弃）")

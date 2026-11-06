@@ -135,6 +135,55 @@ CREATE TABLE event_fts (
     dataset_id UNINDEXED,
     body     TEXT
 );
+
+-- 派生数据版本：记录 manifest 哈希与可用状态，避免“事件没变、派生文件变了”时沿用旧结论
+CREATE TABLE artifact_sources (
+    artifact_id   TEXT PRIMARY KEY,
+    dataset_id    TEXT NOT NULL,
+    relative_path TEXT NOT NULL,
+    sha256        TEXT NOT NULL,
+    method_version TEXT NOT NULL,
+    status        TEXT NOT NULL,
+    verified_at   TEXT NOT NULL
+);
+
+-- 自建数据的运行维度：主题、模型、fixture、场景与观测结果
+CREATE TABLE runs (
+    dataset_id   TEXT NOT NULL,
+    run_id       TEXT NOT NULL,
+    model        TEXT,
+    fixture      TEXT,
+    scenario     TEXT,
+    observed     INTEGER NOT NULL DEFAULT 0,
+    anomaly_type TEXT,
+    start_us     INTEGER,
+    end_us       INTEGER,
+    event_count  INTEGER NOT NULL,
+    metrics_json TEXT,
+    artifact_id  TEXT,
+    PRIMARY KEY (dataset_id, run_id)
+);
+
+CREATE TABLE run_pairs (
+    dataset_id    TEXT NOT NULL,
+    run_id        TEXT NOT NULL,
+    normal_run_id TEXT NOT NULL,
+    model         TEXT,
+    fixture       TEXT,
+    artifact_id   TEXT,
+    PRIMARY KEY (dataset_id, run_id, normal_run_id)
+);
+
+-- 明确记录的父子/回复关系；不包含推测关联
+CREATE TABLE event_links (
+    dataset_id      TEXT NOT NULL,
+    source_event_id TEXT NOT NULL,
+    target_event_id TEXT NOT NULL,
+    relation        TEXT NOT NULL,
+    derivation      TEXT NOT NULL,
+    artifact_id     TEXT,
+    PRIMARY KEY (dataset_id, source_event_id, target_event_id, relation, derivation)
+);
 """
 
 INDEXES = """
@@ -158,6 +207,8 @@ CREATE INDEX IF NOT EXISTS idx_rel_event        ON relations(dataset_id, event_i
 CREATE INDEX IF NOT EXISTS idx_events_srcid     ON events(dataset_id, source_record_id);
 CREATE INDEX IF NOT EXISTS idx_events_file      ON events(dataset_id, source_file);
 CREATE INDEX IF NOT EXISTS idx_anno_event       ON annotation_events(dataset_id, event_id);
+CREATE INDEX IF NOT EXISTS idx_links_target     ON event_links(dataset_id, target_event_id);
+CREATE INDEX IF NOT EXISTS idx_runs_scenario    ON runs(dataset_id, scenario, model, fixture);
 CREATE INDEX IF NOT EXISTS idx_fts_dataset      ON event_fts(dataset_id);
 CREATE INDEX IF NOT EXISTS idx_bucket           ON time_buckets(dataset_id, granularity, bucket_key);
 CREATE VIRTUAL TABLE IF NOT EXISTS event_fts_idx USING fts5(

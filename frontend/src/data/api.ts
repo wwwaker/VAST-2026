@@ -311,6 +311,124 @@ export interface ComparePayload {
   metric_note: string;
 }
 
+export interface RunAuditSummary {
+  attempt_count: number;
+  review_valid: number;
+  review_invalid: number;
+  review_unknown: number;
+  version_current: number;
+  version_stale: number;
+  version_unknown: number;
+  published_current: number;
+  published_stale: number;
+  denied: number;
+  failed: number;
+  publish_unknown: number;
+  published_without_valid_review: number;
+  repeated_handoff: number;
+}
+
+export interface RunAuditRule {
+  rule_id: string;
+  scope: string | null;
+  status: string;
+  reason: string;
+  evidence_event_ids: string[];
+  pairing?: string;
+}
+
+export interface RunSummary {
+  run_id: string;
+  model: string | null;
+  fixture: string | null;
+  scenario: string | null;
+  observed: boolean;
+  anomaly_type: string | null;
+  start_us: number | null;
+  end_us: number | null;
+  duration_us: number | null;
+  event_count: number;
+  metrics: Record<string, unknown>;
+}
+
+export interface RunItem extends RunSummary {
+  normal_run_id: string | null;
+  has_pair: boolean;
+  audit: RunAuditSummary;
+  audit_rules: RunAuditRule[];
+}
+
+export interface RunsPayload {
+  meta: Record<string, unknown>;
+  items: RunItem[];
+}
+
+export interface RunCall {
+  role: string | null;
+  started_event_id: string | null;
+  finished_event_id: string;
+  start_us: number | null;
+  end_us: number;
+  duration_ms: number | null;
+  status: string | null;
+  unpaired: boolean;
+}
+
+export interface RunLink {
+  source_event_id: string;
+  target_event_id: string;
+  relation: string;
+  derivation: string;
+}
+
+export interface RunDetailPayload {
+  meta: Meta;
+  run: RunSummary;
+  pair: { normal_run_id: string; model: string | null; fixture: string | null } | null;
+  events: EventItem[];
+  links: RunLink[];
+  calls: RunCall[];
+  audit: {
+    attempts: { attempt_event_id: string; review: RunAuditRule; version_check: RunAuditRule; publish: RunAuditRule }[];
+    rules: RunAuditRule[];
+    handoff: {
+      total: number;
+      repeated_pair_count: number;
+      pairs: { source_role: string; target_role: string; count: number; evidence_event_ids: string[] }[];
+      loops: { path: string[]; event_ids: string[] }[];
+    };
+    summary: RunAuditSummary;
+  };
+  truncated: boolean;
+}
+
+export interface RunStageSide {
+  count: number;
+  event_ids: string[];
+  start_offset_us: number | null;
+  duration_us: number | null;
+  actors?: string[];
+}
+
+export interface RunComparisonPayload {
+  meta: Record<string, unknown>;
+  pair: {
+    run_id: string;
+    baseline_run_id: string;
+    auto: boolean;
+    valid: boolean;
+    same_model: boolean;
+    same_fixture: boolean;
+    baseline_normal: boolean;
+  };
+  run: RunSummary;
+  baseline: RunSummary;
+  stages: { stage: string; label: string; run: RunStageSide; baseline: RunStageSide; missing: { run: boolean; baseline: boolean } }[];
+  metrics: { key: string; label: string; run: unknown; baseline: unknown; different: boolean }[];
+  audit: { run: RunAuditSummary; baseline: RunAuditSummary };
+  note: string;
+}
+
 export interface NoteItem {
   note_id: number;
   dataset_id: string;
@@ -534,6 +652,51 @@ export function fetchCompare(
       cursor_us: params.cursorUs ?? undefined,
       masking: params.masking ? "true" : undefined,
     }),
+    signal,
+  );
+}
+
+export function fetchRuns(
+  params: { model?: string; fixture?: string; scenario?: string; observed?: boolean },
+  signal?: AbortSignal,
+): Promise<RunsPayload> {
+  return getJson<RunsPayload>(
+    "/api/runs",
+    {
+      dataset: "CUSTOM",
+      model: params.model,
+      fixture: params.fixture,
+      scenario: params.scenario,
+      observed: params.observed === undefined ? undefined : String(params.observed),
+    },
+    signal,
+  );
+}
+
+export function fetchRun(
+  runId: string,
+  options: { cursorUs?: number | null; masking?: boolean } = {},
+  signal?: AbortSignal,
+): Promise<RunDetailPayload> {
+  return getJson<RunDetailPayload>(
+    `/api/runs/${encodeURIComponent(runId)}`,
+    {
+      dataset: "CUSTOM",
+      cursor_us: options.cursorUs ?? undefined,
+      masking: options.masking ? "true" : undefined,
+    },
+    signal,
+  );
+}
+
+export function fetchRunComparison(
+  runId: string,
+  baselineRunId?: string | null,
+  signal?: AbortSignal,
+): Promise<RunComparisonPayload> {
+  return getJson<RunComparisonPayload>(
+    "/api/run-comparisons",
+    { dataset: "CUSTOM", run_id: runId, baseline_run_id: baselineRunId ?? undefined },
     signal,
   );
 }

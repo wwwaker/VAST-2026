@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..db import get_conn, require_dataset
 from ..domain import event_types
+from ..ingest import artifacts
 from ..ingest.loader import parse_epoch_us
 from ..ingest.manifest import ALL
 from ..query import filters
@@ -77,12 +78,11 @@ def capabilities(dataset_id: str):
                 "SELECT key, cnt FROM stat_counts WHERE dataset_id=? AND kind='type'", (dataset_id,)
             )
         }
+        artifact = artifacts.status_of(conn, dataset_id)
 
     payload = event_types.capabilities(dataset_id)
     unknown = event_types.unknown_types(dataset_id, list(counts))
-    types = [
-        {**item, "count": counts.get(item["type"], 0)} for item in payload["types"]
-    ]
+    types = [{**item, "count": counts.get(item["type"], 0)} for item in payload["types"]]
     return {
         "contract_version": filters.CONTRACT_VERSION,
         "dataset_id": dataset_id,
@@ -106,7 +106,8 @@ def capabilities(dataset_id: str):
             "compare": dataset_id != "CUSTOM",
             "run_compare": dataset_id == "CUSTOM",
         },
-        "artifact_status": "not_configured",
+        "artifact_status": artifact["status"],
+        "artifact": artifact,
     }
 
 
