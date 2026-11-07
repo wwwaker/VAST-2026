@@ -9,6 +9,14 @@ export type { BasketItem, CanvasView, CompareReturn, CompareState, DatasetId } f
 export type { Filters };
 export type EvidenceTab = "message" | "related" | "raw" | "notes" | "basket";
 export interface ActiveCase { case_id: string; title: string }
+export interface FindingDraft {
+  title: string;
+  claim: string;
+  status: "hypothesis" | "supported" | "inconclusive";
+  explanation: string;
+  limitations: string;
+}
+const EMPTY_FINDING_DRAFT: FindingDraft = { title: "", claim: "", status: "hypothesis", explanation: "", limitations: "" };
 
 interface WorkspaceValue {
   state: WorkspaceState;
@@ -36,6 +44,8 @@ interface WorkspaceValue {
   basket: BasketItem[]; addToBasket: (item: BasketItem) => void;
   removeFromBasket: (eventId: string, role: BasketItem["role"]) => void; clearBasket: () => void;
   activeCase: ActiveCase | null; setActiveCase: (value: ActiveCase | null, expectedDataset?: DatasetId) => void;
+  findingDraft: FindingDraft; setFindingDraft: (patch: Partial<FindingDraft>) => void;
+  noteDraft: string; setNoteDraft: (value: string) => void;
   notes: NoteItem[]; notesLoading: boolean; refreshNotes: () => Promise<void>;
   addNote: (body: string, options?: { eventId?: string | null; eventTime?: number | null }) => Promise<void>;
   removeNote: (noteId: number) => Promise<void>;
@@ -50,6 +60,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [evidenceTab, setEvidenceTab] = useState<EvidenceTab>("message");
   const [activeCaseState, setActiveCaseState] = useState<(ActiveCase & { dataset: DatasetId }) | null>(null);
+  const [findingDrafts, setFindingDrafts] = useState<Record<string, FindingDraft>>({});
+  const [noteDrafts, setNoteDrafts] = useState<Partial<Record<DatasetId, string>>>({});
   const [notesState, setNotes] = useState<{ dataset: DatasetId; items: NoteItem[] }>({ dataset: state.dataset, items: [] });
   const [notesLoading, setNotesLoading] = useState(false);
   const dataset = state.dataset;
@@ -57,6 +69,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const filterSummary = useMemo(() => describeFilters(filters), [filters]);
   const notes = notesState.dataset === dataset ? notesState.items : [];
   const activeCase = activeCaseState?.dataset === dataset ? activeCaseState : null;
+  const findingDraftKey = `${dataset}:${activeCase?.case_id ?? "new"}`;
+  const findingDraft = findingDrafts[findingDraftKey] ?? EMPTY_FINDING_DRAFT;
+  const noteDraft = noteDrafts[dataset] ?? "";
 
   const refreshNotes = useCallback(async () => {
     const requestedDataset = stateRef.current.dataset;
@@ -77,7 +92,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, []);
   const selectEvent = useCallback((id: string | null, atUs?: number | null) => {
     dispatch({ type: "inspect", selection: id ? { kind: "event", id, timeUs: atUs ?? null } : null });
-    if (id) setEvidenceOpen(true); // Legacy drawer behavior, replaced in S1.
   }, []);
   const setCursor = useCallback<Dispatch<SetStateAction<number | null>>>((value) => {
     dispatch({ type: "cursor", value });
@@ -129,6 +143,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       if (expectedDataset && stateRef.current.dataset !== expectedDataset) return;
       setActiveCaseState(item ? { ...item, dataset: stateRef.current.dataset } : null);
     },
+    findingDraft,
+    setFindingDraft: (patch) => setFindingDrafts((prev) => ({ ...prev, [findingDraftKey]: { ...(prev[findingDraftKey] ?? EMPTY_FINDING_DRAFT), ...patch } })),
+    noteDraft,
+    setNoteDraft: (value) => setNoteDrafts((prev) => ({ ...prev, [dataset]: value })),
     notes, notesLoading, refreshNotes, addNote, removeNote,
   };
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;

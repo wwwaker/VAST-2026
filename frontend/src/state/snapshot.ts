@@ -211,7 +211,8 @@ export function migrateLegacy(value: unknown, dataset: DatasetId): { snapshot: U
   state = workspaceReducer(state, { type: "filters", patch: filters });
   const summary = ["旧快照已迁移；未记录的配对、视口和子模式不作推测。"];
   if (old.canvas_view !== undefined) choice(old.canvas_view, ["timeline", "graph", "compare", "trace"]);
-  if (old.canvas_view === "graph") state = workspaceReducer(state, { type: "canvas", view: "graph" });
+  if (old.canvas_view === "timeline") state = workspaceReducer(state, { type: "canvas", view: "timeline" });
+  else if (old.canvas_view === "graph") state = workspaceReducer(state, { type: "canvas", view: "graph" });
   else if (old.canvas_view === "compare") state = workspaceReducer(state, { type: "canvas", view: "compare" });
   else if (old.canvas_view === "trace" && dataset === "MC2") state = workspaceReducer(state, { type: "canvas", view: "trace" });
   if (filters.runId && dataset === "CUSTOM") {

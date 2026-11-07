@@ -26,10 +26,13 @@ export function EvidenceDrawer() {
     setEvidenceTab,
     selectedEventId,
     selectedEventAt,
+    state,
     notes,
     notesLoading,
     addNote,
     removeNote,
+    noteDraft,
+    setNoteDraft,
     focusEntity,
     openTrace,
     addToBasket,
@@ -126,7 +129,15 @@ export function EvidenceDrawer() {
             eventTime={selectedEventAt}
             onAdd={addNote}
             onRemove={removeNote}
+            draft={noteDraft}
+            onDraftChange={setNoteDraft}
           />
+        ) : !selectedEventId && state.selection ? (
+          <div className="empty-state">
+            <p>已选择 {state.selection.kind === "graphEdge" ? "关系边" : state.selection.kind === "entity" ? "实体" : state.selection.kind === "file" ? "文件" : "对象"}。</p>
+            <p className="muted mono">{"id" in state.selection ? state.selection.id : state.selection.kind === "graphEdge" ? `${state.selection.sourceId} → ${state.selection.targetId}` : "当前选择"}</p>
+            <p className="muted small">该对象没有事件详情接口；可从关系图或事件流继续选择具体事件。</p>
+          </div>
         ) : !selectedEventId ? (
           <div className="empty-state">
             <p>尚未选择事件。</p>

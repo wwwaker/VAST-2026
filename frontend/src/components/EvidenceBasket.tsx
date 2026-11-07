@@ -16,13 +16,10 @@ export function EvidenceBasket() {
     clearBasket,
     activeCase,
     setActiveCase,
+    findingDraft,
+    setFindingDraft,
   } = useWorkspace();
 
-  const [title, setTitle] = useState("");
-  const [claim, setClaim] = useState("");
-  const [status, setStatus] = useState<FindingRecord["status"]>("hypothesis");
-  const [explanation, setExplanation] = useState("");
-  const [limitations, setLimitations] = useState("");
   const [findings, setFindings] = useState<FindingRecord[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -40,7 +37,7 @@ export function EvidenceBasket() {
   }, [activeCase]);
 
   const saveCase = async () => {
-    const trimmed = title.trim();
+    const trimmed = findingDraft.title.trim();
     if (!trimmed) {
       setMessage("先给案例起个名字");
       return;
@@ -49,7 +46,7 @@ export function EvidenceBasket() {
     try {
       const created = await createCase({ dataset_id: dataset, title: trimmed, snapshot: snapshot() });
       setActiveCase({ case_id: created.case_id, title: created.title }, dataset);
-      setTitle("");
+      setFindingDraft({ title: "" });
       setMessage(`已保存案例 ${created.case_id}（${basket.length} 条固定证据）`);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "保存失败");
@@ -63,7 +60,7 @@ export function EvidenceBasket() {
       setMessage("先保存或选择一个案例");
       return;
     }
-    if (!claim.trim() || !explanation.trim()) {
+    if (!findingDraft.claim.trim() || !findingDraft.explanation.trim()) {
       setMessage("主张与解释都要填");
       return;
     }
@@ -71,10 +68,10 @@ export function EvidenceBasket() {
     try {
       const created = await createFinding({
         case_id: activeCase.case_id,
-        claim: claim.trim(),
-        status,
-        explanation: explanation.trim(),
-        limitations: limitations.trim() || null,
+        claim: findingDraft.claim.trim(),
+        status: findingDraft.status,
+        explanation: findingDraft.explanation.trim(),
+        limitations: findingDraft.limitations.trim() || null,
         evidence: basket.map((item) => ({
           reference_id: item.event_id,
           role: item.role,
@@ -82,9 +79,7 @@ export function EvidenceBasket() {
         })),
       });
       setFindings((prev) => [...prev, created]);
-      setClaim("");
-      setExplanation("");
-      setLimitations("");
+      setFindingDraft({ claim: "", explanation: "", limitations: "" });
       setMessage(created.evidence.length ? `已记录结论（${created.evidence.length} 条证据）` : "已记录结论（尚无证据）");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "保存结论失败");
@@ -127,9 +122,9 @@ export function EvidenceBasket() {
           <div className="drawer-actions">
             <input
               type="text"
-              value={title}
+              value={findingDraft.title}
               placeholder="案例标题"
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => setFindingDraft({ title: e.target.value })}
               className="text-input"
               maxLength={80}
             />
@@ -177,11 +172,11 @@ export function EvidenceBasket() {
           type="text"
           className="text-input"
           placeholder="主张（一句话）"
-          value={claim}
-          onChange={(e) => setClaim(e.target.value)}
+          value={findingDraft.claim}
+          onChange={(e) => setFindingDraft({ claim: e.target.value })}
           maxLength={200}
         />
-        <select value={status} onChange={(e) => setStatus(e.target.value as FindingRecord["status"])}>
+        <select value={findingDraft.status} onChange={(e) => setFindingDraft({ status: e.target.value as FindingRecord["status"] })}>
           <option value="hypothesis">假设</option>
           <option value="supported">有证据支持</option>
           <option value="inconclusive">证据不足</option>
@@ -190,15 +185,15 @@ export function EvidenceBasket() {
           className="text-input"
           rows={3}
           placeholder="解释：哪条证据支持这个主张，推理是什么"
-          value={explanation}
-          onChange={(e) => setExplanation(e.target.value)}
+          value={findingDraft.explanation}
+          onChange={(e) => setFindingDraft({ explanation: e.target.value })}
         />
         <textarea
           className="text-input"
           rows={2}
           placeholder="局限（可选）：数据缺什么、结论不能覆盖什么"
-          value={limitations}
-          onChange={(e) => setLimitations(e.target.value)}
+          value={findingDraft.limitations}
+          onChange={(e) => setFindingDraft({ limitations: e.target.value })}
         />
         <button type="button" className="btn" onClick={saveFinding} disabled={busy || !activeCase}>
           保存结论（{basket.length} 条证据）

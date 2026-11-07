@@ -12,9 +12,21 @@ let count = 0;
 const test = (name, fn) => { fn(); count++; console.log(`PASS ${name}`); };
 const reduce = m.workspaceReducer;
 let state = m.initialWorkspace("MC2");
+test("MC2 defaults to system overview", () => {
+  assert.equal(state.task, "overview");
+  assert.equal(state.mode, "system");
+  assert.equal(state.taskModes.overview, "system");
+});
 state = reduce(state, { type: "openTrace", rootEventId: "MC2:event:373902", fileId: "MC2:missing-file" });
 state = reduce(state, { type: "inspect", selection: { kind: "event", id: "MC2:event:21202", timeUs: 0 } });
 test("selection preserves MC2 root/file", () => assert.equal(state.traceObject.rootEventId, "MC2:event:373902"));
+state = reduce(state, { type: "task", task: "overview" });
+state = reduce(state, { type: "task", task: "trace" });
+test("MC2 trace context survives overview round trip", () => {
+  assert.equal(state.traceObject.rootEventId, "MC2:event:373902");
+  assert.equal(state.traceObject.fileId, "MC2:missing-file");
+  assert.equal(state.mode, "source");
+});
 state = reduce(state, { type: "focus", id: "MC2:missing-entity" });
 test("graph focus does not add participant filter", () => assert.equal(state.baseEventFilters.participantId, null));
 state = reduce(state, { type: "task", task: "compare", mode: "window" });

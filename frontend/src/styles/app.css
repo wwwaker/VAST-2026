@@ -230,6 +230,96 @@ select:focus-visible {
   overflow: hidden;
 }
 
+.workspace-heading {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-5) 0;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.task-nav {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.task-nav-primary,
+.task-nav-secondary {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.task-nav-primary {
+  border-bottom: 1px solid var(--border);
+}
+
+.task-tab,
+.mode-tab {
+  flex: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.task-tab:hover,
+.mode-tab:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.task-tab-active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+.task-nav-secondary {
+  min-height: 30px;
+}
+
+.task-nav-label {
+  flex: none;
+  margin-right: var(--space-2);
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.mode-tab {
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.mode-tab-active {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-bottom-color: var(--accent);
+}
+
+.parallel-toggle {
+  margin-left: auto;
+}
+
+.workspace-status {
+  align-self: center;
+  flex: none;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
 .canvas-toolbar {
   position: sticky;
   top: 0;
@@ -263,6 +353,22 @@ select:focus-visible {
   width: var(--event-size);
   border-width: 0 0 0 1px;
   animation: dock-in-right 180ms ease-out both;
+}
+
+.event-dock-bottom {
+  position: absolute;
+  z-index: 20;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: min(var(--event-size), 48vh);
+  border-width: 1px 0 0;
+  box-shadow: 0 -8px 22px rgb(15 35 31 / 10%);
+  animation: dock-in-bottom 180ms ease-out both;
+}
+
+.body-event-open .canvas-area {
+  padding-bottom: calc(min(var(--event-size), 48vh) + var(--space-5));
 }
 
 .event-panel {
@@ -360,9 +466,52 @@ select:focus-visible {
   width: 2px;
 }
 
+.dock-resizer-top {
+  top: -4px;
+  right: 0;
+  left: 0;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.dock-resizer-top::after {
+  top: 3px;
+  right: 0;
+  left: 0;
+  height: 2px;
+}
+
 @keyframes dock-in-right {
   from { opacity: 0.5; transform: translateX(8px); }
   to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes dock-in-bottom {
+  from { opacity: 0.5; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.findings-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 100%;
+}
+
+.findings-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.findings-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.findings-head p {
+  margin: 4px 0 0;
 }
 
 @container (max-width: 440px) {
@@ -1212,17 +1361,17 @@ select:focus-visible {
   width: var(--evidence-size);
   min-width: 0;
   min-height: 0;
-  border-right: 1px solid var(--border);
+  border-left: 1px solid var(--border);
   background: var(--panel);
-  animation: dock-in-left 180ms ease-out both;
+  animation: dock-in-right 180ms ease-out both;
 }
 
 .evidence-dock .drawer {
   min-width: 0;
 }
 
-@keyframes dock-in-left {
-  from { opacity: 0.5; transform: translateX(-8px); }
+@keyframes dock-in-right {
+  from { opacity: 0.5; transform: translateX(8px); }
   to { opacity: 1; transform: translateX(0); }
 }
 
@@ -1804,20 +1953,24 @@ code {
   border: 1px solid var(--border);
 }
 
-@media (max-width: 1180px) {
+/* Medium widths keep the canvas geometry stable while the inspector overlays it. */
+@media (max-width: 1439px) {
   .evidence-dock {
     position: absolute;
     z-index: 10;
     top: 0;
     bottom: 0;
-    left: 0;
+    right: 0;
+    left: auto;
     width: min(var(--evidence-size), 88vw);
     z-index: 30;
     box-shadow: var(--shadow);
   }
+}
 
-  .body-evidence-open .canvas-area {
-    padding-left: 56px;
+@media (min-width: 901px) and (max-width: 1439px) {
+  .body.body-evidence-open.body-event-open .evidence-dock {
+    bottom: min(var(--event-size), 48vh);
   }
 }
 

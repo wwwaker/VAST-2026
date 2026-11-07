@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { useWorkspace, type DatasetId } from "../state/workspace";
 import { useTheme, type ThemeMode } from "../theme/theme";
 
@@ -16,6 +16,8 @@ export function TopBar({
   onToggleEvidence,
   eventOpen,
   onToggleEvent,
+  evidenceTriggerRef,
+  eventTriggerRef,
 }: {
   showBench: boolean;
   onToggleBench: () => void;
@@ -24,6 +26,8 @@ export function TopBar({
   onToggleEvidence: () => void;
   eventOpen: boolean;
   onToggleEvent: () => void;
+  evidenceTriggerRef: RefObject<HTMLButtonElement>;
+  eventTriggerRef: RefObject<HTMLButtonElement>;
 }) {
   const { dataset, setDataset, filters, setFilters } = useWorkspace();
   const { mode, setMode, reducedMotion, setReducedMotion } = useTheme();
@@ -115,6 +119,7 @@ export function TopBar({
 
       <div className="topbar-docks" aria-label="侧栏">
         <button
+          ref={evidenceTriggerRef}
           type="button"
           className={`btn btn-quiet${evidenceOpen ? " btn-active" : ""}`}
           aria-pressed={evidenceOpen}
@@ -125,6 +130,7 @@ export function TopBar({
           证据
         </button>
         <button
+          ref={eventTriggerRef}
           type="button"
           className={`btn btn-quiet${eventOpen ? " btn-active" : ""}`}
           aria-pressed={eventOpen}

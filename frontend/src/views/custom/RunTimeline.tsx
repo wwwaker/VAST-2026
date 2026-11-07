@@ -237,7 +237,7 @@ export function RunTimeline({
             );
           })}
 
-          {layout.events.map((event) => {
+          {layout.events.map((event, index) => {
             const position = layout.positions.get(event.event_id);
             if (!position) return null;
             const selected = event.event_id === selectedEventId;
@@ -247,7 +247,7 @@ export function RunTimeline({
             const fill = colors.categories[Math.max(0, Math.min(7, event.category - 1))];
             return (
               <g
-                key={event.event_id}
+                key={`${event.event_id}-${index}`}
                 className="run-event"
                 onClick={() => selectEvent(event.event_id, event.time_us)}
                 role="button"
@@ -346,11 +346,11 @@ export function RunTimeline({
               <span className={statusClass(rule.status)}>{statusLabel(rule.status)}</span>
               <span className="audit-reason">{rule.reason}</span>
               <span className="audit-evidence">
-                {rule.evidence_event_ids.slice(0, 3).map((eventId) => {
+                {rule.evidence_event_ids.slice(0, 3).map((eventId, index) => {
                   const visible = layout.positions.has(eventId);
                   return (
                     <button
-                      key={eventId}
+                      key={`${eventId}-${index}`}
                       type="button"
                       className="btn btn-quiet audit-evidence-btn"
                       disabled={!visible}

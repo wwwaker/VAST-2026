@@ -17,8 +17,6 @@ export function emptyTrace(dataset: DatasetId): TraceObject {
 }
 export function initialWorkspace(dataset: DatasetId = "MC2"): WorkspaceState {
   const taskModes = Object.fromEntries(Object.entries(CAPABILITIES[dataset]).map(([key, values]) => [key, values[0]])) as Record<TaskId, Mode>;
-  // S0 keeps the current MC2 timeline landing container; S1 owns the new landing UI.
-  if (dataset === "MC2") taskModes.overview = "time";
   return { dataset, task: "overview", mode: taskModes.overview, taskModes,
     baseEventFilters: baseFilters({ ...EMPTY_FILTERS }), traceObject: emptyTrace(dataset),
     selection: null, comparison: null, viewports: {}, graphContext: { focusedEntityId: null, depth: 1 },
@@ -99,7 +97,9 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
     case "reset": return initialWorkspace(state.dataset);
     case "task": {
       let next = chooseMode(state, action.task, action.mode);
-      if (action.task === "overview") next = { ...next, traceObject: emptyTrace(state.dataset) };
+      // CUSTOM runs are scoped to the trace/run task. MC2's root/file context is
+      // investigation context and must survive ordinary task navigation.
+      if (action.task === "overview" && state.dataset === "CUSTOM") next = { ...next, traceObject: emptyTrace(state.dataset) };
       if (action.task === "compare") {
         const comparison = next.mode === "window" ? windowComparison(next) :
           next.mode === "history" ? (state.comparison?.kind === "history" ? state.comparison : { kind: "history" as const, targetRootId: state.traceObject.dataset === "MC2" ? state.traceObject.rootEventId : null, includedRootIds: [], alignment: "stage" as const, beforeUs: null }) :

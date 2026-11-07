@@ -9,6 +9,8 @@ export function NotesPanel({
   eventTime,
   onAdd,
   onRemove,
+  draft,
+  onDraftChange,
 }: {
   notes: NoteItem[];
   loading: boolean;
@@ -16,8 +18,9 @@ export function NotesPanel({
   eventTime: number | null;
   onAdd: (body: string, options?: { eventId?: string | null; eventTime?: number | null }) => Promise<void>;
   onRemove: (noteId: number) => Promise<void>;
+  draft: string;
+  onDraftChange: (value: string) => void;
 }) {
-  const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,7 +35,7 @@ export function NotesPanel({
         eventId: attachToEvent ? selectedEventId : null,
         eventTime: attachToEvent ? eventTime : null,
       });
-      setDraft("");
+      onDraftChange("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存失败");
     } finally {
@@ -45,7 +48,7 @@ export function NotesPanel({
       <div className="notes-editor">
         <textarea
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => onDraftChange(e.target.value)}
           placeholder="记录判断、支持证据、反证与未确定项…"
           rows={3}
           onKeyDown={(e) => {
