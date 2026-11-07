@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useWorkspace } from "../state/workspace";
+import { SavedInvestigations } from "./SavedInvestigations";
 import { createCase, createFinding, deleteFinding, fetchFindings, type FindingRecord } from "../data/api";
 
 const ROLE_TEXT = { support: "支持", counter: "反证", uncertain: "待核实" } as const;
@@ -9,11 +10,7 @@ const STATUS_TEXT = { hypothesis: "假设", supported: "有证据支持", inconc
 export function EvidenceBasket() {
   const {
     dataset,
-    filters,
-    canvasView,
-    selectedEventId,
-    focusedEntityId,
-    traceRootId,
+    snapshot,
     basket,
     removeFromBasket,
     clearBasket,
@@ -37,8 +34,8 @@ export function EvidenceBasket() {
     }
     const controller = new AbortController();
     fetchFindings(activeCase.case_id, controller.signal)
-      .then((data) => setFindings(data.items))
-      .catch(() => setFindings([]));
+      .then((data) => { if (!controller.signal.aborted) setFindings(data.items); })
+      .catch(() => { if (!controller.signal.aborted) setFindings([]); });
     return () => controller.abort();
   }, [activeCase]);
 
@@ -50,21 +47,8 @@ export function EvidenceBasket() {
     }
     setBusy(true);
     try {
-      const snapshot = {
-        contract_version: 2,
-        filters: { ...filters },
-        canvas_view: canvasView,
-        selected_event_id: selectedEventId,
-        focused_entity_id: focusedEntityId,
-        trace_root_id: traceRootId,
-        pinned_evidence: basket.map((item) => ({
-          event_id: item.event_id,
-          role: item.role,
-          excerpt: item.excerpt,
-        })),
-      };
-      const created = await createCase({ dataset_id: dataset, title: trimmed, snapshot });
-      setActiveCase({ case_id: created.case_id, title: created.title });
+      const created = await createCase({ dataset_id: dataset, title: trimmed, snapshot: snapshot() });
+      setActiveCase({ case_id: created.case_id, title: created.title }, dataset);
       setTitle("");
       setMessage(`已保存案例 ${created.case_id}（${basket.length} 条固定证据）`);
     } catch (err) {
@@ -116,6 +100,7 @@ export function EvidenceBasket() {
 
   return (
     <div className="basket">
+      <SavedInvestigations />
       <h3>案例</h3>
       {activeCase ? (
         <div className="callout">

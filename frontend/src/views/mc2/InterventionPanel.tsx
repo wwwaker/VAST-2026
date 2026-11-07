@@ -16,10 +16,11 @@ function actorName(value: string | null): string {
 
 /** 单点干预论证：覆盖、附带影响、可切断性、局限。 */
 export function InterventionPanel() {
-  const { selectEvent } = useWorkspace();
+  const { selectEvent, state, dispatch } = useWorkspace();
   const [payload, setPayload] = useState<InterventionPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState(false);
+  const selected = state.interventionPosition === "relay_queue";
+  const setSelected = (value: boolean) => dispatch({ type: "display", patch: { interventionPosition: value ? "relay_queue" : null } });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -154,7 +155,7 @@ export function InterventionPanel() {
         <button
           type="button"
           className={`btn${selected ? " btn-quiet" : ""}`}
-          onClick={() => setSelected((value) => !value)}
+          onClick={() => setSelected(!selected)}
           aria-pressed={selected}
         >
           {selected ? "取消选择该干预位置" : "选为干预位置"}

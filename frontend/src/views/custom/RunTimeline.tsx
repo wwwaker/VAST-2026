@@ -69,7 +69,7 @@ export function RunTimeline({
   onBack: () => void;
   onCompare: (runId: string) => void;
 }) {
-  const { cursor, masking, selectedEventId, selectEvent } = useWorkspace();
+  const { cursor, masking, selectedEventId, selectEvent, filters } = useWorkspace();
   const { colors } = useTheme();
   const [detail, setDetail] = useState<RunDetailPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +80,8 @@ export function RunTimeline({
     const controller = new AbortController();
     setLoading(true);
     setError(null);
-    fetchRun(runId, { cursorUs: cursor, masking }, controller.signal)
+    setDetail(null);
+    fetchRun(runId, { cursorUs: cursor, masking, filters }, controller.signal)
       .then((payload) => {
         if (!controller.signal.aborted) setDetail(payload);
       })
@@ -91,7 +92,7 @@ export function RunTimeline({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [runId, cursor, masking]);
+  }, [runId, cursor, masking, filters]);
 
   const layout = useMemo(() => {
     if (!detail) return null;

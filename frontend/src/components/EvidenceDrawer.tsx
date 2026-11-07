@@ -61,13 +61,14 @@ export function EvidenceDrawer() {
     }
     let cancelled = false;
     setLoading(true);
+    setEvent(null);
     setError(null);
     fetchEvent(dataset, selectedEventId)
       .then((detail) => {
         if (cancelled) return;
         setEvent(detail);
         // 选中事件时把关系图聚焦到它的 actor（不强制切换视图）
-        if (detail.actor_id) focusEntity(detail.actor_id);
+        if (detail.actor_id) focusEntity(detail.actor_id, { onlyIfEmpty: true });
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "读取失败");

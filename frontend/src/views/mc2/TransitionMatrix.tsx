@@ -20,12 +20,15 @@ interface Selection {
 
 /** M2-04：MC2 相邻操作转移矩阵。未做 actor 校正前只显示支持数与 actor 数。 */
 export function TransitionMatrix() {
-  const { filters, cursor, masking, selectEvent } = useWorkspace();
-  const [windowMinutes, setWindowMinutes] = useState<5 | 30>(5);
+  const { filters, cursor, masking, selectEvent, state, dispatch } = useWorkspace();
+  const comparison = state.comparison?.kind === "transitions" ? state.comparison : null;
+  const windowMinutes: 5 | 30 = comparison?.maxLagUs === 30 * 60_000_000 ? 30 : 5;
+  const setWindowMinutes = (minutes: 5 | 30) => dispatch({ type: "comparison", comparison: { kind: "transitions", selectedPair: null, maxLagUs: minutes * 60_000_000 } });
   const [payload, setPayload] = useState<TransitionPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [selected, setSelected] = useState<Selection | null>(null);
+  const selected: Selection | null = comparison?.selectedPair ? { source_type: comparison.selectedPair[0], next_type: comparison.selectedPair[1] } : null;
+  const setSelected = (value: Selection | null) => dispatch({ type: "comparison", comparison: { kind: "transitions", selectedPair: value ? [value.source_type, value.next_type] : null, maxLagUs: windowMinutes * 60_000_000 } });
 
   const key = filterKey(filters, {
     window: windowMinutes,
@@ -43,7 +46,7 @@ export function TransitionMatrix() {
     )
       .then((data) => {
         setPayload(data);
-        setSelected(null);
+
       })
       .catch((err) => {
         if (controller.signal.aborted) return;

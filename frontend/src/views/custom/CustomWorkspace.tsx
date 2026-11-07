@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useWorkspace } from "../../state/workspace";
 import { OverviewView } from "../OverviewView";
 import { CasePicker } from "./CasePicker";
@@ -6,33 +5,17 @@ import { RunOverview } from "./RunOverview";
 import { RunTimeline } from "./RunTimeline";
 import { RunCompare } from "./RunCompare";
 
-type Mode = "runs" | "run" | "compare";
-
 /** CUSTOM：默认按运行浏览；系统总览保留为可切换的全量背景。 */
 export function CustomWorkspace() {
-  const { clearFilters, setCursor, selectEvent, setFilters } = useWorkspace();
-  const [mode, setMode] = useState<Mode>("runs");
-  const [runId, setRunId] = useState<string | null>(null);
-  const [baselineRunId, setBaselineRunId] = useState<string | null>(null);
-  const [showOverview, setShowOverview] = useState(false);
-
-  const openRun = (id: string, baseline: string | null = null) => {
-    // 进入运行即建立该运行的上下文：清掉旧条件，并把 run_id 写进统一筛选，
-    // 否则画布只看这一次运行、右侧事件流仍是全量，两个口径会对不上
-    clearFilters();
-    setFilters({ runId: id });
-    selectEvent(null);
-    setCursor(null);
-    setRunId(id);
-    setBaselineRunId(baseline);
-    setMode(baseline ? "compare" : "run");
+  const { state, dispatch, changeTask, clearFilters } = useWorkspace();
+  const runId = state.traceObject.dataset === "CUSTOM" ? state.traceObject.runId : null;
+  const baselineRunId = state.comparison?.kind === "runPair" ? state.comparison.baselineRunId : null;
+  const mode = state.task === "compare" && state.mode === "runPair" ? "compare" : state.task === "trace" ? "run" : "runs";
+  const showOverview = state.task === "overview" && state.mode === "time";
+  const openRun = (id: string, baseline: string | null = null, complete = false) => {
+    dispatch({ type: "openRun", runId: id, baselineRunId: baseline, complete });
   };
-
-  const backToList = () => {
-    setMode("runs");
-    setRunId(null);
-    setBaselineRunId(null);
-  };
+  const backToList = () => changeTask("overview", "runs");
 
   return (
     <div className="custom-workspace">
@@ -41,7 +24,7 @@ export function CustomWorkspace() {
           <button
             type="button"
             className={`seg-item${!showOverview ? " seg-active" : ""}`}
-            onClick={() => setShowOverview(false)}
+            onClick={() => changeTask("overview", "runs")}
             aria-pressed={!showOverview}
           >
             运行流程
@@ -49,7 +32,7 @@ export function CustomWorkspace() {
           <button
             type="button"
             className={`seg-item${showOverview ? " seg-active" : ""}`}
-            onClick={() => setShowOverview(true)}
+            onClick={() => changeTask("overview", "time")}
             aria-pressed={showOverview}
           >
             系统总览
@@ -64,24 +47,21 @@ export function CustomWorkspace() {
         <OverviewView />
       ) : (
         <>
-          <CasePicker onOpen={openRun} />
+          <CasePicker onOpen={(id, baseline) => openRun(id, baseline, true)} />
+          {runId && <div className="canvas-subbar"><span className="muted small">{mode === "compare" ? "完整运行对照；附加事件筛选与回放不用于阶段对照。" : "运行作用域与附加事件筛选分开；清筛选仍保留当前运行。"}</span>{mode !== "compare" && <><button type="button" className="btn btn-quiet" onClick={() => changeTask("trace", "run")}>保留附加筛选</button><button type="button" className="btn btn-quiet" onClick={clearFilters}>查看完整运行</button></>}</div>}
           {mode === "runs" ? (
             <RunOverview onOpen={openRun} />
           ) : mode === "compare" && runId ? (
             <RunCompare
               runId={runId}
               baselineRunId={baselineRunId}
-              onBack={() => setMode("run")}
+              onBack={() => changeTask("trace", "run")}
             />
           ) : runId ? (
             <RunTimeline
               runId={runId}
               onBack={backToList}
-              onCompare={(id) => {
-                setRunId(id);
-                setBaselineRunId(null);
-                setMode("compare");
-              }}
+              onCompare={(id) => dispatch({ type: "openRun", runId: id, compare: true })}
             />
           ) : (
             <div className="empty-state"><p className="muted">请选择一个运行。</p></div>

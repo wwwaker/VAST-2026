@@ -14,6 +14,7 @@ from .. import case_store
 from ..db import get_conn, require_dataset
 from ..domain import cases as case_domain
 from ..domain import export as export_domain
+from ..domain import ui_snapshot
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
 
@@ -74,6 +75,10 @@ def list_cases(dataset: str = Query("CUSTOM")):
 def create_case(payload: CaseCreate):
     with get_conn() as conn:
         dataset_row = _require_dataset(conn, payload.dataset_id)
+        try:
+            snapshot_status = ui_snapshot.validate(payload.snapshot, payload.dataset_id, conn)
+        except (ui_snapshot.SnapshotError, TypeError, KeyError, RecursionError) as exc:
+            raise HTTPException(422, f"invalid_ui_snapshot: {exc}") from exc
     title = payload.title.strip()
     if not title:
         raise HTTPException(400, "案例标题不能为空")
@@ -86,7 +91,7 @@ def create_case(payload: CaseCreate):
         snapshot=snapshot,
         data_version=dataset_row["data_version"],
     )
-    return {**created, "kind": "user", "status": "ok", "status_label": "可用"}
+    return {**created, "kind": "user", "status": "ok", "status_label": "可用", "snapshot_status": snapshot_status}
 
 
 @router.get("/{case_id}/export")
@@ -124,6 +129,7 @@ def get_case(case_id: str):
                 "status_label": "数据版本已变" if stale else "可用",
                 "stale": stale,
                 "findings": findings,
+                "snapshot_status": ui_snapshot.describe(user["snapshot"], dataset_id, conn),
                 **user,
             }
     return {

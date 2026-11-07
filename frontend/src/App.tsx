@@ -74,6 +74,8 @@ function Workspace() {
     compareReturn,
     restoreCompare,
     filterSummary,
+    state,
+    dispatch,
   } = useWorkspace();
   useHotkeys(() => setShowHelp((v) => !v));
 
@@ -136,6 +138,8 @@ function Workspace() {
               <div className="canvas-toolbar">
                 <ViewTabs />
               </div>
+              {state.notice && <div className="callout" role="status">{state.notice}</div>}
+              {!compareReturn && state.returnStack.length > 0 && <div className="compare-return-banner"><span>已保留显式下钻前的调查上下文</span><button type="button" className="btn btn-quiet" onClick={() => dispatch({ type: "return" })}>返回上次调查</button></div>}
               {compareReturn && canvasView !== "compare" && (
                 <div className="compare-return-banner" role="status">
                   <span>

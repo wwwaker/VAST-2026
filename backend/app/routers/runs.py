@@ -19,15 +19,10 @@ from .events import load_annotations, summarize
 
 router = APIRouter(prefix="/api", tags=["runs"])
 
-STAGES = [
-    ("start", "运行开始"),
-    ("research", "研究/读取 fixture"),
-    ("write", "写作与版本"),
-    ("review", "提交与审核"),
-    ("publisher_read", "发布者读取"),
-    ("attempt", "发布尝试"),
-    ("result", "发布结果"),
-]
+from ..domain.run_stages import (
+    STAGES, STAGE_RULES_VERSION, stage_of as _stage_of,
+    stage_payload as _stage_payload, stage_summary as _stage_summary, summarize_run,
+)
 
 
 def _require_custom(conn, dataset: str):
@@ -67,7 +62,7 @@ def _run_payload(row) -> dict:
         "anomaly_type": row["anomaly_type"],
         "start_us": row["start_us"],
         "end_us": row["end_us"],
-        "duration_us": (row["end_us"] - row["start_us"]) if row["start_us"] and row["end_us"] else None,
+        "duration_us": (row["end_us"] - row["start_us"]) if row["start_us"] is not None and row["end_us"] is not None else None,
         "event_count": row["event_count"],
         "metrics": metrics,
     }
@@ -118,6 +113,7 @@ def list_runs(
     scenario: str | None = None,
     observed: bool | None = None,
     limit: int = Query(200, ge=1, le=500),
+    include_stages: bool = False,
 ):
     with get_conn() as conn:
         dataset_row = _require_custom(conn, dataset)
@@ -145,6 +141,10 @@ def list_runs(
                 "audit_rules": [rule for rule in audit["rules"] if rule["status"] not in {"valid", "current"}],
             }
         )
+        if include_stages:
+            complete = len(events) == row["event_count"] and any(e["event_type"] == "run_started" for e in events) and any(e["event_type"] == "run_finished" for e in events)
+            items[-1]["stage_summary"] = summarize_run(events, row["start_us"], complete=complete)
+    total = len(items)
     items = items[:limit]
 
     return {
@@ -155,9 +155,13 @@ def list_runs(
             "scope": "runs",
             "applied_filters": {"model": model, "fixture": fixture, "scenario": scenario, "observed": observed},
             "matched_runs": len(items),
-            "truncated": len(items) >= limit,
+            "matched_runs_total": total,
+            "returned_runs": len(items),
+            "truncated": total > len(items),
+            **({"summary_scope": "full_run", "stage_rules_version": STAGE_RULES_VERSION} if include_stages else {}),
         },
         "items": items,
+        **({"stage_dictionary": [{"key": key, "label": label, "order": order} for order, (key, label) in enumerate(STAGES)]} if include_stages else {}),
     }
 
 
@@ -253,49 +257,6 @@ def run_detail(
     }
 
 
-def _stage_of(event: dict) -> str | None:
-    event_type = event["event_type"]
-    role = custom_audit.role_of(event.get("actor_id"))
-    if event_type == "run_started":
-        return "start"
-    if event_type == "file_read":
-        if role == "researcher":
-            return "research"
-        if role == "publisher":
-            return "publisher_read"
-        return None
-    if event_type in {"file_write", "version_updated"}:
-        return "write"
-    if event_type in {"submit_review", "review_decision"}:
-        return "review"
-    if event_type == "publish_attempt":
-        return "attempt"
-    if event_type == "publish_result":
-        return "result"
-    return None
-
-
-def _stage_payload(events: list[dict]) -> dict:
-    grouped: dict[str, list[dict]] = defaultdict(list)
-    for event in events:
-        stage = _stage_of(event)
-        if stage:
-            grouped[stage].append(event)
-    return grouped
-
-
-def _stage_summary(events: list[dict], start_us: int | None) -> dict:
-    if not events:
-        return {"count": 0, "event_ids": [], "start_offset_us": None, "duration_us": None}
-    first = min(event["time_sort_us"] for event in events)
-    last = max(event["time_sort_us"] for event in events)
-    return {
-        "count": len(events),
-        "event_ids": [event["event_id"] for event in events],
-        "start_offset_us": (first - start_us) if start_us else None,
-        "duration_us": last - first,
-        "actors": sorted({custom_audit.role_of(event.get("actor_id")) or "unknown" for event in events}),
-    }
 
 
 def _metrics(events: list[dict], audit: dict) -> dict:

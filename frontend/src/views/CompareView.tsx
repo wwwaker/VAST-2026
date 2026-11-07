@@ -36,13 +36,12 @@ export function CompareView() {
   const {
     dataset,
     filters,
-    setFilters,
+    dispatch,
     setCanvasView,
     cursor,
     masking,
     compareState,
     setCompareState,
-    saveCompareReturn,
   } = useWorkspace();
   const { colors } = useTheme();
 
@@ -101,7 +100,10 @@ export function CompareView() {
       controller.signal,
     )
       .then((data) => {
-        if (!controller.signal.aborted) setPayload(data);
+        if (!controller.signal.aborted) {
+          setPayload(data);
+          if (data.baseline.start_us != null && data.baseline.end_us != null) dispatch({ type: "resolvedWindow", currentUs: [startUs, endUs], baselineUs: [data.baseline.start_us, data.baseline.end_us] });
+        }
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted) return;
@@ -173,14 +175,12 @@ export function CompareView() {
   const drillDown = (row: ComparePayload["rows"][number]) => {
     const evidence = row.evidence_filter;
     // 先保存完整比较状态（筛选 + 对照方式），返回时恢复原窗口与历史窗
-    saveCompareReturn({ filters: { ...filters }, compare: { ...compareState } });
-    setFilters({
+    dispatch({ type: "drillFilters", patch: {
       startUs: evidence.start_us,
       endUs: evidence.end_us,
       actorId: dimension === "actor" && row.key !== "__unknown__" ? row.key : null,
       eventTypes: dimension === "event_type" ? [row.key] : [],
-    });
-    setCanvasView("timeline");
+    } });
   };
 
   if (startUs == null || endUs == null) {

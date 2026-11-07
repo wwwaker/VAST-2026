@@ -19,6 +19,9 @@ VAST_Challenge_2026-main/
 /data/
 /final-data/
 
+# ---- 本地项目文档 ----
+/docs/
+
 # ---- 编辑器与系统 ----
 .vscode/
 .idea/

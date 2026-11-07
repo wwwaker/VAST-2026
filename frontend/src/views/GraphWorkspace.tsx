@@ -1,14 +1,16 @@
-import { useState } from "react";
 import { useWorkspace } from "../state/workspace";
 import { RelationGraph } from "./RelationGraph";
 import { SystemMap } from "./mc2/SystemMap";
 
-type GraphMode = "local" | "system";
-
 /** 关系图标签下的两种取景：局部实体（可筛选）与 MC2 系统背景（类型聚合）。 */
 export function GraphWorkspace() {
-  const { dataset, focusedEntityId, openTrace, traceRootId, selectedEventId } = useWorkspace();
-  const [mode, setMode] = useState<GraphMode>("local");
+  const { dataset, focusedEntityId, openTrace, traceRootId, selectedEventId, state, changeTask } = useWorkspace();
+  const mode = state.mode === "system" ? "system" : "local";
+  const setMode = (mode: "local" | "system") => {
+    if (mode === "system") changeTask("overview", "system");
+    else if (state.task === "trace") changeTask("trace", "localGraph");
+    else changeTask("overview", "relations");
+  };
 
   const rootId = traceRootId ?? selectedEventId;
 

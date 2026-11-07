@@ -45,16 +45,21 @@ const PROVENANCE_TEXT: Record<string, string> = {
 
 /** MC2 来源链：post → 内容文件 → 文件操作，候选层单独标注。 */
 export function SourceTrace() {
-  const { dataset, filters, cursor, masking, selectedEventId, selectEvent, traceRootId, traceFileId, openTrace } =
+  const { dataset, filters, cursor, masking, selectEvent, traceRootId, traceFileId, openTrace, state, changeTask } =
     useWorkspace();
   const { colors } = useTheme();
   const [roots, setRoots] = useState<TraceRootItem[]>([]);
   const [payload, setPayload] = useState<TracePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<TraceMode>("chain");
+  const mode: TraceMode = state.task === "compare" ? (state.mode === "transitions" ? "matrix" : "patterns") : state.mode === "intervention" ? "intervention" : "chain";
+  const setMode = (value: TraceMode) => {
+    if (value === "patterns") changeTask("compare", "history");
+    else if (value === "matrix") changeTask("compare", "transitions");
+    else changeTask("trace", value === "intervention" ? "intervention" : "source");
+  };
 
-  const rootId = traceRootId ?? selectedEventId;
+  const rootId = traceRootId;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -78,8 +83,9 @@ export function SourceTrace() {
     const controller = new AbortController();
     setLoading(true);
     setError(null);
+    setPayload(null);
     fetchTrace({ rootEventId: rootId, filters, cursorUs: masking ? cursor : null, masking }, controller.signal)
-      .then((data) => setPayload(data))
+      .then((data) => { if (!controller.signal.aborted) setPayload(data); })
       .catch((err) => {
         if (controller.signal.aborted) return;
         setPayload(null);
@@ -160,13 +166,13 @@ export function SourceTrace() {
           ))}
         </div>
         <span className="muted small">
-          链根来自日志明确记录的 post_content_source；选中事件流中的任意事件也可作为根。
+          链根来自日志明确记录的 post_content_source；使用显式追踪动作更换根，选择事件只查看证据。
         </span>
       </div>
 
       {!rootId && (
         <div className="empty-state">
-          <p className="muted">先在事件流中选择一条事件，或点击上面的链根。</p>
+          <p className="muted">点击上面的链根，或对事件使用“追踪来源”动作。</p>
         </div>
       )}
 

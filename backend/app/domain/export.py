@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from . import ui_snapshot
+
 import html
 import json
 from datetime import datetime, timezone
@@ -109,6 +111,7 @@ def build(conn, case_id: str, data_version: str) -> dict:
         "stale": stale,
         "generated_at": _now(),
         "snapshot": user_case["snapshot"] if user_case else None,
+        "snapshot_status": ui_snapshot.describe(user_case["snapshot"], dataset_id, conn) if user_case else None,
         "preset": preset,
         "findings": enriched,
         "unresolved": unresolved,
@@ -140,12 +143,15 @@ def render_markdown(payload: dict) -> str:
         lines.append("- ⚠️ 案例保存时的数据版本与当前主库不同，结论需要重新核验。")
     lines.append("")
 
-    snapshot = payload.get("snapshot") or {}
+    original_snapshot = payload.get("snapshot")
+    snapshot = original_snapshot if isinstance(original_snapshot, dict) else {}
     if snapshot:
         lines.append("## 恢复状态")
-        filters = snapshot.get("filters") or {}
+        filters = snapshot.get("base_filters", snapshot.get("filters"))
+        filters = filters if isinstance(filters, dict) else {}
         applied = {k: v for k, v in filters.items() if v not in (None, "", [], False)}
-        lines.append(f"- 画布：{_md(snapshot.get('canvas_view'))}")
+        lines.append(f"- 画布/任务：{_md(snapshot.get('task', snapshot.get('canvas_view')))} · {_md(snapshot.get('mode'))}")
+        lines.append(f"- UI 快照：{_md(str(snapshot.get('ui_state_version', 'legacy')))}；恢复状态：{_md((payload.get('snapshot_status') or {}).get('status'))}")
         lines.append(f"- 筛选：`{_md(json.dumps(applied, ensure_ascii=False))}`")
         for key, label in (
             ("selected_event_id", "选中事件"),
@@ -156,9 +162,13 @@ def render_markdown(payload: dict) -> str:
             if snapshot.get(key):
                 lines.append(f"- {label}：`{snapshot[key]}`")
         pair = snapshot.get("run_pair")
-        if pair:
+        if isinstance(pair, list) and len(pair) == 2 and all(isinstance(item, str) for item in pair):
             lines.append(f"- 运行对照：`{pair[0]}` ↔ `{pair[1]}`")
         lines.append("")
+        # Preserve all new/legacy/future fields in Markdown as well as JSON export.
+        lines.append("<details><summary>完整调查快照（原样保留）</summary>\n")
+        lines.append("```json\n" + json.dumps(snapshot, ensure_ascii=False, indent=2).replace("<", "\\u003c").replace(">", "\\u003e").replace("`", "\\u0060") + "\n```")
+        lines.append("\n</details>\n")
 
     preset = payload.get("preset")
     if preset:

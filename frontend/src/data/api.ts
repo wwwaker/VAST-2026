@@ -352,6 +352,7 @@ export interface RunSummary {
 }
 
 export interface RunItem extends RunSummary {
+  stage_summary?: RunStageSummary[];
   normal_run_id: string | null;
   has_pair: boolean;
   audit: RunAuditSummary;
@@ -359,8 +360,18 @@ export interface RunItem extends RunSummary {
 }
 
 export interface RunsPayload {
+  stage_dictionary?: { key: string; label: string; order: number }[];
   meta: Record<string, unknown>;
   items: RunItem[];
+}
+
+export interface RunStageSummary {
+  key: string;
+  state: "recorded" | "no_record" | "unknown";
+  count: number | null;
+  start_offset_us: number | null;
+  duration_us: number | null;
+  sample_event_ids: string[];
 }
 
 export interface RunCall {
@@ -657,7 +668,7 @@ export function fetchCompare(
 }
 
 export function fetchRuns(
-  params: { model?: string; fixture?: string; scenario?: string; observed?: boolean },
+  params: { model?: string; fixture?: string; scenario?: string; observed?: boolean; includeStages?: boolean; limit?: number },
   signal?: AbortSignal,
 ): Promise<RunsPayload> {
   return getJson<RunsPayload>(
@@ -668,6 +679,8 @@ export function fetchRuns(
       fixture: params.fixture,
       scenario: params.scenario,
       observed: params.observed === undefined ? undefined : String(params.observed),
+      include_stages: params.includeStages ? "true" : undefined,
+      limit: params.limit,
     },
     signal,
   );
@@ -675,12 +688,13 @@ export function fetchRuns(
 
 export function fetchRun(
   runId: string,
-  options: { cursorUs?: number | null; masking?: boolean } = {},
+  options: { cursorUs?: number | null; masking?: boolean; filters?: Filters } = {},
   signal?: AbortSignal,
 ): Promise<RunDetailPayload> {
   return getJson<RunDetailPayload>(
     `/api/runs/${encodeURIComponent(runId)}`,
     {
+      ...(options.filters ? toApiFilters(options.filters) : {}),
       dataset: "CUSTOM",
       cursor_us: options.cursorUs ?? undefined,
       masking: options.masking ? "true" : undefined,
@@ -780,6 +794,7 @@ export interface CaseListPayload {
 }
 
 export interface CaseRecord {
+  snapshot_status?: { status: string; restorable?: boolean; missing_references?: { kind: string; id: string }[]; cross_dataset_references?: { kind: string; id: string }[]; error?: string };
   case_id: string;
   dataset_id: string;
   title: string;
@@ -857,8 +872,8 @@ export function deleteFinding(findingId: string): Promise<null> {
   return sendJson(`/api/findings/${encodeURIComponent(findingId)}`, "DELETE");
 }
 
-export function fetchCases(signal?: AbortSignal): Promise<CaseListPayload> {
-  return getJson("/api/cases", { dataset: "CUSTOM" }, signal);
+export function fetchCases(signal?: AbortSignal, dataset = "CUSTOM"): Promise<CaseListPayload> {
+  return getJson("/api/cases", { dataset }, signal);
 }
 
 export function fetchCase(caseId: string, signal?: AbortSignal): Promise<CaseItem> {

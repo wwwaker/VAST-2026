@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useWorkspace } from "../../state/workspace";
 import { fetchCases, type CaseItem, type CaseListPayload } from "../../data/api";
+import { RestoreCaseButton } from "../../components/RestoreCaseButton";
 
 const STATUS_CLASS: Record<string, string> = {
   ok: "tag tag-ok",
@@ -15,7 +16,7 @@ export function CasePicker({
 }: {
   onOpen: (runId: string, baselineRunId: string | null) => void;
 }) {
-  const { setActiveCase } = useWorkspace();
+  const { setActiveCase, activeCase } = useWorkspace();
   const [payload, setPayload] = useState<CaseListPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [active, setActive] = useState<string | null>(null);
@@ -23,12 +24,12 @@ export function CasePicker({
   useEffect(() => {
     const controller = new AbortController();
     fetchCases(controller.signal)
-      .then((data) => setPayload(data))
+      .then((data) => { if (!controller.signal.aborted) setPayload(data); })
       .catch((err) => {
         if (!controller.signal.aborted) setError(err instanceof Error ? err.message : "案例读取失败");
       });
     return () => controller.abort();
-  }, []);
+  }, [activeCase?.case_id]);
 
   if (error) {
     return <p className="muted small">冻结案例不可用：{error}</p>;
@@ -94,6 +95,7 @@ export function CasePicker({
                   <span>{item.title}</span>
                   <span className={STATUS_CLASS[item.status] ?? "tag"}>{item.status_label}</span>
                   <span className="mono small">{item.case_id}</span>
+                  <RestoreCaseButton caseId={item.case_id} />
                   <a
                     className="btn btn-quiet pattern-event"
                     href={`/api/cases/${item.case_id}/export?format=md`}

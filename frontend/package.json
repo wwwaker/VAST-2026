@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "check:ui": "node scripts/ui_check.mjs"
+    "check:ui": "node scripts/ui_check.mjs",
+    "check:state": "node scripts/check_workspace.mjs",
+    "check:s0": "node scripts/check_s0_ui.mjs"
   },
   "dependencies": {
     "d3-array": "^3.2.4",

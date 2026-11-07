@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useWorkspace } from "../../state/workspace";
 import { fetchRunComparison, formatDuration, type RunComparisonPayload } from "../../data/api";
 
 function value(value: unknown): string {
@@ -17,21 +18,26 @@ export function RunCompare({
   baselineRunId?: string | null;
   onBack: () => void;
 }) {
+  const { dispatch } = useWorkspace();
   const [payload, setPayload] = useState<RunComparisonPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
     setError(null);
+    setPayload(null);
     fetchRunComparison(runId, baselineRunId, controller.signal)
       .then((data) => {
-        if (!controller.signal.aborted) setPayload(data);
+        if (!controller.signal.aborted) {
+          setPayload(data);
+          dispatch({ type: "resolvedPair", runId, baselineRunId: data.pair.baseline_run_id });
+        }
       })
       .catch((err: unknown) => {
         if (!controller.signal.aborted) setError(err instanceof Error ? err.message : "读取失败");
       });
     return () => controller.abort();
-  }, [runId, baselineRunId]);
+  }, [runId, baselineRunId, dispatch]);
 
   if (error) {
     return (

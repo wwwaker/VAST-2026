@@ -150,6 +150,7 @@ function edgeMidpoint(edge: DrawnLink): { x: number; y: number } {
 
 export function RelationGraph() {
   const {
+    state, dispatch,
     dataset,
     filters,
     focusedEntityId,
@@ -161,15 +162,25 @@ export function RelationGraph() {
   const { colors } = useTheme();
 
   const [payload, setPayload] = useState<GraphPayload | null>(null);
-  const [depth, setDepth] = useState(2);
+  const depth = state.graphContext.depth;
+  const setDepth = (depth: number) => dispatch({ type: "display", patch: { graphContext: { ...state.graphContext, depth: depth as 1 | 2 | 3 } } });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [leavingLayout, setLeavingLayout] = useState<GraphLayout | null>(null);
   const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
-  const [viewTransform, setViewTransform] = useState<GraphTransform>({ x: 0, y: 0, scale: 1 });
+  const transform = state.graphContext.transform;
+  const viewTransform: GraphTransform = transform ? { x: transform.x, y: transform.y, scale: transform.k } : { x: 0, y: 0, scale: 1 };
+  const setViewTransform = (value: GraphTransform | ((previous: GraphTransform) => GraphTransform)) => {
+    const next = typeof value === "function" ? value(viewTransform) : value;
+    dispatch({ type: "display", patch: { graphContext: { ...state.graphContext, transform: { x: next.x, y: next.y, k: next.scale } } } });
+  };
   const [panning, setPanning] = useState(false);
-  const [selectedEdge, setSelectedEdge] = useState<GraphEdge | null>(null);
+  const selectedEdge = useMemo(() => {
+    const ref = state.selection;
+    return ref?.kind === "graphEdge" ? payload?.edges.find((edge) => edge.source === ref.sourceId && edge.target === ref.targetId && edge.relation === ref.relation && edge.derivation === ref.derivation) ?? null : null;
+  }, [payload, state.selection]);
+  const setSelectedEdge = (edge: GraphEdge | null) => dispatch({ type: "inspect", selection: edge ? { kind: "graphEdge", sourceId: edge.source ?? "", targetId: edge.target, relation: edge.relation, derivation: edge.derivation } : null });
   const [evidence, setEvidence] = useState<EventItem[]>([]);
   const [evidenceCursor, setEvidenceCursor] = useState<string | null>(null);
   const [evidenceMatched, setEvidenceMatched] = useState<number | null>(null);
@@ -190,7 +201,6 @@ export function RelationGraph() {
     setLoading(true);
     setError(null);
     setPayload(null);
-    setSelectedEdge(null);
     fetchGraph(
       dataset,
       focusedEntityId,
@@ -209,11 +219,6 @@ export function RelationGraph() {
       });
     return () => controller.abort();
   }, [dataset, focusedEntityId, filters, depth, cursor, masking]);
-
-  useEffect(() => {
-    setViewTransform({ x: 0, y: 0, scale: 1 });
-    setSelectedEdge(null);
-  }, [dataset, focusedEntityId]);
 
   useEffect(() => {
     if (!selectedEdge) {
@@ -395,7 +400,7 @@ export function RelationGraph() {
     if (!stage) return;
     stage.addEventListener("wheel", zoomGraph, { passive: false });
     return () => stage.removeEventListener("wheel", zoomGraph);
-  }, [payload]);
+  }, [payload, viewTransform.x, viewTransform.y, viewTransform.scale]);
 
   const layout = useMemo(() => buildLayout(payload), [payload]);
 

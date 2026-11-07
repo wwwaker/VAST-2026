@@ -1,3 +1,4 @@
+import { useWorkspace } from "../../state/workspace";
 import { useEffect, useMemo, useState } from "react";
 import { fetchRuns, formatDuration, type RunAuditSummary, type RunItem } from "../../data/api";
 
@@ -18,8 +19,11 @@ export function RunOverview({ onOpen }: { onOpen: (runId: string) => void }) {
   const [items, setItems] = useState<RunItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [scenario, setScenario] = useState("all");
-  const [model, setModel] = useState("all");
+  const { state, dispatch } = useWorkspace();
+  const scenario = state.collectionFilters.scenario ?? "all";
+  const model = state.collectionFilters.model ?? "all";
+  const setScenario = (value: string) => dispatch({ type: "display", patch: { collectionFilters: { ...state.collectionFilters, scenario: value === "all" ? null : value } } });
+  const setModel = (value: string) => dispatch({ type: "display", patch: { collectionFilters: { ...state.collectionFilters, model: value === "all" ? null : value } } });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -49,9 +53,11 @@ export function RunOverview({ onOpen }: { onOpen: (runId: string) => void }) {
       items.filter(
         (item) =>
           (scenario === "all" || (item.scenario ?? "未标注") === scenario) &&
-          (model === "all" || (item.model ?? "未知") === model),
+          (model === "all" || (item.model ?? "未知") === model) &&
+          (!state.collectionFilters.fixture || item.fixture === state.collectionFilters.fixture) &&
+          (state.collectionFilters.observed === null || item.observed === state.collectionFilters.observed),
       ),
-    [items, scenario, model],
+    [items, scenario, model, state.collectionFilters.fixture, state.collectionFilters.observed],
   );
 
   if (error) {
