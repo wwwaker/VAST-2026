@@ -38,6 +38,27 @@ export interface ActiveCase {
   title: string;
 }
 
+/** 基线比较的对照方式：自动前一等长窗，或用户手选的历史窗 */
+export interface CompareState {
+  dimension: "actor" | "event_type";
+  mode: "auto" | "manual";
+  baselineStartUs: number | null;
+  baselineEndUs: number | null;
+}
+
+const DEFAULT_COMPARE: CompareState = {
+  dimension: "event_type",
+  mode: "auto",
+  baselineStartUs: null,
+  baselineEndUs: null,
+};
+
+/** 下钻前保存的完整比较状态，返回时恢复筛选与历史窗 */
+export interface CompareReturn {
+  filters: Filters;
+  compare: CompareState;
+}
+
 interface WorkspaceValue {
   dataset: DatasetId;
   setDataset: (id: DatasetId) => void;
@@ -54,6 +75,13 @@ interface WorkspaceValue {
 
   canvasView: CanvasView;
   setCanvasView: (view: CanvasView) => void;
+  /** 基线比较的对照方式；放在工作区以便下钻后返回不丢历史窗 */
+  compareState: CompareState;
+  setCompareState: (patch: Partial<CompareState>) => void;
+  compareReturn: CompareReturn | null;
+  saveCompareReturn: (snapshot: CompareReturn) => void;
+  restoreCompare: () => void;
+  clearCompareReturn: () => void;
   /** 关系图的聚焦实体；只是探索中心，不等于 participant 筛选 */
   focusedEntityId: string | null;
   focusEntity: (id: string | null, options?: { switchView?: boolean }) => void;
@@ -106,6 +134,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [selectedEventAt, setSelectedEventAt] = useState<number | null>(null);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [canvasView, setCanvasView] = useState<CanvasView>("timeline");
+  const [compareState, setCompareStateState] = useState<CompareState>(DEFAULT_COMPARE);
+  const [compareReturn, setCompareReturn] = useState<CompareReturn | null>(null);
   const [focusedEntityId, setFocusedEntityId] = useState<string | null>(null);
   const [traceRootId, setTraceRootId] = useState<string | null>(null);
   const [traceFileId, setTraceFileId] = useState<string | null>(null);
@@ -133,12 +163,32 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setEvidenceOpen(false);
     setCursor(null);
     setPlaying(false);
+    setCompareStateState(DEFAULT_COMPARE);
+    setCompareReturn(null);
     if (canvasView === "trace") setCanvasView("timeline");
   }, [canvasView]);
 
   const setFilters = useCallback((patch: Partial<Filters>) => {
     setFiltersState((prev) => ({ ...prev, ...patch }));
   }, []);
+
+  const setCompareState = useCallback((patch: Partial<CompareState>) => {
+    setCompareStateState((prev) => ({ ...prev, ...patch }));
+  }, []);
+
+  const saveCompareReturn = useCallback((snapshot: CompareReturn) => {
+    setCompareReturn(snapshot);
+  }, []);
+
+  const clearCompareReturn = useCallback(() => setCompareReturn(null), []);
+
+  const restoreCompare = useCallback(() => {
+    if (!compareReturn) return;
+    setFiltersState(compareReturn.filters);
+    setCompareStateState(compareReturn.compare);
+    setCanvasView("compare");
+    setCompareReturn(null);
+  }, [compareReturn]);
 
   const clearFilters = useCallback(() => setFiltersState(EMPTY_FILTERS), []);
 
@@ -239,6 +289,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       selectEvent,
       canvasView,
       setCanvasView,
+      compareState,
+      setCompareState,
+      compareReturn,
+      saveCompareReturn,
+      restoreCompare,
+      clearCompareReturn,
       focusedEntityId,
       focusEntity,
       traceRootId,
@@ -279,6 +335,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       selectedEventAt,
       selectEvent,
       canvasView,
+      compareState,
+      setCompareState,
+      compareReturn,
+      saveCompareReturn,
+      restoreCompare,
+      clearCompareReturn,
       focusedEntityId,
       focusEntity,
       traceRootId,

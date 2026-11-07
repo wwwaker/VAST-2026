@@ -206,6 +206,59 @@ if (!caseCompare.pair.includes("run-06309bfc") || !caseCompare.pair.includes("ru
 console.log("[案例对照]", JSON.stringify(caseCompare));
 await page.screenshot({ path: path.join(OUT, "ui-case-compare.png") });
 
+console.log("== 预置案例结论导出 ==");
+const presetCases = await (await fetch(`${URL}/api/cases?dataset=CUSTOM`)).json();
+const presetCase = (presetCases.items ?? []).find((item) => item.title.includes("审批绕过"));
+if (!presetCase) throw new Error("找不到“审批绕过”预置案例");
+const presetClaim = `自检预置案例结论 ${Date.now()}`;
+try {
+  const presetRows = await page.$$(".stream-row");
+  await presetRows[0].click();
+  await page.waitForSelector(".basket-add .btn", { timeout: 10000 });
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll(".basket-add .btn")].find((b) => b.textContent?.includes("支持"));
+    btn?.click();
+  });
+  await page.evaluate(() => {
+    const tab = [...document.querySelectorAll(".tabs .tab")].find((t) => t.textContent?.includes("证据篮"));
+    tab?.click();
+  });
+  await page.waitForSelector(".basket .finding-form", { timeout: 10000 });
+  const presetBasket = await page.evaluate(() => ({
+    title: document.querySelector(".basket .callout strong")?.textContent?.trim() ?? "",
+    exportLinks: document.querySelectorAll(".basket .callout a[href*='/export']").length,
+  }));
+  if (!presetBasket.title.includes("审批绕过")) throw new Error(`证据篮未关联预置案例：${presetBasket.title}`);
+  if (presetBasket.exportLinks !== 2) throw new Error(`预置案例导出入口数量异常：${presetBasket.exportLinks}`);
+
+  await page.type(".finding-form input.text-input", presetClaim);
+  await page.type(".finding-form textarea", "预置案例只读，结论写入独立 notes.db");
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll(".finding-form .btn")].find((b) => b.textContent?.includes("保存结论"));
+    btn?.click();
+  });
+  await page.waitForFunction(
+    (text) => [...document.querySelectorAll(".finding-list strong")].some((n) => n.textContent?.includes(text)),
+    { timeout: 15000 },
+    presetClaim,
+  );
+  const presetExport = await fetch(`${URL}/api/cases/${presetCase.case_id}/export?format=md`);
+  const presetMarkdown = await presetExport.text();
+  if (presetExport.status !== 200) throw new Error(`预置案例导出失败：${presetExport.status}`);
+  if (!presetMarkdown.includes(presetClaim)) throw new Error("预置案例导出缺少新结论");
+  if (!presetMarkdown.includes("数据版本")) throw new Error("预置案例导出缺少数据版本");
+  console.log("[预置案例导出]", JSON.stringify({ caseId: presetCase.case_id, ...presetBasket, chars: presetMarkdown.length }));
+  await page.screenshot({ path: path.join(OUT, "ui-preset-export.png") });
+} finally {
+  // 预置案例只读，不能删；只清理本次写入的结论
+  const findings = await (await fetch(`${URL}/api/findings?case_id=${presetCase.case_id}`)).json();
+  const target = (findings.items ?? []).find((item) => item.claim === presetClaim);
+  if (target?.finding_id) {
+    const removed = await fetch(`${URL}/api/findings/${target.finding_id}`, { method: "DELETE" });
+    console.log(`[清理] 删除预置案例自检结论 ${target.finding_id} → ${removed.status}`);
+  }
+}
+
 // 回到运行列表，继续测运行级筛选
 await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
 await page.waitForSelector(".stream-row", { timeout: 20000 });
@@ -565,6 +618,69 @@ const cmp = await page.evaluate(() => {
 });
 console.log("[比较]", JSON.stringify(cmp, null, 1));
 await page.screenshot({ path: path.join(OUT, "ui-compare.png") });
+
+console.log("== 基线比较：手选历史窗与下钻返回 ==");
+await page.evaluate(() => {
+  const btn = [...document.querySelectorAll('[aria-label="对照方式"] .seg-item')].find((b) =>
+    b.textContent?.includes("手选历史窗"),
+  );
+  btn?.click();
+});
+await page.waitForSelector(".compare-manual-field input", { timeout: 10000 });
+// datetime-local 由 React 受控：必须用原生 setter 并派发 input 事件
+await page.evaluate(() => {
+  const inputs = [...document.querySelectorAll(".compare-manual-field input")];
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  setter?.call(inputs[0], "2046-05-17T08:00");
+  inputs[0].dispatchEvent(new Event("input", { bubbles: true }));
+  setter?.call(inputs[1], "2046-05-17T09:00");
+  inputs[1].dispatchEvent(new Event("input", { bubbles: true }));
+});
+await page.evaluate(() => {
+  const btn = [...document.querySelectorAll(".compare-manual-actions .btn")].find((b) =>
+    b.textContent?.includes("应用历史窗"),
+  );
+  btn?.click();
+});
+await wait(900);
+const manualCompare = await page.evaluate(() => ({
+  head: document.querySelector(".compare-head")?.textContent ?? "",
+  rows: document.querySelectorAll(".compare-row-button").length,
+  mode: [...document.querySelectorAll('[aria-label="对照方式"] .seg-item')]
+    .find((b) => b.classList.contains("seg-active"))?.textContent?.trim(),
+  overlap: document.querySelector(".compare .callout-warn strong")?.textContent?.trim() ?? "",
+}));
+if (!manualCompare.head.includes("08:00") || !manualCompare.head.includes("09:00")) {
+  throw new Error(`手选历史窗未生效：${manualCompare.head}`);
+}
+if (manualCompare.mode !== "手选历史窗") throw new Error(`对照方式未切换：${manualCompare.mode}`);
+if (manualCompare.overlap.includes("相交")) throw new Error("手选窗不应与当前窗口相交");
+console.log("[手选历史窗]", JSON.stringify(manualCompare));
+await page.screenshot({ path: path.join(OUT, "ui-compare-manual.png") });
+
+// 下钻保存比较状态；返回后必须恢复 08:00–09:00 与手选模式
+await page.evaluate(() => document.querySelector(".compare-row-button")?.click());
+await page.waitForSelector(".compare-return-banner", { timeout: 10000 });
+const returnBanner = await page.$eval(".compare-return-banner", (node) => node.textContent?.trim());
+if (!returnBanner?.includes("正在查看比较证据")) throw new Error(`缺少比较返回入口：${returnBanner}`);
+await page.evaluate(() => {
+  const btn = [...document.querySelectorAll(".compare-return-banner .btn")].find((b) =>
+    b.textContent?.includes("返回比较"),
+  );
+  btn?.click();
+});
+await page.waitForSelector(".compare-row-button", { timeout: 15000 });
+await wait(800);
+const restoredCompare = await page.evaluate(() => ({
+  head: document.querySelector(".compare-head")?.textContent ?? "",
+  mode: [...document.querySelectorAll('[aria-label="对照方式"] .seg-item')]
+    .find((b) => b.classList.contains("seg-active"))?.textContent?.trim(),
+}));
+if (!restoredCompare.head.includes("08:00") || restoredCompare.mode !== "手选历史窗") {
+  throw new Error(`返回比较后未恢复历史窗：${JSON.stringify(restoredCompare)}`);
+}
+console.log("[返回比较]", JSON.stringify(restoredCompare));
+await page.screenshot({ path: path.join(OUT, "ui-compare-return.png") });
 
 console.log("== 调查笔记 ==");
 await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });

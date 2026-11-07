@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useWorkspace } from "../../state/workspace";
 import { fetchCases, type CaseItem, type CaseListPayload } from "../../data/api";
 
 const STATUS_CLASS: Record<string, string> = {
@@ -14,6 +15,7 @@ export function CasePicker({
 }: {
   onOpen: (runId: string, baselineRunId: string | null) => void;
 }) {
+  const { setActiveCase } = useWorkspace();
   const [payload, setPayload] = useState<CaseListPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [active, setActive] = useState<string | null>(null);
@@ -35,6 +37,8 @@ export function CasePicker({
 
   const pick = (item: CaseItem) => {
     setActive(item.case_id);
+    // 预置案例只读，但允许把结论写进独立 notes.db；导出走同一个案例接口
+    setActiveCase({ case_id: item.case_id, title: item.title });
     onOpen(item.run_id, item.baseline_run_id);
   };
 
@@ -73,7 +77,8 @@ export function CasePicker({
         ))}
       </div>
       <p className="muted small">
-        案例只是入口：期望值来自对当前主库的重算，点开后可继续改筛选、查看原始事件。
+        案例只是入口：期望值来自对当前主库的重算，点开后可继续改筛选、查看原始事件；
+        选中后可在「证据篮」写结论并导出 Markdown/JSON，预置案例本身不会被修改。
       </p>
 
       {payload.user_items.length > 0 && (

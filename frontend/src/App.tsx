@@ -32,7 +32,7 @@ const readLayout = (key: string, fallback: string) => {
 };
 
 function ViewTabs() {
-  const { canvasView, setCanvasView, dataset } = useWorkspace();
+  const { canvasView, setCanvasView, dataset, compareReturn, restoreCompare } = useWorkspace();
   const visible = VIEWS.filter((v) => !v.only || v.only.includes(dataset));
   return (
     <div className="view-tabs" role="tablist" aria-label="主画布视图">
@@ -44,7 +44,14 @@ function ViewTabs() {
           aria-selected={canvasView === v.key}
           title={v.hint}
           className={`view-tab${canvasView === v.key ? " view-tab-active" : ""}`}
-          onClick={() => setCanvasView(v.key)}
+          onClick={() => {
+            // 从比较证据返回：恢复下钻前的窗口与历史窗，而不是新开一个默认比较
+            if (v.key === "compare" && compareReturn) {
+              restoreCompare();
+              return;
+            }
+            setCanvasView(v.key);
+          }}
         >
           {v.label}
         </button>
@@ -59,7 +66,15 @@ function Workspace() {
   const [eventOpen, setEventOpen] = useState(() => readLayout("event-open", "true") === "true");
   const [evidenceSize, setEvidenceSize] = useState(() => Math.max(280, Math.min(560, Number(readLayout("evidence-size", "392")) || 392)));
   const [eventSize, setEventSize] = useState(() => Math.max(240, Math.min(520, Number(readLayout("event-size", "320")) || 320)));
-  const { canvasView, dataset, evidenceOpen, setEvidenceOpen } = useWorkspace();
+  const {
+    canvasView,
+    dataset,
+    evidenceOpen,
+    setEvidenceOpen,
+    compareReturn,
+    restoreCompare,
+    filterSummary,
+  } = useWorkspace();
   useHotkeys(() => setShowHelp((v) => !v));
 
   const persist = (key: string, value: string) => {
@@ -121,6 +136,16 @@ function Workspace() {
               <div className="canvas-toolbar">
                 <ViewTabs />
               </div>
+              {compareReturn && canvasView !== "compare" && (
+                <div className="compare-return-banner" role="status">
+                  <span>
+                    正在查看比较证据：<span className="muted small">{filterSummary}</span>
+                  </span>
+                  <button type="button" className="btn btn-quiet" onClick={restoreCompare}>
+                    返回比较
+                  </button>
+                </div>
+              )}
               {canvasView === "timeline" &&
                 (dataset === "CUSTOM" ? (
                   <CustomWorkspace />
