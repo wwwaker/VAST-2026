@@ -15,12 +15,13 @@ __pycache__/
 # ---- 第三方参考工程：独立 clone，内含 150 MB neo4j.zip ----
 VAST_Challenge_2026-main/
 
-# ---- 本地数据与派生分析产物：体积较大，使用说明见 docs/数据获取.md ----
+# ---- 本地数据与派生分析产物：体积较大，使用说明见 docs/reference/数据获取.md ----
+# data/ 是唯一数据根：process/ 标准数据、raw/ 原始包、views/ + analysis/ 派生视图
 /data/
-/final-data/
 
-# ---- 本地项目文档 ----
-/docs/
+# ---- 文档进入版本管理；本地产物仍写入 build/ ----
+/docs/.local/
+/docs/**/~$*
 
 # ---- 编辑器与系统 ----
 .vscode/

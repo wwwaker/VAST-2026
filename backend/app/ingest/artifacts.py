@@ -1,7 +1,7 @@
-"""派生数据（final-data/process/views）接入与版本核验。
+"""派生数据（data/process/views）接入与版本核验。
 
-派生数据不是源事实：manifest 里的 SHA-256 与当前 data/processed 源事件不一致时，
-只能关闭该能力，不能沿用旧结论。路径一律相对 MAS_ARTIFACT_ROOT（默认项目根/final-data）。
+派生数据不是源事实：manifest 里的 SHA-256 与当前 data/process 源事件不一致时，
+只能关闭该能力，不能沿用旧结论。路径一律相对 MAS_ARTIFACT_ROOT（默认项目根/data）。
 """
 
 from __future__ import annotations

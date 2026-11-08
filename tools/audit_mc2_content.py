@@ -113,7 +113,7 @@ def main() -> int:
     parser.add_argument("--out", default=os.path.join(ROOT, "build", "mc2-content-audit.json"))
     parser.add_argument(
         "--zip",
-        default=os.path.join(ROOT, "final-data", "raw", "official_data", "MC2", "VAST_Challenge_2026_MC2.zip"),
+        default=os.path.join(ROOT, "data", "raw", "official_data", "MC2", "VAST_Challenge_2026_MC2.zip"),
     )
     args = parser.parse_args()
 

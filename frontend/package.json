@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "check:ui": "node scripts/ui_check.mjs",
     "check:state": "node scripts/check_workspace.mjs",
-    "check:s0": "node scripts/check_s0_ui.mjs"
+    "check:s0": "node scripts/check_s0_ui.mjs",
+    "check:reference": "node scripts/check_reference_ui.mjs",
+    "check:regression": "node scripts/check_regression_other_datasets.mjs"
   },
   "dependencies": {
     "d3-array": "^3.2.4",

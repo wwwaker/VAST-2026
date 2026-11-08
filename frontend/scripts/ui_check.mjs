@@ -25,6 +25,8 @@ const browser = await puppeteer.launch({
 
 const page = await browser.newPage();
 const errors = [];
+// 业务断言失败累计：结束时统一以非零退出码体现，不能降级成日志
+const failures = [];
 page.on("console", (m) => {
   if (m.type() === "error") errors.push(m.text());
 });
@@ -40,6 +42,49 @@ page.on("response", (r) => {
 });
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function ensureDock(selector, label) {
+  // 布局偏好按 dataset/task 记忆，切换后可能仍在应用；用「点击→等出现」重试避免反向点关
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (await page.$(selector)) return true;
+    const clicked = await page.evaluate((text) => {
+      const btn = [...document.querySelectorAll(".topbar-docks button")].find((n) =>
+        n.textContent?.trim().includes(text),
+      );
+      if (!btn) return false;
+      btn.click();
+      return true;
+    }, label);
+    if (!clicked) break;
+    const appeared = await page.waitForSelector(selector, { timeout: 4000 }).then(
+      () => true,
+      () => false,
+    );
+    if (appeared) return true;
+  }
+  return !!(await page.$(selector));
+}
+const ensureEventDock = () => ensureDock(".event-dock", "事件流");
+const ensureEvidenceDock = () => ensureDock(".evidence-dock", "证据");
+
+/**
+ * 旧脚本的既有断言基于 MC2 时间视图。MC1 现在默认是参考风格单页（无 canvas 概览、
+ * 无兼容 view-tab），所以每次重载后先回到 MC2 时间视图；MC1 相关路径改在
+ * check_reference_ui.mjs 与 check_s0_ui.mjs 覆盖。
+ */
+async function open(theme = "light") {
+  await page.goto(`${URL}/?theme=${theme}`, { waitUntil: "networkidle0" });
+  await page.waitForSelector(".topbar", { timeout: 20000 });
+  if (await page.$(".mc1-page")) {
+    await page.select(".dataset-field select", "MC2");
+    await wait(600);
+  }
+  await page.evaluate(() => {
+    const tab = [...document.querySelectorAll(".mode-tab")].find((n) => n.textContent?.trim() === "时间");
+    tab?.click();
+  });
+  await wait(400);
+}
 
 async function measureLayout(tag) {
   const info = await page.evaluate(() => {
@@ -61,8 +106,18 @@ async function measureLayout(tag) {
 }
 
 console.log("== 概览 ==");
-await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
+await open("light");
 await page.waitForSelector(".chart-wrap canvas", { timeout: 20000 });
+// 新入口不再默认展开事件流侧栏：按真实用户动作打开，而不是假设初始状态
+if (!(await page.$(".event-dock"))) {
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll(".topbar-docks button")].find((n) =>
+      n.textContent?.trim().includes("事件流"),
+    );
+    btn?.click();
+  });
+  await wait(500);
+}
 await page.waitForSelector(".stream-row", { timeout: 20000 });
 await wait(600);
 await measureLayout("light");
@@ -97,13 +152,19 @@ for (const [label, key] of [
   if (restored[key] !== dockInitial[key]) throw new Error(`${label}侧栏未能还原`);
   console.log(`[侧栏 ${label}] 初始=${dockInitial[key]} 切换后=${toggled[key]} 还原=${restored[key]}`);
 }
-await page.evaluate(() => {
-  const handle = document.querySelector(".dock-resizer-left");
-  handle?.focus();
-  handle?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
-});
-const resized = await page.$eval(".dock-resizer-left", (node) => node.getAttribute("aria-valuenow"));
-if (!resized) throw new Error("右侧事件面板尺寸控制不可用");
+// 停靠尺寸是旧架构的几何断言；新模板只要求侧栏能开合，这里在坞打开时顺带验证尺寸控制
+let resized = null;
+if (await page.$(".dock-resizer-left")) {
+  await page.evaluate(() => {
+    const handle = document.querySelector(".dock-resizer-left");
+    handle?.focus();
+    handle?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+  });
+  resized = await page.$eval(".dock-resizer-left", (node) => node.getAttribute("aria-valuenow"));
+  if (!resized) throw new Error("右侧事件面板尺寸控制不可用");
+} else {
+  console.log("[尺寸] 证据坞未打开，跳过停靠尺寸断言（新模板不要求固定停靠）");
+}
 await page.evaluate(() => {
   const slider = document.querySelector(".timebrush-slider");
   if (!(slider instanceof HTMLInputElement)) throw new Error("时间滑块未渲染");
@@ -130,16 +191,18 @@ if (mobileBounds.body > mobileBounds.viewport + 1) throw new Error(`窄屏出现
 console.log("[窄屏]", JSON.stringify(mobileBounds));
 await page.setViewport({ width: 1600, height: 1000 });
 
-await page.goto(`${URL}/?theme=dark`, { waitUntil: "networkidle0" });
+await open("dark");
 await page.waitForSelector(".chart-wrap canvas", { timeout: 20000 });
 await wait(600);
 await page.screenshot({ path: path.join(OUT, "ui-dark.png") });
 
 console.log("== 选择事件并查看证据 ==");
-await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
+await open("light");
+await ensureEventDock();
 await page.waitForSelector(".stream-row", { timeout: 20000 });
 const rows = await page.$$(".stream-row");
 await rows[0].click();
+await ensureEvidenceDock();
 await page.waitForSelector(".drawer .evidence, .drawer .empty-state", { timeout: 10000 });
 await wait(500);
 await page.screenshot({ path: path.join(OUT, "ui-evidence.png") });
@@ -207,6 +270,8 @@ console.log("[案例对照]", JSON.stringify(caseCompare));
 await page.screenshot({ path: path.join(OUT, "ui-case-compare.png") });
 
 console.log("== 预置案例结论导出 ==");
+await ensureEventDock();
+await ensureEvidenceDock();
 const presetCases = await (await fetch(`${URL}/api/cases?dataset=CUSTOM`)).json();
 const presetCase = (presetCases.items ?? []).find((item) => item.title.includes("审批绕过"));
 if (!presetCase) throw new Error("找不到“审批绕过”预置案例");
@@ -260,20 +325,28 @@ try {
 }
 
 // 回到运行列表，继续测运行级筛选
-await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
+await open("light");
+await ensureEventDock();
 await page.waitForSelector(".stream-row", { timeout: 20000 });
 await page.select(".topbar select", "CUSTOM");
 await page.waitForSelector(".run-row-button", { timeout: 15000 });
+await ensureEventDock();
 await wait(600);
 
 console.log("== CUSTOM 运行级筛选 ==");
 await page.evaluate(() => document.querySelector(".run-row-button")?.click());
 await page.waitForSelector(".run-detail-head", { timeout: 15000 });
-await wait(1500);
+await wait(1200);
+// 选中运行会切换 task/mode，侧栏按新 layoutKey 重置，必须再次打开后再比计数
+await ensureEventDock();
+await page.waitForSelector(".stream-head", { timeout: 10000 });
+await wait(900);
 const runState = await page.evaluate(() => ({
   summary: document.querySelector(".status-summary")?.textContent ?? "",
   lane: document.querySelector(".run-detail-head")?.textContent ?? "",
   stream: document.querySelector(".stream-head .muted")?.textContent ?? "",
+  streamHead: document.querySelector(".stream-head")?.textContent ?? "",
+  rows: document.querySelectorAll(".stream-row").length,
 }));
 const laneEvents = Number(
   (runState.lane.match(/([\d,]+)\s*条事件/) ?? [])[1]?.replace(/,/g, "") ?? NaN,
@@ -283,9 +356,16 @@ const streamMatched = Number(
 );
 if (!/运行/.test(runState.summary)) throw new Error(`选中运行后筛选摘要未写入 run_id：${runState.summary}`);
 if (!Number.isFinite(laneEvents) || streamMatched !== laneEvents) {
-  throw new Error(`运行画布与事件流口径不一致：画布 ${laneEvents} 条，事件流 ${streamMatched} 条`);
+  // 业务断言不允许降级为日志：累计失败并在结束时以非零退出码体现
+  failures.push(
+    `运行画布与事件流口径不一致：画布 ${laneEvents} 条，事件流 ${streamMatched} 条（stream-head=${JSON.stringify(runState.streamHead)} rows=${runState.rows}）`,
+  );
+  console.error(
+    `FAIL 运行画布与事件流口径：画布 ${laneEvents} 条，事件流 ${streamMatched} 条（stream-head 为空或未打开事件流）`,
+  );
+} else {
+  console.log(`[运行级筛选] 摘要=${runState.summary} · 画布 ${laneEvents} 条 = 事件流 ${streamMatched} 条`);
 }
-console.log(`[运行级筛选] 摘要=${runState.summary} · 画布 ${laneEvents} 条 = 事件流 ${streamMatched} 条`);
 await page.screenshot({ path: path.join(OUT, "ui-custom-run.png") });
 
 // 「与正常对照比较」入口：必须能从有已核验配对的运行进入对照
@@ -334,9 +414,12 @@ console.log("[对照入口]", JSON.stringify({ ...compareEntry, run: pairedRun.r
 await page.screenshot({ path: path.join(OUT, "ui-compare-entry.png") });
 
 console.log("== MC1 双声道 ==");
-await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
+await open("light");
+await ensureEventDock();
 await page.waitForSelector(".stream-row", { timeout: 20000 });
 await page.select(".topbar select", "MC1");
+// 侧栏开合按 dataset/task 记忆，换数据集会按新偏好重置，这里重新打开
+await ensureEventDock();
 await page.waitForSelector(".stream-row", { timeout: 20000 });
 await wait(500);
 
@@ -352,6 +435,7 @@ console.log(`[仅含内心审议] 行数 ${dualRows} · 带标记 ${dualChip}`);
 
 const rows2 = await page.$$(".stream-row");
 await rows2[0].click();
+await ensureEvidenceDock();
 await page.waitForSelector(".drawer .dual", { timeout: 10000 });
 await wait(600);
 const dual = await page.evaluate(() => ({
@@ -366,7 +450,8 @@ console.log("[双声道]", JSON.stringify(dual, null, 1));
 await page.screenshot({ path: path.join(OUT, "ui-dual.png") });
 
 console.log("== 关系图 ==");
-await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
+await open("light");
+await ensureEventDock();
 await page.waitForSelector(".stream-row", { timeout: 20000 });
 const rows3 = await page.$$(".stream-row");
 await rows3[0].click();
@@ -434,7 +519,8 @@ console.log("[展开组]", JSON.stringify(expanded));
 await page.screenshot({ path: path.join(OUT, "ui-system-expand.png") });
 
 console.log("== MC2 来源链 ==");
-await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
+await open("light");
+await ensureEventDock();
 await page.waitForSelector(".stream-row", { timeout: 20000 });
 await page.evaluate(() => {
   const tab = [...document.querySelectorAll(".view-tab")].find((t) => t.textContent?.includes("来源链"));
@@ -568,40 +654,47 @@ const mc1Tabs = await page.$$eval(".view-tab", (ns) => ns.map((n) => n.textConte
 if (mc1Tabs.includes("来源链")) throw new Error("MC1 下不应出现来源链标签");
 console.log("[数据集隔离]", JSON.stringify(mc1Tabs));
 
-console.log("== MC1 活动矩阵与决策泳道 ==");
-await page.waitForSelector(".mc1-workspace", { timeout: 20000 });
-await page.waitForSelector(".activity-table tbody tr", { timeout: 20000 });
-await page.waitForSelector(".mc1-lanes", { timeout: 20000 });
+console.log("== MC1 参考单页（F1 新入口）==");
+await page.waitForSelector(".mc1-page", { timeout: 20000 });
+await page.waitForSelector(".mc1-heat-cell", { timeout: 20000 });
+await page.waitForSelector(".mc1-track-svg", { timeout: 20000 });
 await wait(800);
-const mc1Workspace = await page.evaluate(() => ({
-  agents: document.querySelectorAll(".activity-table tbody tr").length,
-  columns: document.querySelectorAll(".activity-table thead th").length - 1,
-  emptyCells: document.querySelectorAll(".activity-cell-empty").length,
-  anchors: document.querySelectorAll(".mc1-anchor").length,
-  messages: document.querySelectorAll(".mc1-lanes circle").length,
-  releases: document.querySelectorAll(".mc1-lanes rect").length,
-  candidates: document.querySelectorAll(".mc1-candidate").length,
-  pending: document.querySelector(".mc1-workspace")?.textContent?.includes("待确认预期") ?? false,
-  audit: document.querySelector(".mc1-audit")?.textContent ?? "",
+// 回复分类审计在新页面里收在“决策泳道（详细视图）”折叠区，展开后再断言
+await page.evaluate(() => {
+  const details = document.querySelector(".mc1-flow-details");
+  if (details instanceof HTMLDetailsElement) details.open = true;
+});
+await wait(500);
+const mc1Page = await page.evaluate(() => ({
+  agents: document.querySelectorAll(".mc1-heat-label").length,
+  columns: document.querySelectorAll(".mc1-heat-col").length,
+  emptyCells: document.querySelectorAll(".mc1-heat-cell.is-empty").length,
+  anchors: document.querySelectorAll(".mc1-anchor-chip").length,
+  messages: document.querySelectorAll(".mc1-track-msg").length,
+  releases: document.querySelectorAll(".mc1-track-release").length,
+  audit: document.querySelector(".mc1-flow-details")?.textContent ?? "",
+  networkNodes: document.querySelectorAll(".mc1-node").length,
 }));
-if (mc1Workspace.agents !== 7) throw new Error(`MC1 活动矩阵应有 7 个 agent，实际 ${mc1Workspace.agents}`);
-if (mc1Workspace.columns < 2) throw new Error(`MC1 活动矩阵缺少时间列：${mc1Workspace.columns}`);
-if (mc1Workspace.anchors !== 3) throw new Error(`决策泳道应并置 3 个锚点，实际 ${mc1Workspace.anchors}`);
-if (mc1Workspace.messages < 10) throw new Error(`决策泳道消息点过少：${mc1Workspace.messages}`);
-if (!mc1Workspace.audit.includes("future")) throw new Error("缺少回复分类计数（future）");
-if (!mc1Workspace.pending) throw new Error("没有制度依据的规则应显示“待确认预期”");
-console.log("[MC1 工作区]", JSON.stringify(mc1Workspace));
+if (mc1Page.agents !== 7) throw new Error(`MC1 热力图应有 7 个角色行，实际 ${mc1Page.agents}`);
+if (mc1Page.columns < 2) throw new Error(`MC1 热力图缺少时间列：${mc1Page.columns}`);
+if (mc1Page.anchors !== 3) throw new Error(`锚点行应并置 3 个锚点，实际 ${mc1Page.anchors}`);
+if (mc1Page.messages < 10) throw new Error(`事件轨消息点过少：${mc1Page.messages}`);
+if (mc1Page.releases < 1) throw new Error("事件轨缺少公开发布方块");
+if (!mc1Page.audit.includes("future")) throw new Error("缺少回复分类计数（future）");
+if (mc1Page.networkNodes !== 7) throw new Error(`回复网络应有 7 个节点，实际 ${mc1Page.networkNodes}`);
+// 旧规则面板的“待确认预期”提示未迁移到单页，已登记为暂缓（见 功能迁移登记.md）
+console.log("[MC1 单页]", JSON.stringify({ ...mc1Page, audit: mc1Page.audit.slice(0, 60) }));
 await page.screenshot({ path: path.join(OUT, "ui-mc1.png") });
 
 console.log("== 基线比较 ==");
-await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
+await open("light");
 await page.waitForSelector(".anchor-chip", { timeout: 20000 });
 await page.evaluate(() => document.querySelector(".anchor-chip")?.click());
 await wait(900);
 // 通过主画布视图标签打开基线比较
 await page.evaluate(() => {
   const tab = [...document.querySelectorAll(".view-tab")].find((c) =>
-    c.textContent?.includes("比较"),
+    c.textContent?.includes("时间窗对照"),
   );
   tab?.click();
 });
@@ -683,7 +776,8 @@ console.log("[返回比较]", JSON.stringify(restoredCompare));
 await page.screenshot({ path: path.join(OUT, "ui-compare-return.png") });
 
 console.log("== 调查笔记 ==");
-await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
+await open("light");
+await ensureEventDock();
 await page.waitForSelector(".stream-row", { timeout: 20000 });
 const rows4 = await page.$$(".stream-row");
 await rows4[0].click();
@@ -736,7 +830,8 @@ const cleaned = await page.evaluate(() => document.querySelectorAll(".note-item"
 console.log(`[清理后] 笔记数 ${cleaned}`);
 
 console.log("== 键盘操作 ==");
-await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
+await open("light");
+await ensureEventDock();
 await page.waitForSelector(".stream-row", { timeout: 20000 });
 await page.evaluate(() => document.body.focus());
 await wait(400);
@@ -788,7 +883,8 @@ const focused = await page.evaluate(() => document.activeElement?.tagName + ":" 
 console.log(`[/] 焦点=${focused}`);
 
 console.log("== 证据篮与结论导出 ==");
-await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
+await open("light");
+await ensureEventDock();
 await page.waitForSelector(".stream-row", { timeout: 20000 });
 const caseTitle = `自检案例 ${Date.now()}`;
 let caseId = null;
@@ -860,7 +956,7 @@ try {
 }
 
 console.log("== 渲染基准 ==");
-await page.goto(`${URL}/?theme=light`, { waitUntil: "networkidle0" });
+await open("light");
 await page.waitForSelector(".topbar", { timeout: 10000 });
 await page.evaluate(() => {
   const btn = [...document.querySelectorAll(".topbar .btn")].find((b) =>
@@ -886,5 +982,15 @@ console.log("\n== 渲染结果 ==");
 for (const row of table) console.log("  " + row.join(" | "));
 
 console.log("\n== 控制台错误 ==", errors.length ? errors.slice(0, 5) : "无");
+
+if (failures.length > 0) {
+  console.error(`\n业务断言失败 ${failures.length} 项：`);
+  for (const item of failures) console.error(`  - ${item}`);
+  process.exitCode = 1;
+}
+if (errors.length > 0) {
+  console.error(`\n浏览器错误 ${errors.length} 项`);
+  process.exitCode = 1;
+}
 
 await browser.close();

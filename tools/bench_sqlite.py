@@ -19,20 +19,20 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 DATASETS = {
     "MC1": {
-        "events": os.path.join(ROOT, "data", "processed", "official_data", "MC1", "events.jsonl"),
-        "entities": os.path.join(ROOT, "data", "processed", "official_data", "MC1", "entities.json"),
+        "events": os.path.join(ROOT, "data", "process", "official_data", "MC1", "events.jsonl"),
+        "entities": os.path.join(ROOT, "data", "process", "official_data", "MC1", "entities.json"),
         "entity_container": "entities",
         "timezone_status": "unknown",
     },
     "MC2": {
-        "events": os.path.join(ROOT, "data", "processed", "official_data", "MC2", "events.jsonl"),
-        "entities": os.path.join(ROOT, "data", "processed", "official_data", "MC2", "entities.json"),
+        "events": os.path.join(ROOT, "data", "process", "official_data", "MC2", "events.jsonl"),
+        "entities": os.path.join(ROOT, "data", "process", "official_data", "MC2", "entities.json"),
         "entity_container": "entities",
         "timezone_status": "utc",
     },
     "CUSTOM": {
-        "events": os.path.join(ROOT, "data", "processed", "custom_dataset", "events.jsonl"),
-        "entities": os.path.join(ROOT, "data", "processed", "custom_dataset", "entities.json"),
+        "events": os.path.join(ROOT, "data", "process", "custom_dataset", "events.jsonl"),
+        "entities": os.path.join(ROOT, "data", "process", "custom_dataset", "entities.json"),
         "entity_container": None,  # 根即数组
         "timezone_status": "utc",
     },

@@ -15,7 +15,7 @@ const MODE_LABELS: Record<Mode, string> = {
   window: "时间窗", history: "历史", transitions: "转移", runPair: "运行对照", claims: "结论", notes: "笔记",
 };
 
-export function TaskNav({ onParallel }: { onParallel: () => void }) {
+export function TaskNav({ onParallel, compact = false }: { onParallel: () => void; compact?: boolean }) {
   const { dataset, state, changeTask } = useWorkspace();
   const modes = CAPABILITIES[dataset][state.task];
 
@@ -35,25 +35,32 @@ export function TaskNav({ onParallel }: { onParallel: () => void }) {
             {task.label}
           </button>
         ))}
-      </div>
-      <div className="task-nav-secondary" role="tablist" aria-label={`${state.task} 模式`}>
-        <span className="task-nav-label">{TASKS.find((task) => task.id === state.task)?.label}</span>
-        {modes.map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            role="tab"
-            aria-selected={state.mode === mode}
-            className={`mode-tab${state.mode === mode ? " mode-tab-active" : ""}`}
-            onClick={() => changeTask(state.task, mode)}
-          >
-            {MODE_LABELS[mode] ?? mode}
+        {compact && (
+          <button type="button" className="btn btn-quiet parallel-toggle" onClick={onParallel} title="同时打开证据详述和事件辅助区">
+            并列核对
           </button>
-        ))}
-        <button type="button" className="btn btn-quiet parallel-toggle" onClick={onParallel} title="同时打开检查器和事件辅助区">
-          并列核对
-        </button>
+        )}
       </div>
+      {!compact && (
+        <div className="task-nav-secondary" role="tablist" aria-label={`${state.task} 模式`}>
+          <span className="task-nav-label">{TASKS.find((task) => task.id === state.task)?.label}</span>
+          {modes.map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              role="tab"
+              aria-selected={state.mode === mode}
+              className={`mode-tab${state.mode === mode ? " mode-tab-active" : ""}`}
+              onClick={() => changeTask(state.task, mode)}
+            >
+              {MODE_LABELS[mode] ?? mode}
+            </button>
+          ))}
+          <button type="button" className="btn btn-quiet parallel-toggle" onClick={onParallel} title="同时打开检查器和事件辅助区">
+            并列核对
+          </button>
+        </div>
+      )}
     </nav>
   );
 }

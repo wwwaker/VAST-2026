@@ -21,6 +21,8 @@ async function task(label) {
   await clickText(".task-tab", label);
 }
 async function mode(label) {
+  // MC1 参考界面把模式收进页面内的图表显隐，不再有二级 mode-tab；此处按新入口容忍缺失
+  if (!(await page.$(".mode-tab"))) return;
   await clickText(".mode-tab", label);
 }
 async function ensureEventStream() {
@@ -156,8 +158,7 @@ try {
 
   await page.select(".dataset-field select", "MC1");
   await task("概览");
-  await mode("活动");
-  await page.waitForSelector(".mc1-workspace");
+  await page.waitForSelector(".mc1-page");
   await ensureEventStream();
   await page.click(".stream-row");
   if (!(await page.$(".drawer"))) await clickText(".topbar-docks button", "证据");
@@ -169,7 +170,7 @@ try {
   await task("追踪");
   await mode("局部关系");
   await restoreFromBasket(mc1.case_id);
-  await page.waitForSelector(".mc1-workspace");
+  await page.waitForSelector(".mc1-page");
   check("MC1 save/read/restore returns current activity container", () => {});
   await page.screenshot({ path: path.join(out, "mc1-activity.png") });
 
@@ -181,15 +182,15 @@ try {
   // Reload the list, not the investigation, by opening the basket again.
   await drawerBasket();
   await page.reload({ waitUntil: "networkidle0" });
-  await page.select(".dataset-field select", "MC1"); await page.waitForSelector(".mc1-workspace");
+  await page.select(".dataset-field select", "MC1"); await page.waitForSelector(".mc1-page");
   await restoreFromBasket(missingCase.case_id);
   await page.waitForFunction(() => [...document.querySelectorAll('[role="status"]')].some((n) => n.textContent?.includes("缺失引用 1 条")));
   check("missing reference remains explicit and is not replaced by first event", () => {});
   await page.screenshot({ path: path.join(out, "missing-reference.png") });
   for (const [dataset, template, savedTask, alias, canonical, selector] of [
-    ["MC1", mc1.snapshot, "overview", "timeline", "time", ".chart-wrap"],
+    ["MC1", mc1.snapshot, "overview", "timeline", "time", ".mc1-page"],
     ["CUSTOM", pair.snapshot, "overview", "local", "relations", ".graph-workspace"],
-    ["MC1", mc1.snapshot, "trace", "messages", "decision", ".mc1-workspace"],
+    ["MC1", mc1.snapshot, "trace", "messages", "decision", ".mc1-page"],
     ["MC2", mc2.snapshot, "trace", "file", "source", ".trace-view"],
   ]) {
     const snapshot = structuredClone(template);

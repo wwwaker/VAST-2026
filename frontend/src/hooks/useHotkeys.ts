@@ -14,6 +14,21 @@ function isTyping(target: EventTarget | null): boolean {
   return el.isContentEditable;
 }
 
+/**
+ * 原生可交互元素（按钮/链接/摘要/带 role=button 的图元）自己消费 Enter 与 Space。
+ * 全局快捷键只接管"焦点不在控件上"的情况，避免「关闭」按钮按 Enter 反而打开证据坞。
+ */
+const INTERACTIVE_ROLES = new Set(["button", "link", "switch", "checkbox", "tab", "menuitem", "option"]);
+
+function isInteractiveControl(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  if (!el || typeof el.getAttribute !== "function") return false;
+  if (typeof el.closest === "function" && el.closest("button, a, summary, [role='button']")) return true;
+  const role = el.getAttribute("role");
+  if (role && INTERACTIVE_ROLES.has(role)) return true;
+  return false;
+}
+
 export function useHotkeys(onToggleHelp: () => void) {
   const {
     dataset,
@@ -31,6 +46,9 @@ export function useHotkeys(onToggleHelp: () => void) {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTyping(event.target)) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
+      // 局部处理过的按键（如 SVG 图元的 Enter/Space）不再触发全局回放或开坞
+      if (event.defaultPrevented) return;
+      if ((event.key === "Enter" || event.key === " ") && isInteractiveControl(event.target)) return;
 
       const baseStep = dataset === "CUSTOM" ? SECOND_US : HOUR_US;
       const step = event.shiftKey ? baseStep * 6 : baseStep;

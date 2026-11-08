@@ -5,6 +5,12 @@
 一条完整调查路径：**选择数据集 → 建立概览基线 → 刷选异常时段 → 沿事件流下钻 → 核对原始记录**。
 三套数据共用同一套筛选、联动与证据视图，各自的语义差异收敛在 manifest 里。
 
+**当前开发方向（2026-11-08）**：以本地参考项目的 MC1 界面为模板，直接复用热力图、事件轨、网络和点击详情；MC2 与自建数据沿用同一页面骨架。继续使用现有 SQLite/FastAPI、状态与快照基础。旧四任务导航重构计划已归档，不再作为开发门槛。
+
+**F1 已完成（未提交）**：MC1 默认页改为参考风格单页（角色活动热力图 → 点格读消息 → 事件轨/回复网络），新增 `/api/mc1/reply-network`；`data/` 已合并为唯一数据根（`data/process/`）。两轮独立复核的 9 项问题（点格/节点扩窗、渠道按钮不同源、事件轨静默截断与补入越权、轨点击无结果、键盘关闭与焦点、旧脚本断言降级）已修复并补断言，见 [F1 修复复验](docs/current/交接/F1-修复复验.md)。分支 `codex/reference-ui`。F2–F4 未开始。
+
+F1 数据与功能经 [第三次独立复核](docs/current/交接/F1-三次复核记录.md) 通过；用户随后要求去除 MC1 的旧导航与重复界面。新会话从 [文档入口](docs/README.md) 阅读，**先执行 [MC1 收尾清理](docs/current/MC1收尾清理提示词.md)，完成后再用 [F2 MC2 提示词](docs/current/第二阶段提示词-F2-MC2参考界面.md)**，不把未清理的旧壳复制到 MC2。
+
 ---
 
 ## 环境要求
@@ -69,7 +75,9 @@ cd frontend && npm run dev        # http://localhost:5173
 | `python tools/bench_sqlite.py --dataset MC2` | SQLite 导入与查询基准 |
 | `python tools/bench_api.py --base http://127.0.0.1:8000` | API 性能基准（预热 3 / 采样 30），写 `build/api-bench-v2.json` |
 | `python tools/audit_mc2_content.py` | MC2 内容可用性审计，写 `build/mc2-content-audit.json` |
-| `cd frontend && npm run check:ui -- http://127.0.0.1:8000` | 无头浏览器自检：布局、交互、键盘、截图、渲染基准、控制台错误 |
+| `cd frontend && npm run check:ui -- http://127.0.0.1:8000` | 既有浏览器回归；新页面需适配入口并保留业务断言，输出到 build/ |
+| `cd frontend && npm run check:reference -- http://127.0.0.1:8021` | F1 MC1 参考界面检查（联动、尺寸、主题、MC2/CUSTOM 入口），写 `build/reference-ui/F1/` |
+| `cd frontend && npm run check:regression -- http://127.0.0.1:8021` | MC2 来源链/系统背景与 CUSTOM 运行入口的最小回归 |
 | `python tools/check_contrast.py --strict` | 双主题对比度验收（WCAG 2.1），有失败项时退出码非 0 |
 | `curl http://127.0.0.1:8000/api/health` | 健康检查（含库大小） |
 
@@ -78,16 +86,18 @@ cd frontend && npm run dev        # http://localhost:5173
 ## 目录
 
 ```text
-data/processed/          处理后数据（JSONL 事件表 + JSON 实体表 + labels.json）
+data/process/            标准数据（JSONL 事件表 + JSON 实体表 + labels.json）与派生 views/、analysis/
 backend/app/ingest/      manifest、adapter、导入命令行
 backend/app/domain/      类型字典、CUSTOM 审计规则、MC2 文件与来源链
 backend/app/routers/     查询接口
 frontend/src/            工作区前端（theme / state / components / views）
 frontend/src/views/mc2/  来源链、文件轨迹、转移矩阵（仅 MC2）
-frontend/src/views/mc1/  活动矩阵、决策泳道、先兆候选（仅 MC1）
+frontend/src/views/mc1/  MC1 参考单页（热力图、事件轨、回复网络、消息详情、先兆候选）
 tools/                   基准脚本、对比度检查、MC2 内容审计、API 基准
 build/                   数据库与截图产物（不入库）
-docs/                    计划书、数据适配规则、基准与接口说明
+docs/current/            当前范围、参考界面计划、验收和 F1 提示词
+docs/reference/          数据适配、恢复、后端接口与历史 SQLite 基准
+docs/archive/            原 UI 计划、S0/S1 交接与复核历史（不再执行）
 ```
 
 ---
@@ -117,7 +127,7 @@ MC2 还在 manifest 里记录了**候选干预点**：`SwiftWren_further_instruc
 - **自建数据没有 `source_record_id`**，已回落为 `event_id` 并在界面标注。
 - 标签的 `scenario`（流程配置）与 `observed`（是否实际观测到）分开呈现，不合并成一个"异常"标记。
 
-更细的字段规则见 `docs/数据适配规则.md`。
+更细的字段规则见 [数据适配规则](docs/reference/数据适配规则.md)。
 
 ---
 
@@ -134,8 +144,8 @@ MC2 还在 manifest 里记录了**候选干预点**：`SwiftWren_further_instruc
 - MC1 已有回复分类、7 agent 活动矩阵、决策泳道与先兆候选。`reply_future_reference`（174 条）保留原始关系但默认不进入历史传播主链；环境叙事与人工标记单独标注 `provenanceKind`，同轮共现不改称因果。没有制度依据的“发布前审核”规则显示“待确认预期”，不生成候选。
 - MC2 已有系统背景地图、历史实例阶段对齐、单点干预论证与操作转移矩阵。矩阵只给支持对数与 actor 数；**未实现 actor 校正前不展示 lift/倍数**，同执行者相邻操作不表示因果。干预位置只有一个候选，不宣称是唯一入口。
 - 基线比较支持“自动前一窗 / 手选历史窗（UTC）”，下钻返回会恢复原窗口与手选窗；同角色群组对照尚未实现，不能把“按主体”当成“同角色”。
-- 当前 UI 仍是旧布局：MC1 / CUSTOM 的“事件时间线”标签被数据集工作区替换。**S0 共享状态、快照保存/最小恢复、批量阶段摘要和后端校验已实施且通过独立复核**；四任务导航、新检查器和页面重绘留在 S1–S5。[S0 交接报告](docs/阶段交接/S0-交接报告.md) 列出实施范围，[S0 复核记录](docs/阶段交接/S0-复核记录.md) 列出复验，[S1 提示词](docs/交接提示词/第二阶段-S1骨架迁移.md) 可用于继续实施。
-- 性能数字来自本机单用户顺序请求（预热 3 次、采样 30 次），`build/api-bench-v2.json` 中冷启动与缓存命中分开记录。真实任务走查、并发压测、投影仪与真机窄屏验收本轮暂不要求；走查模板保留在 `docs/任务走查记录模板.md`（未执行，因此不写完成率或可用性结论）。
+- 当前代码在 `d816b19` 之后包含 F1 的 MC1 参考界面（分支 `codex/reference-ui`，未提交）。MC2/CUSTOM 仍是原页面，F2 才换外壳。S1 历史复核针对当时版本，不自动覆盖后续修改；实际草稿/证据/状态问题仍需验证。历史见 [存档目录](docs/archive/README.md)。
+- 性能数字来自本机单用户顺序请求（预热 3 次、采样 30 次），`build/api-bench-v2.json` 中冷启动与缓存命中分开记录；不代表新界面实测。用户走查、并发、投影仪与真机触屏未验证，不写完成率或可用性结论。新路线的浏览器尺寸/截图门槛见 [验收与交接](docs/current/验收与交接.md)。
 
 ---
 
@@ -143,20 +153,14 @@ MC2 还在 manifest 里记录了**候选干预点**：`SwiftWren_further_instruc
 
 | 文档 | 内容 |
 | --- | --- |
-| `docs/项目计划书.md` | 项目定位、范围、里程碑、风险 |
-| `docs/数据适配规则.md` | 字段映射与 16 条冲突规则（含实测数据） |
-| `docs/SQLite基准报告.md` | 建库体积、查询延迟、索引决策 |
-| `docs/后端接口说明.md` | 接口契约、实测延迟、性能陷阱 |
-| `docs/前端骨架说明.md` | token 层、渲染决策、交互闭环、遗留项 |
-| [UI重构实施规格](docs/UI重构实施规格.md) | 当前开发基线；S0 基础已实施，四工作区与 S1–S5 待实施 |
-| [UI重构分会话执行与交接计划](docs/UI重构分会话执行与交接计划.md) | 六阶段串行实施、独立复核、质量门槛和交接方法 |
-| [第一阶段 S0 提示词](docs/交接提示词/第一阶段-S0状态与兼容基础.md) | 可直接复制给新会话：共享状态、快照兼容、阶段摘要与运行验收 |
-| [阶段交接报告模板](docs/阶段交接/阶段交接报告模板.md) | 开工基线、真实接入、测试证据、残留问题与下一阶段 |
-| [S0 交接报告](docs/阶段交接/S0-交接报告.md) | reducer 真实消费者、快照兼容、32 run 摘要、G0 与实际回归 |
-| [S0 独立复核记录](docs/阶段交接/S0-复核记录.md) | R0-01～04 历史复现、修复后复验与 S0 退出状态 |
-| [第二阶段 S1 提示词](docs/交接提示词/第二阶段-S1骨架迁移.md) | 核对 S0 复核证据后，迁移四任务导航、检查器与响应式骨架 |
-| [UI设计评审与研究建议](docs/UI设计评审与研究建议.md) | 代码/截图评审、比赛与研究依据、设计取舍 |
-| `docs/界面与交互重构方案.md` | 历史 UI 草案，冲突条目由实施规格接管 |
-| `docs/布局优化方案.md` | 历史布局骨架与设计过程，当前能力以代码为准 |
-| `docs/可视分析任务完成度审查与完善路线.md` | 完成度审查、§0.1 进度表与验收路线 |
-| `docs/数据获取.md` | 数据不入库的原因、恢复步骤与校验基线 |
+| [文档入口](docs/README.md) | 阅读顺序、有效性与维护规则 |
+| [项目范围与比赛要求](docs/current/项目范围与比赛要求.md) | 当前产品方向、比赛问题、数据约束与工程基线 |
+| [参考界面实施计划](docs/current/参考界面实施计划.md) | MC1 直接复用、MC2/CUSTOM 模板适配、F1–F4 与 Git 策略 |
+| [验收与交接](docs/current/验收与交接.md) | 真实联动、数据/草稿/快照、截图与回归门槛 |
+| [第一阶段 F1 提示词](docs/current/第一阶段提示词-F1-MC1参考界面.md) | 可直接交给新会话实施 MC1 页面 |
+| [第二阶段 F2 提示词](docs/current/第二阶段提示词-F2-MC2参考界面.md) | 当前下一阶段：复用 F1 模板交付 MC2，含背景、理念、实施边界和验收 |
+| [数据适配规则](docs/reference/数据适配规则.md) | 字段映射、时区、引用与标签含义 |
+| [后端接口说明](docs/reference/后端接口说明.md) | 接口契约、快照和查询基础 |
+| [数据获取](docs/reference/数据获取.md) | 本地数据恢复及校验 |
+| [SQLite基准报告](docs/reference/SQLite基准报告.md) | 历史测量与索引决策 |
+| [历史存档及路径迁移](docs/archive/README.md) | 原计划/提示词/复核，保留原始结论、不再作为执行指令 |

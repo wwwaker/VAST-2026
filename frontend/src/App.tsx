@@ -18,7 +18,7 @@ import { RenderBenchView } from "./views/RenderBenchView";
 import { CustomWorkspace } from "./views/custom/CustomWorkspace";
 import { GraphWorkspace } from "./views/GraphWorkspace";
 import { SourceTrace } from "./views/mc2/SourceTrace";
-import { Mc1Workspace } from "./views/mc1/Mc1Workspace";
+import { Mc1ReferencePage } from "./views/mc1/Mc1ReferencePage";
 import { TaskNav, taskModeLabel } from "./components/TaskNav";
 import { FindingsWorkspace } from "./views/FindingsWorkspace";
 
@@ -79,21 +79,22 @@ function renderTaskContent(dataset: DatasetId, state: ReturnType<typeof useWorks
     return <CompareView />;
   }
 
+  // MC1 使用参考风格单页：热力图 / 事件轨 / 回复网络在同一页内显隐与并排，
+  // 不再按 task/mode 切成多套画布。比较与结论仍复用既有视图。
+  if (dataset === "MC1") {
+    return <Mc1ReferencePage />;
+  }
+
   if (state.task === "trace") {
     if (dataset === "MC2" && (state.mode === "source" || state.mode === "intervention")) return <SourceTrace />;
     if (dataset === "CUSTOM" && state.mode === "run") return <CustomWorkspace />;
     if (dataset === "CUSTOM" && state.mode === "localGraph") return <GraphWorkspace />;
-    if (dataset === "MC1" && state.mode === "decision") return <Mc1Workspace />;
     return <GraphWorkspace />;
   }
 
   if (dataset === "CUSTOM") {
     if (state.mode === "relations") return <GraphWorkspace />;
     return <CustomWorkspace />;
-  }
-  if (dataset === "MC1") {
-    if (state.mode === "relations") return <GraphWorkspace />;
-    return state.mode === "activity" ? <Mc1Workspace /> : <OverviewView />;
   }
   if (state.mode === "system" || state.mode === "relations") return <GraphWorkspace />;
   return <OverviewView />;
@@ -195,16 +196,18 @@ function Workspace() {
         onToggleEvent={() => { const next = !eventOpen; setEventOpen(next); if (next && window.innerWidth < 900) setEvidenceOpen(false); persist({ eventOpen: next, ...(next && window.innerWidth < 900 ? { evidenceOpen: false } : {}) }); }}
       />
       <div className="workspace-heading">
-        <TaskNav onParallel={parallel} />
+        <TaskNav onParallel={parallel} compact={dataset === "MC1"} />
         <span className="workspace-status" aria-live="polite">{taskModeLabel(dataset, state.task, state.mode)}</span>
       </div>
       <div className="workbench" style={{ "--event-size": `${eventSize}px`, "--evidence-size": `${evidenceSize}px` } as CSSProperties}>
         <div className={`body${eventOpen ? " body-event-open" : ""}${evidenceOpen ? " body-evidence-open" : ""}`}>
           <main className="canvas-area">
             {showBench ? <RenderBenchView /> : <>
-              <div className="canvas-toolbar">
-                <ViewTabs />
-              </div>
+              {dataset !== "MC1" && (
+                <div className="canvas-toolbar">
+                  <ViewTabs />
+                </div>
+              )}
               {state.notice && <div className="callout" role="status">{state.notice}</div>}
               {!compareReturn && state.returnStack.length > 0 && <div className="compare-return-banner"><span>已保留显式下钻前的调查上下文</span><button type="button" className="btn btn-quiet" onClick={() => dispatch({ type: "return" })}>返回上次调查</button></div>}
               {compareReturn && state.task !== "compare" && <div className="compare-return-banner" role="status"><span>正在查看比较证据：<span className="muted small">{filterSummary}</span></span><button type="button" className="btn btn-quiet" onClick={restoreCompare}>返回比较</button></div>}

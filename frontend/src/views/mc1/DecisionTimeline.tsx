@@ -244,23 +244,25 @@ export function DecisionTimeline({
             )}
           </div>
 
-          <div className="mc1-audit">
-            <strong>回复引用分类</strong>
-            <span className="muted small">
-              valid {payload.reply_audit.counts.reply_valid ?? 0} · future{" "}
-              {payload.reply_audit.counts.reply_future_reference ?? 0} · empty{" "}
-              {payload.reply_audit.counts.empty_reference ?? 0} · mention{" "}
-              {payload.reply_audit.counts.mention ?? 0} · unresolved{" "}
-              {payload.reply_audit.counts.unresolved_reference ?? 0}
-            </span>
-            <span className="muted small">{payload.reply_audit.mapping_note}</span>
-          </div>
-
-          <ul className="tight-list muted small">
-            {payload.notes.map((note) => (
-              <li key={note}>{note}</li>
-            ))}
-          </ul>
+          <details className="mc1-flow-audit">
+            <summary>回复引用分类与口径（{payload.reply_audit.reply_edges} 条 reply 边）</summary>
+            <div className="mc1-audit">
+              <strong>回复引用分类</strong>
+              <span className="muted small">
+                valid {payload.reply_audit.counts.reply_valid ?? 0} · future{" "}
+                {payload.reply_audit.counts.reply_future_reference ?? 0} · empty{" "}
+                {payload.reply_audit.counts.empty_reference ?? 0} · mention{" "}
+                {payload.reply_audit.counts.mention ?? 0} · unresolved{" "}
+                {payload.reply_audit.counts.unresolved_reference ?? 0}
+              </span>
+              <span className="muted small">{payload.reply_audit.mapping_note}</span>
+            </div>
+            <ul className="tight-list muted small">
+              {payload.notes.map((note) => (
+                <li key={note}>{note}</li>
+              ))}
+            </ul>
+          </details>
         </>
       )}
     </section>

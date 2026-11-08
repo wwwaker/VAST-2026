@@ -33,6 +33,8 @@ PUBLIC_CHANNELS = {"personal_post", "official_post", "anonymous_post"}
 DEFAULT_WINDOW_HALF_US = 2 * 60 * 60 * 1_000_000
 DEFAULT_RADIUS_US = 30 * 60 * 1_000_000
 MAX_LIST = 40
+# 事件轨单窗口记录上限；超出时返回 messages_total / truncated，并补入关键事件
+LANE_LIMIT = 800
 
 _ROUND_RE = re.compile(r"_(\d{2})_\d{3}$")
 _VIEWS_CACHE: dict[tuple, dict] = {}
@@ -588,12 +590,22 @@ def decision_context(conn, selection: EventSelection, views: dict | None = None)
                         {**entry, "track": "constraint", "constraint_basis": "event_marker"}
                     )
 
+    lane_params = {**selection.params, "lane_start": start_us, "lane_end": end_us}
+    # 先数真实总量，再取前 LANE_LIMIT 条；截断必须显式返回，不能静默
+    lane_total = int(
+        conn.execute(
+            "SELECT COUNT(*) AS n FROM events e WHERE "
+            + selection.where_sql
+            + " AND e.time_sort_us >= :lane_start AND e.time_sort_us < :lane_end",
+            lane_params,
+        ).fetchone()["n"]
+    )
     message_rows = conn.execute(
         "SELECT event_id, source_record_id, time_sort_us, timestamp_raw, event_type, actor_id, "
         "       channel_id, details_json, reply_class, reply_target_event_id "
         "FROM events e WHERE " + selection.where_sql + " AND e.time_sort_us >= :lane_start "
-        "AND e.time_sort_us < :lane_end ORDER BY e.time_sort_us LIMIT 800",
-        {**selection.params, "lane_start": start_us, "lane_end": end_us},
+        "AND e.time_sort_us < :lane_end ORDER BY e.time_sort_us LIMIT :lane_limit",
+        {**lane_params, "lane_limit": LANE_LIMIT},
     ).fetchall()
     messages = []
     releases = []
@@ -625,6 +637,35 @@ def decision_context(conn, selection: EventSelection, views: dict | None = None)
         ),
         None,
     )
+
+    # 截断时补回"本来满足筛选、只是被行数上限挤掉"的关键事件。
+    # 补入候选必须仍满足同一个 EventSelection，不能被角色/渠道/关键词筛掉的记录混进成员轨。
+    pinned_events: list[str] = []
+    if lane_total > LANE_LIMIT:
+        for anchor in (target, lift_event):
+            if not anchor:
+                continue
+            anchor_us = int(anchor["time_us"])
+            if not (start_us <= anchor_us < end_us):
+                continue
+            if any(entry["event_id"] == anchor["event_id"] for entry in messages):
+                continue
+            matched = conn.execute(
+                "SELECT 1 FROM events e WHERE "
+                + selection.where_sql
+                + " AND e.event_id = :pinned_event_id LIMIT 1",
+                {**selection.params, "pinned_event_id": anchor["event_id"]},
+            ).fetchone()
+            if matched is None:
+                continue
+            entry = {**anchor, "provenanceKind": "recorded", "pinned": True}
+            messages.append(entry)
+            if entry.get("channel_scope") == "public":
+                releases.append(entry)
+            pinned_events.append(anchor["event_id"])
+    if pinned_events:
+        messages.sort(key=lambda item: item["time_us"])
+        releases.sort(key=lambda item: item["time_us"])
 
     from . import mc1_rules
 
@@ -658,13 +699,17 @@ def decision_context(conn, selection: EventSelection, views: dict | None = None)
             "public_releases": len(releases),
             "analyst_markers": len(markers),
         },
-        "lane_limit": 800,
-        "truncated": len(messages) >= 800,
+        "lane_limit": LANE_LIMIT,
+        "messages_total": lane_total,
+        # 判断依据是"窗口内真实总数 > 实际绘制条数（不含补入的关键事件）"
+        "truncated": lane_total > (len(messages) - len(pinned_events)),
+        "pinned_events": pinned_events,
         "reply_audit": reply_audit(conn, views),
         "leading_indicators": indicators,
         "notes": [
             "环境轨与消息轨严格分层，计数不能相加冒充事件总量。",
             "同轮共现与人工 event_markers 不构成已证实因果。",
             "轮次精度记录以轮次区间显示，不伪装成精确时刻。",
+            f"消息轨单窗口最多 {LANE_LIMIT} 条；超出时 truncated=true，并补入窗口内的关键事件（pinned_events）。",
         ],
     }

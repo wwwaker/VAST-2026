@@ -1382,6 +1382,8 @@ export interface Mc1EventRef {
   relation_reason?: string;
   usable_as_history?: boolean;
   delta_us?: number;
+  /** 事件轨截断时被额外补入的关键事件 */
+  pinned?: boolean;
 }
 
 export interface Mc1EnvironmentRecord {
@@ -1498,7 +1500,11 @@ export interface Mc1DecisionPayload {
   leading_indicators: Mc1IndicatorsPayload;
   notes: string[];
   lane_limit: number;
+  /** 当前窗口内消息总数（可能大于 tracks.messages.length） */
+  messages_total: number;
   truncated: boolean;
+  /** 截断时补入的关键事件 ID */
+  pinned_events: string[];
   views_available: boolean;
 }
 
@@ -1577,6 +1583,96 @@ export function fetchMc1EventContext(
     `/api/events/${encodeURIComponent(eventId)}/context`,
     withFilters(params.filters, {
       dataset: "MC1",
+      cursor_us: params.cursorUs ?? undefined,
+      masking: params.masking ? "true" : undefined,
+    }),
+    signal,
+  );
+}
+
+export interface Mc1ReplyNode {
+  id: string;
+  label: string;
+  messages: number;
+  with_deliberation: number;
+  public_messages: number;
+  reply_out: number;
+  reply_in: number;
+  mention_out: number;
+  mention_in: number;
+}
+
+export interface Mc1ReplyEdge {
+  source: string;
+  target: string;
+  kind: "reply" | "mention";
+  reply_class: string;
+  evidence_count: number;
+  first_us: number | null;
+  last_us: number | null;
+}
+
+export interface Mc1ReplyNetworkPayload {
+  meta: Meta;
+  dataset_id: string;
+  nodes: Mc1ReplyNode[];
+  edges: Mc1ReplyEdge[];
+  counts: {
+    reply_edges: number;
+    mention_edges: number;
+    by_reply_class: Record<string, number>;
+  };
+  notes: string[];
+}
+
+export interface Mc1ReplyEvidencePayload {
+  meta: Meta;
+  dataset_id: string;
+  edge: { source: string; target: string; kind: string; reply_class: string | null };
+  first_us: number | null;
+  last_us: number | null;
+  items: EventItem[];
+}
+
+/** agent 级回复/点名称网络（reply_to 上卷 + mention），口径与筛选条件由服务端保证。 */
+export function fetchMc1ReplyNetwork(
+  params: { filters: Filters; cursorUs?: number | null; masking?: boolean },
+  signal?: AbortSignal,
+): Promise<Mc1ReplyNetworkPayload> {
+  return getJson<Mc1ReplyNetworkPayload>(
+    "/api/mc1/reply-network",
+    withFilters(params.filters, {
+      dataset: "MC1",
+      cursor_us: params.cursorUs ?? undefined,
+      masking: params.masking ? "true" : undefined,
+    }),
+    signal,
+  );
+}
+
+/** 单条聚合边的真实消息；必须与网络聚合使用同一筛选条件。 */
+export function fetchMc1ReplyEvidence(
+  params: {
+    filters: Filters;
+    sourceAgent: string;
+    targetAgent: string;
+    kind: "reply" | "mention";
+    replyClass?: string | null;
+    limit?: number;
+    cursorUs?: number | null;
+    masking?: boolean;
+  },
+  signal?: AbortSignal,
+): Promise<Mc1ReplyEvidencePayload> {
+  return getJson<Mc1ReplyEvidencePayload>(
+    "/api/mc1/reply-network/evidence",
+    withFilters(params.filters, {
+      dataset: "MC1",
+      source_agent: params.sourceAgent,
+      target_agent: params.targetAgent,
+      kind: params.kind,
+      reply_class: params.replyClass ?? undefined,
+      limit: params.limit ?? 50,
       cursor_us: params.cursorUs ?? undefined,
       masking: params.masking ? "true" : undefined,
     }),
