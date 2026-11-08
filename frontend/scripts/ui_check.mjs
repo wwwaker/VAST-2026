@@ -9,8 +9,11 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const URL = process.argv[2] ?? "http://127.0.0.1:8000";
-// 输出路径按脚本自身位置定位，避免 npm --prefix 与直接 node 调用时落到不同目录
-const OUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "build");
+// 输出路径按脚本自身位置定位，避免 npm --prefix 与直接 node 调用时落到不同目录；
+// UI_CHECK_OUT 可指向本轮独立目录，避免覆盖历史截图
+const OUT = process.env.UI_CHECK_OUT
+  ? path.resolve(process.env.UI_CHECK_OUT)
+  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "build");
 const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 const TEST_NOTE = `UI 自检生成的测试笔记 ${Date.now()}`;
 
@@ -415,13 +418,19 @@ await page.screenshot({ path: path.join(OUT, "ui-compare-entry.png") });
 
 console.log("== MC1 双声道 ==");
 await open("light");
-await ensureEventDock();
-await page.waitForSelector(".stream-row", { timeout: 20000 });
 await page.select(".topbar select", "MC1");
-// 侧栏开合按 dataset/task 记忆，换数据集会按新偏好重置，这里重新打开
-await ensureEventDock();
-await page.waitForSelector(".stream-row", { timeout: 20000 });
-await wait(500);
+await page.waitForSelector(".mc1-page");
+// 通用事件查询现在收在页面「工具」菜单里
+await page.evaluate(() => {
+  const tools = document.querySelector(".mc1-tools");
+  if (tools instanceof HTMLDetailsElement) tools.open = true;
+});
+await page.evaluate(() => {
+  const btn = [...document.querySelectorAll(".mc1-tools-menu button")].find((n) => n.textContent?.trim() === "事件查询");
+  btn?.click();
+});
+await page.waitForSelector(".mc1-card .stream-row", { timeout: 20000 });
+await wait(800);
 
 // 只筛含内部审议的事件
 await page.evaluate(() => {
@@ -429,23 +438,23 @@ await page.evaluate(() => {
   box?.click();
 });
 await wait(1000);
-const dualRows = await page.$$eval(".stream-row", (ns) => ns.length);
-const dualChip = await page.$$eval(".stream-row .tag-delib", (ns) => ns.length);
+const dualRows = await page.$$eval(".mc1-card .stream-row", (ns) => ns.length);
+const dualChip = await page.$$eval(".mc1-card .stream-row .tag-delib", (ns) => ns.length);
 console.log(`[仅含内心审议] 行数 ${dualRows} · 带标记 ${dualChip}`);
 
-const rows2 = await page.$$(".stream-row");
+const rows2 = await page.$$(".mc1-card .stream-row");
 await rows2[0].click();
-await ensureEvidenceDock();
-await page.waitForSelector(".drawer .dual", { timeout: 10000 });
+await page.waitForSelector(".mc1-reader .dual", { timeout: 15000 });
 await wait(600);
 const dual = await page.evaluate(() => ({
-  width: Math.round(document.querySelector(".drawer")?.getBoundingClientRect().width ?? 0),
-  coverage: document.querySelector(".dual-head .muted")?.textContent,
-  left: document.querySelectorAll(".dual-body")[0]?.textContent?.slice(0, 60),
-  right: document.querySelectorAll(".dual-body")[1]?.textContent?.slice(0, 60),
-  tabs: [...document.querySelectorAll(".dual-tab")].map((t) => t.textContent),
-  sources: [...document.querySelectorAll(".dual-source")].map((t) => t.textContent),
+  width: Math.round(document.querySelector(".mc1-reader")?.getBoundingClientRect().width ?? 0),
+  coverage: document.querySelector(".mc1-reader .dual-head .muted")?.textContent,
+  left: document.querySelectorAll(".mc1-reader .dual-body")[0]?.textContent?.slice(0, 60),
+  right: document.querySelectorAll(".mc1-reader .dual-body")[1]?.textContent?.slice(0, 60),
+  tabs: [...document.querySelectorAll(".mc1-reader .dual-tab")].map((t) => t.textContent),
+  sources: [...document.querySelectorAll(".mc1-reader .dual-source")].map((t) => t.textContent),
 }));
+if (!dual.left || !dual.right) throw new Error(`阅读面板没有双声道内容：${JSON.stringify(dual)}`);
 console.log("[双声道]", JSON.stringify(dual, null, 1));
 await page.screenshot({ path: path.join(OUT, "ui-dual.png") });
 
@@ -659,12 +668,7 @@ await page.waitForSelector(".mc1-page", { timeout: 20000 });
 await page.waitForSelector(".mc1-heat-cell", { timeout: 20000 });
 await page.waitForSelector(".mc1-track-svg", { timeout: 20000 });
 await wait(800);
-// 回复分类审计在新页面里收在“决策泳道（详细视图）”折叠区，展开后再断言
-await page.evaluate(() => {
-  const details = document.querySelector(".mc1-flow-details");
-  if (details instanceof HTMLDetailsElement) details.open = true;
-});
-await wait(500);
+// 回复分类已迁入事件轨卡片的常显审计行，不再依赖整套决策泳道
 const mc1Page = await page.evaluate(() => ({
   agents: document.querySelectorAll(".mc1-heat-label").length,
   columns: document.querySelectorAll(".mc1-heat-col").length,
@@ -672,8 +676,9 @@ const mc1Page = await page.evaluate(() => ({
   anchors: document.querySelectorAll(".mc1-anchor-chip").length,
   messages: document.querySelectorAll(".mc1-track-msg").length,
   releases: document.querySelectorAll(".mc1-track-release").length,
-  audit: document.querySelector(".mc1-flow-details")?.textContent ?? "",
+  audit: document.querySelector('[data-testid="mc1-reply-audit"]')?.textContent ?? "",
   networkNodes: document.querySelectorAll(".mc1-node").length,
+  taskTabs: document.querySelectorAll(".task-tab").length,
 }));
 if (mc1Page.agents !== 7) throw new Error(`MC1 热力图应有 7 个角色行，实际 ${mc1Page.agents}`);
 if (mc1Page.columns < 2) throw new Error(`MC1 热力图缺少时间列：${mc1Page.columns}`);
@@ -681,6 +686,7 @@ if (mc1Page.anchors !== 3) throw new Error(`锚点行应并置 3 个锚点，实
 if (mc1Page.messages < 10) throw new Error(`事件轨消息点过少：${mc1Page.messages}`);
 if (mc1Page.releases < 1) throw new Error("事件轨缺少公开发布方块");
 if (!mc1Page.audit.includes("future")) throw new Error("缺少回复分类计数（future）");
+if (mc1Page.taskTabs !== 0) throw new Error(`MC1 不应再显示四任务导航，实际 ${mc1Page.taskTabs}`);
 if (mc1Page.networkNodes !== 7) throw new Error(`回复网络应有 7 个节点，实际 ${mc1Page.networkNodes}`);
 // 旧规则面板的“待确认预期”提示未迁移到单页，已登记为暂缓（见 功能迁移登记.md）
 console.log("[MC1 单页]", JSON.stringify({ ...mc1Page, audit: mc1Page.audit.slice(0, 60) }));
@@ -861,14 +867,20 @@ await page.keyboard.press("Space");
 await wait(300);
 console.log(`[空格] 播放态按钮文案=${playing}`);
 
-// ↓ 选中事件并打开侧栏
+// ↓ 在事件列表内移动选择：方向键只在列表获得焦点时生效，不抢其他控件的方向键
+await page.evaluate(() => document.querySelector(".stream-row")?.focus());
+await wait(200);
 await page.keyboard.press("ArrowDown");
 await wait(700);
 const kbdSelect = await page.evaluate(() => ({
-  selected: document.querySelector(".stream-row-active")?.textContent?.slice(0, 30) ?? null,
+  focused: document.activeElement?.getAttribute("data-event-id") ?? null,
+  selected: document.querySelector(".stream-row-active")?.getAttribute("data-event-id") ?? null,
   drawer: !!document.querySelector(".drawer"),
 }));
 console.log("[↓ / Enter]", JSON.stringify(kbdSelect));
+if (!kbdSelect.focused || kbdSelect.focused !== kbdSelect.selected) {
+  failures.push(`事件列表方向键未同步选中行：${JSON.stringify(kbdSelect)}`);
+}
 
 // Esc 关闭侧栏
 await page.keyboard.press("Escape");

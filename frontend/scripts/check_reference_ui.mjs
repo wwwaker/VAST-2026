@@ -1,8 +1,8 @@
 /**
- * F1 MC1 参考界面检查：真实浏览器路径 + 截图。
+ * MC1 参考界面检查：真实浏览器路径 + 截图。
  * 用法（后端已在独立端口托管 frontend/dist）：
- *   node scripts/check_reference_ui.mjs http://127.0.0.1:8021
- * 截图与结果写入 build/reference-ui/F1/。
+ *   node scripts/check_reference_ui.mjs http://127.0.0.1:8031
+ * 截图与结果写入 build/reference-ui/MC1-cleanup/。
  */
 import puppeteer from "puppeteer-core";
 import path from "node:path";
@@ -10,11 +10,12 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const URL = process.argv[2] ?? "http://127.0.0.1:8021";
-const OUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "build", "reference-ui", "F1");
+const OUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "build", "reference-ui", "MC1-cleanup");
 const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 fs.mkdirSync(OUT, { recursive: true });
 
 const results = [];
+const createdCases = [];
 function check(name, ok, detail = "") {
   results.push({ name, ok: !!ok, detail });
   console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? " — " + detail : ""}`);
@@ -93,9 +94,19 @@ const heat = await page.evaluate(() => ({
   hasAnchorChip: !!document.querySelector(".mc1-anchor-chip"),
   networkNodes: document.querySelectorAll(".mc1-node").length,
   networkEdges: document.querySelectorAll(".mc1-edge-hit").length,
-  flowSvg: !!document.querySelector(".mc1-lanes"),
+  flowSvg: !!document.querySelector(".mc1-track-svg"),
   hasToolbarTabs: !!document.querySelector(".view-tabs"),
   modeTabs: document.querySelectorAll(".mode-tab").length,
+  taskTabs: document.querySelectorAll(".task-tab").length,
+  modeLabel: document.querySelector(".workspace-status")?.textContent?.trim() ?? null,
+  parallel: document.querySelectorAll(".parallel-toggle").length,
+  dockButtons: [...document.querySelectorAll(".topbar-docks button")].map((n) => n.textContent?.trim()),
+  benchButton: [...document.querySelectorAll(".topbar .btn")].some((n) => n.textContent?.includes("渲染基准")),
+  anchorIds: [...document.querySelectorAll(".mc1-anchor-chip")].map((n) => n.textContent?.replace(/\s+/g, " ").trim()),
+  oldLaneDetails: !!document.querySelector(".mc1-flow-details"),
+  tools: [...document.querySelectorAll(".mc1-tools-menu button")].map((n) => n.textContent?.trim()),
+  audit: document.querySelector('[data-testid="mc1-reply-audit"]')?.textContent?.replace(/\s+/g, " ") ?? "",
+  statusbar: !!document.querySelector(".statusbar"),
 }));
 check("MC1 默认页存在热力图", heat.cells > 0, `cells=${heat.cells} cols=${heat.cols}`);
 check("热力图 7 个角色行", heat.rows === 7, `rows=${heat.rows}`);
@@ -105,7 +116,19 @@ check("回复网络 7 节点", heat.networkNodes === 7, `nodes=${heat.networkNod
 check("回复网络边可点", heat.networkEdges > 0, `edges=${heat.networkEdges}`);
 check("事件轨已渲染", heat.flowSvg);
 check("MC1 不再显示兼容视图 tabs", !heat.hasToolbarTabs);
-check("MC1 不再显示模式二级 tab", heat.modeTabs === 0, `modeTabs=${heat.modeTabs}`);
+check("MC1 不再显示四任务导航", heat.taskTabs === 0 && heat.parallel === 0, `taskTabs=${heat.taskTabs} parallel=${heat.parallel}`);
+check("MC1 不再显示内部模式标签", heat.modeLabel === null, `label=${heat.modeLabel}`);
+check("MC1 顶栏只保留证据工具", heat.dockButtons.length === 1 && heat.dockButtons[0] === "证据", heat.dockButtons.join(","));
+check("渲染基准移出常规顶栏", !heat.benchButton);
+check("锚点行不常显长 ID", heat.anchorIds.every((text) => !/#|MC1:event:|env:21/.test(text)), heat.anchorIds.join(" | "));
+check("旧决策泳道整块退出", !heat.oldLaneDetails);
+check("回复分类仍在事件轨可见", heat.audit.includes("future") && heat.audit.includes("有效"), heat.audit.slice(0, 80));
+check("MC1 无拥挤状态条", !heat.statusbar);
+check(
+  "证据/案例/对照/事件查询都有入口",
+  ["事件查询", "时间窗对照", "案例与证据", "先兆候选"].every((item) => heat.tools.includes(item)),
+  heat.tools.join(","),
+);
 await shot("mc1-default-1600-light");
 
 // --- 热力图与事件轨的列对齐 / 滚动同步 ---
@@ -178,26 +201,26 @@ const cellClicked = await page.evaluate(() => {
   return true;
 });
 check("点击热力格", cellClicked);
-await page.waitForSelector(".mc1-detail-card", { timeout: 10000 });
+await page.waitForSelector(".mc1-reader", { timeout: 10000 });
 await wait(800);
 const detail = await page.evaluate(() => ({
-  msgs: document.querySelectorAll(".mc1-detail-card .mc1-msg").length,
-  title: document.querySelector(".mc1-detail-card strong")?.textContent?.trim() ?? "",
-  emptyText: document.querySelector(".mc1-detail-card")?.textContent?.includes("没有匹配消息") ?? false,
-  globalFilterChanged: !!document.querySelector(".mc1-detail-card .btn-quiet"),
+  msgs: document.querySelectorAll(".mc1-reader .mc1-msg").length,
+  title: document.querySelector(".mc1-reader strong")?.textContent?.trim() ?? "",
+  emptyText: document.querySelector(".mc1-reader")?.textContent?.includes("没有匹配消息") ?? false,
+  globalFilterChanged: !!document.querySelector(".mc1-reader .btn-quiet"),
 }));
 check("点格打开真实消息集合", detail.msgs > 0 || detail.emptyText, `msgs=${detail.msgs} title=${detail.title}`);
 await shot("mc1-cell-1600-light");
 
 if (detail.msgs > 0) {
-  await page.evaluate(() => document.querySelector(".mc1-detail-card .mc1-msg-head")?.click());
+  await page.evaluate(() => document.querySelector(".mc1-reader .mc1-msg-head")?.click());
   await wait(1100);
   const expanded = await page.evaluate(() => {
-    const text = document.querySelector(".mc1-detail-card")?.textContent ?? "";
+    const text = document.querySelector(".mc1-reader")?.textContent ?? "";
     return {
-      outgoing: text.includes("外发内容"),
+      outgoing: text.includes("外发文本"),
       deliberation: text.includes("内部审议"),
-      raw: text.includes("原始字段"),
+      raw: text.includes("原始 ID"),
       eventId: text.includes("event_id"),
     };
   });
@@ -205,6 +228,41 @@ if (detail.msgs > 0) {
   check("展开消息显示内部审议", expanded.deliberation);
   check("展开消息显示原始字段", expanded.raw && expanded.eventId);
   await shot("mc1-message-detail-1600-light");
+
+  // 证据动作：加入证据篮后打开证据面板，阅读面板让位且证据仍在
+  const addedToBasket = await page.evaluate(() => {
+    const btn = [...document.querySelectorAll(".mc1-reader .mc1-msg-actions .btn-quiet")].find(
+      (n) => n.textContent?.trim() === "支持",
+    );
+    btn?.click();
+    return !!btn;
+  });
+  check("阅读面板可加入证据篮", addedToBasket);
+  await wait(400);
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll(".mc1-reader .mc1-msg-actions .btn-quiet")].find(
+      (n) => n.textContent?.trim() === "关联上下文",
+    );
+    btn?.click();
+  });
+  await page.waitForSelector(".evidence-dock .drawer", { timeout: 10000 });
+  await wait(500);
+  check(
+    "打开证据面板时阅读面板让位",
+    await page.evaluate(() => !document.querySelector(".mc1-reader")),
+  );
+  await page.evaluate(() => {
+    const tab = [...document.querySelectorAll(".tabs .tab")].find((n) => n.textContent?.trim() === "证据篮");
+    tab?.click();
+  });
+  await page.waitForSelector(".basket", { timeout: 10000 });
+  const basketCount = await page.evaluate(() => document.querySelectorAll(".basket .trace-list li").length);
+  check("证据篮保留刚加入的事件", basketCount >= 1, `count=${basketCount}`);
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll(".topbar-docks button")].find((n) => n.textContent?.includes("证据"));
+    if (btn?.getAttribute("aria-pressed") === "true") btn.click();
+  });
+  await wait(500);
 }
 
 // --- 网络边证据 ---
@@ -220,6 +278,128 @@ const edgeDetail = await page.evaluate(() => {
 check("点击网络边读取真实证据", edgeDetail.exists, edgeDetail.text);
 await shot("mc1-edge-evidence-1600-light");
 
+// ============ C1/C3：事件轨打开的消息进入全局选择，并可核对完整原始载荷 ============
+const trackTarget = await page.evaluate(() => {
+  const msg = document.querySelector(".mc1-track-msg");
+  msg?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  return msg?.getAttribute("data-event-id") ?? null;
+});
+const trackReaderOpen = await page
+  .waitForSelector(".mc1-reader", { timeout: 10000 })
+  .then(() => true, () => false);
+check("事件轨点击打开阅读面板", Boolean(trackTarget) && trackReaderOpen, `target=${trackTarget}`);
+await wait(800);
+const readerEventId = await page.evaluate(
+  () => document.querySelector(".mc1-reader .mc1-msg-raw dd")?.textContent?.trim() ?? "",
+);
+check("阅读面板显示所点事件", readerEventId === trackTarget, `${trackTarget} / ${readerEventId}`);
+
+const apiDetail = await (await fetch(`${URL}/api/events/${encodeURIComponent(trackTarget)}?dataset=MC1`)).json();
+const rawKeys = await page.evaluate(() => {
+  document.querySelectorAll(".mc1-reader details.raw").forEach((node) => {
+    if (node instanceof HTMLDetailsElement) node.open = true;
+  });
+  return [...document.querySelectorAll(".mc1-reader details.raw pre")].map((pre) => {
+    try {
+      return Object.keys(JSON.parse(pre.textContent ?? "{}"));
+    } catch {
+      return null;
+    }
+  });
+});
+check("阅读面板可展开 raw 载荷", Array.isArray(rawKeys[0]) && rawKeys[0].length > 0, `keys=${rawKeys[0]?.length}`);
+check(
+  "raw 字段与 API 完全一致",
+  JSON.stringify(rawKeys[0]) === JSON.stringify(Object.keys(apiDetail.raw)),
+  `ui=${rawKeys[0]?.length} api=${Object.keys(apiDetail.raw).length}`,
+);
+check(
+  "details 载荷与 API 一致",
+  JSON.stringify(rawKeys[1]) === JSON.stringify(Object.keys(apiDetail.details ?? {})),
+  `ui=${rawKeys[1]?.length} api=${Object.keys(apiDetail.details ?? {}).length}`,
+);
+await page.evaluate(() => {
+  document.querySelector('[data-testid="mc1-event-detail"]')?.scrollIntoView({ block: "start" });
+});
+await wait(300);
+await shot("mc1-review-raw");
+
+// 打开证据篮保存案例：快照里的 selection 必须是刚点开的事件
+await page.evaluate(() => {
+  const btn = [...document.querySelectorAll(".topbar-docks button")].find((n) => n.textContent?.includes("证据"));
+  if (btn?.getAttribute("aria-pressed") !== "true") btn?.click();
+});
+await page.waitForSelector(".drawer", { timeout: 10000 });
+await page.evaluate(() => {
+  const tab = [...document.querySelectorAll(".tabs .tab")].find((n) => n.textContent?.trim() === "证据篮");
+  tab?.click();
+});
+await page.waitForSelector('.basket input[placeholder="案例标题"]', { timeout: 10000 });
+await page.type('.basket input[placeholder="案例标题"]', `C1 事件轨选择 ${Date.now()}`);
+const caseCreated = page.waitForResponse(
+  (r) => r.url().endsWith("/api/cases") && r.request().method() === "POST",
+);
+await page.evaluate(() => {
+  const btn = [...document.querySelectorAll(".basket .btn")].find((n) => n.textContent?.includes("保存当前案例"));
+  btn?.click();
+});
+const createdCase = await (await caseCreated).json();
+createdCases.push(createdCase.case_id);
+check(
+  "事件轨打开的消息写入快照 selection",
+  createdCase.snapshot?.selection?.kind === "event" && createdCase.snapshot.selection.id === trackTarget,
+  JSON.stringify(createdCase.snapshot?.selection),
+);
+await page.evaluate(() => {
+  const btn = [...document.querySelectorAll(".topbar-docks button")].find((n) => n.textContent?.includes("证据"));
+  if (btn?.getAttribute("aria-pressed") === "true") btn.click();
+});
+await wait(500);
+
+// ============ C4：事件查询的方向键必须同步正文 ============
+await page.evaluate(() => {
+  const tools = document.querySelector(".mc1-tools");
+  if (tools instanceof HTMLDetailsElement) tools.open = true;
+});
+await page.evaluate(() => {
+  const btn = [...document.querySelectorAll(".mc1-tools-menu button")].find((n) => n.textContent?.trim() === "事件查询");
+  btn?.click();
+});
+await page.waitForSelector('.mc1-card[aria-label="事件查询"] .stream-row', { timeout: 15000 });
+await wait(700);
+const firstRowId = await page.evaluate(() => {
+  const row = document.querySelector('.mc1-card[aria-label="事件查询"] .stream-row');
+  if (!(row instanceof HTMLElement)) return null;
+  row.focus();
+  row.click();
+  return row.getAttribute("data-event-id");
+});
+await page.waitForSelector(".mc1-reader", { timeout: 10000 });
+await wait(600);
+await page.keyboard.press("ArrowDown");
+await wait(900);
+const arrowState = await page.evaluate(() => ({
+  active: document.querySelector('.mc1-card[aria-label="事件查询"] .stream-row-active')?.getAttribute("data-event-id") ?? null,
+  reader: document.querySelector(".mc1-reader .mc1-msg-raw dd")?.textContent?.trim() ?? "",
+  focused: document.activeElement?.getAttribute("data-event-id") ?? null,
+}));
+check(
+  "方向键切换后正文与选中行一致",
+  arrowState.active && arrowState.active !== firstRowId && arrowState.reader === arrowState.active,
+  JSON.stringify(arrowState),
+);
+check("方向键移动焦点到新行", arrowState.focused === arrowState.active, `focus=${arrowState.focused}`);
+await shot("mc1-review-arrow-key");
+await page.evaluate(() => {
+  const tools = document.querySelector(".mc1-tools");
+  if (tools instanceof HTMLDetailsElement) tools.open = true;
+});
+await page.evaluate(() => {
+  const btn = [...document.querySelectorAll(".mc1-tools-menu button")].find((n) => n.textContent?.trim() === "事件查询");
+  btn?.click();
+});
+await wait(300);
+
 // --- 筛选面板与图表显隐 ---
 check("打开筛选面板", await clickText(".mc1-toggle", "筛选"));
 await wait(300);
@@ -229,15 +409,10 @@ await shot("mc1-filters-1600-light");
 check("关闭筛选面板", await clickText(".mc1-toggle", "筛选"));
 await wait(200);
 
-check("并排开关可用", await clickText(".mc1-toggle", "并排"));
-await wait(500);
 check(
-  "并排布局生效",
-  await page.evaluate(() => !!document.querySelector(".mc1-columns.is-side-by-side")),
+  "不再保留重复的并排开关",
+  await page.evaluate(() => ![...document.querySelectorAll(".mc1-toggle")].some((n) => n.textContent?.trim() === "并排")),
 );
-await shot("mc1-side-by-side-1600-light");
-await clickText(".mc1-toggle", "并排");
-await wait(300);
 
 check("隐藏事件轨", await clickText(".mc1-toggle", "事件轨"));
 await wait(300);
@@ -245,6 +420,89 @@ check("事件轨可隐藏", await page.evaluate(() => !document.querySelector('.
 await clickText(".mc1-toggle", "事件轨");
 await wait(600);
 check("事件轨可恢复", await page.evaluate(() => !!document.querySelector('.mc1-card[aria-label="事件轨"]')));
+
+// --- 单一阅读面板：格/边/节点互斥，不再叠多个详情区 ---
+await page.evaluate(() => {
+  document.querySelector(".mc1-edge-hit")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+});
+await wait(800);
+check(
+  "同一时刻只有一个阅读面板",
+  await page.evaluate(
+    () =>
+      document.querySelectorAll(".mc1-reader").length === 1 &&
+      !!document.querySelector('[aria-label="回复边证据"]'),
+  ),
+);
+
+// --- 工具入口：事件查询 / 时间窗对照 / 案例与证据 ---
+const openTools = () => page.evaluate(() => {
+  const tools = document.querySelector(".mc1-tools");
+  if (tools instanceof HTMLDetailsElement) tools.open = true;
+});
+const clickTool = async (label) => {
+  await openTools();
+  await wait(200);
+  const hit = await page.evaluate((text) => {
+    const btn = [...document.querySelectorAll(".mc1-tools-menu button")].find((n) => n.textContent?.trim() === text);
+    btn?.click();
+    return !!btn;
+  }, label);
+  await wait(900);
+  return hit;
+};
+const clearAll = async () => {
+  await openTools();
+  await wait(200);
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll(".mc1-tools-menu button")].find((n) => n.textContent?.trim() === "清空筛选");
+    btn?.click();
+  });
+  await wait(1200);
+};
+
+check("工具菜单有事件查询", await clickTool("事件查询"));
+await page.waitForSelector(".mc1-card .stream-row", { timeout: 15000 });
+check("事件查询列表可读", await page.evaluate(() => document.querySelectorAll(".stream-row").length > 0));
+await page.evaluate(() => document.querySelector(".stream-row")?.click());
+await wait(900);
+check(
+  "事件查询点击在阅读面板打开",
+  await page.evaluate(() => !!document.querySelector('[data-testid="mc1-event-detail"]')),
+);
+await shot("mc1-tool-events-1600-light");
+
+check("工具菜单有时间窗对照", await clickTool("时间窗对照"));
+await wait(600);
+check(
+  "对照工具打开且可返回 MC1",
+  await page.evaluate(() => !!document.querySelector('.mc1-card[aria-label="时间窗对照"]')),
+);
+await shot("mc1-tool-compare-1600-light");
+await clickText('.mc1-card[aria-label="时间窗对照"] .btn-quiet', "返回 MC1");
+await wait(600);
+check(
+  "返回 MC1 后回到图形主界面",
+  await page.evaluate(
+    () =>
+      !document.querySelector('.mc1-card[aria-label="时间窗对照"]') &&
+      !!document.querySelector(".mc1-heat-cell") &&
+      !document.querySelector(".workspace-heading"),
+  ),
+);
+
+check("工具菜单有案例与证据", await clickTool("案例与证据"));
+await page.waitForSelector(".evidence-dock .basket", { timeout: 10000 });
+check(
+  "案例与证据打开证据篮",
+  await page.evaluate(() => !!document.querySelector(".evidence-dock .basket")),
+);
+await shot("mc1-tool-basket-1600-light");
+await page.evaluate(() => {
+  const btn = [...document.querySelectorAll(".topbar-docks button")].find((n) => n.textContent?.includes("证据"));
+  if (btn?.getAttribute("aria-pressed") === "true") btn.click();
+});
+await wait(400);
 
 // ================= R3：截断必须显式，且关键事件可达 =================
 const trunc = await page.evaluate(() => {
@@ -282,20 +540,22 @@ await page.evaluate(() => {
 });
 await wait(1400);
 const trackOpen = await page.evaluate(() => ({
+  reader: !!document.querySelector('[data-testid="mc1-event-detail"]'),
   dock: !!document.querySelector(".evidence-dock"),
-  drawer: !!document.querySelector(".drawer"),
-  text: (document.querySelector(".drawer")?.textContent ?? "").slice(0, 160),
+  text: (document.querySelector('[data-testid="mc1-event-detail"]')?.textContent ?? "").slice(0, 160),
   selected: document.querySelector(".mc1-track-msg.is-selected")?.getAttribute("data-event-id") ?? null,
 }));
 check(
-  "点击事件轨直接打开事件详情",
-  trackOpen.dock && trackOpen.drawer && trackOpen.text.length > 20,
+  "点击事件轨在阅读面板打开正文",
+  trackOpen.reader && !trackOpen.dock && trackOpen.text.length > 20,
   `selected=${trackOpen.selected}`,
 );
-await shot("mc1-review-track-drawer");
+await shot("mc1-review-track-reader");
 await page.evaluate(() => {
-  const btn = [...document.querySelectorAll(".topbar-docks button")].find((n) => n.textContent?.includes("证据"));
-  if (btn?.getAttribute("aria-pressed") === "true") btn.click();
+  const btn = [...document.querySelectorAll('[data-testid="mc1-event-detail"] .btn-quiet')].find(
+    (n) => n.textContent?.trim() === "关闭",
+  );
+  btn?.click();
 });
 await wait(400);
 
@@ -368,7 +628,7 @@ const conflict = await page.evaluate(() => {
   };
 });
 check("角色筛选冲突时按空集处理", conflict.total === 0 && conflict.note.includes("按空集处理"), `total=${conflict.total} note=${conflict.note.slice(0, 60)}`);
-await clickText(".btn", "清空筛选");
+await clearAll();
 await wait(1000);
 await page.evaluate(() => {
   const toggle = [...document.querySelectorAll(".mc1-toggle")].find((n) => n.textContent?.trim() === "筛选");
@@ -390,7 +650,7 @@ const scopePublic = await page.evaluate(() => ({
 }));
 scopePublic.pressed = await channelPressed();
 check("公开渠道按钮与请求一致", scopePublic.pressed.includes("公开发布") && !/匹配消息 912/.test(scopePublic.counts), scopePublic.counts);
-await clickText(".btn", "清空筛选");
+await clearAll();
 await wait(1200);
 const scopeCleared = await page.evaluate(() => ({
   counts: document.querySelector(".mc1-heat-counts")?.textContent?.replace(/\s+/g, " ") ?? "",
@@ -434,6 +694,27 @@ const kbClose = await page.evaluate(() => ({
 }));
 check("Enter 关闭详情不会误开证据坞", !kbClose.detail && !kbClose.drawer, `detail=${kbClose.detail} drawer=${kbClose.drawer}`);
 check("关闭后焦点回到触发格", kbClose.activeKey === kbKey, `active=${kbClose.activeKey}`);
+
+// Escape 关闭阅读面板：不顺手清掉时间窗
+const windowBeforeEsc = await page.evaluate(() => document.querySelector(".mc1-window")?.textContent ?? "");
+const escCell = await page.evaluate(() => {
+  const cell = [...document.querySelectorAll(".mc1-heat-cell")].find((n) => !n.classList.contains("is-empty"));
+  if (!(cell instanceof HTMLElement)) return null;
+  cell.focus();
+  cell.click();
+  return cell.getAttribute("data-cell-key");
+});
+await page.waitForSelector('[data-testid="mc1-cell-detail"]', { timeout: 10000 });
+await page.keyboard.press("Escape");
+await wait(500);
+const escState = await page.evaluate(() => ({
+  detail: !!document.querySelector('[data-testid="mc1-cell-detail"]'),
+  window: document.querySelector(".mc1-window")?.textContent ?? "",
+  activeKey: document.activeElement?.getAttribute("data-cell-key") ?? null,
+}));
+check("Escape 关闭阅读面板", !escState.detail);
+check("Escape 不清掉当前时间窗", escState.window === windowBeforeEsc, `${windowBeforeEsc} -> ${escState.window}`);
+check("Escape 关闭后焦点回到触发格", escState.activeKey === escCell, `active=${escState.activeKey}`);
 const envFocus = await page.evaluate(() => {
   const env = document.querySelector(".mc1-track-env");
   if (!env || typeof env.focus !== "function") return false;
@@ -494,7 +775,33 @@ const pinActor = await page.evaluate(() => ({
     .map((n) => n.getAttribute("aria-label") ?? ""),
 }));
 check("PR-Agent 筛选下事件轨 = 101 条且无补入", pinActor.msgs === 101 && pinActor.pinned === 0, `msgs=${pinActor.msgs} pinned=${pinActor.pinned}`);
-await clickText(".btn", "清空筛选");
+
+// 零匹配：关键词无结果时事件轨为空，也不能补入关键事件
+await page.evaluate(() => {
+  const input = document.querySelector('.topbar input[type="search"]');
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  setter?.call(input, "no-such-keyword-zz");
+  input?.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await wait(1600);
+const zeroMatch = await page.evaluate(() => ({
+  msgs: document.querySelectorAll(".mc1-track-msg").length,
+  pinned: document.querySelectorAll(".mc1-track-msg.is-pinned, .mc1-track-release.is-pinned").length,
+  counts: document.querySelector(".mc1-heat-counts")?.textContent?.replace(/\s+/g, " ") ?? "",
+}));
+check(
+  "零匹配时事件轨为空且不补入关键事件",
+  zeroMatch.msgs === 0 && zeroMatch.pinned === 0 && /匹配消息 0/.test(zeroMatch.counts),
+  JSON.stringify(zeroMatch),
+);
+await page.evaluate(() => {
+  const input = document.querySelector('.topbar input[type="search"]');
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  setter?.call(input, "");
+  input?.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await wait(1400);
+await clearAll();
 await wait(1200);
 
 // ================= R8：网络节点不替换角色筛选 =================
@@ -539,7 +846,7 @@ await page.evaluate(() => {
   btn?.click();
 });
 await wait(400);
-await clickText(".btn", "清空筛选");
+await clearAll();
 await wait(1200);
 
 // ================= R9：环境/边/节点的键盘关闭焦点 =================
@@ -664,15 +971,25 @@ await page.evaluate(() => {
   cell?.click();
 });
 await wait(900);
-const narrow = await page.evaluate(() => ({
-  overflow: document.documentElement.scrollWidth - window.innerWidth,
-  detail: !!document.querySelector(".mc1-detail-card"),
-}));
+const narrow = await page.evaluate(() => {
+  const reader = document.querySelector(".mc1-reader");
+  const rect = reader?.getBoundingClientRect();
+  const close = [...(reader?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.trim() === "关闭");
+  const closeRect = close?.getBoundingClientRect();
+  return {
+    overflow: document.documentElement.scrollWidth - window.innerWidth,
+    detail: !!reader,
+    width: rect ? Math.round(rect.width) : null,
+    closeInViewport: !!closeRect && closeRect.left >= 0 && closeRect.right <= window.innerWidth,
+  };
+});
 check("390 无页面横向溢出", narrow.overflow <= 1, `overflow=${narrow.overflow}`);
+check("390 详情宽度不超出视口", narrow.width != null && narrow.width <= 390, `width=${narrow.width}`);
+check("390 关闭按钮在视口内", narrow.closeInViewport);
 await shot("mc1-390-detail");
-check("390 详情可关闭", await clickText(".mc1-detail-card .btn-quiet", "关闭"));
+check("390 详情可关闭", await clickText(".mc1-reader .btn-quiet", "关闭"));
 await wait(300);
-check("390 关闭后详情消失", await page.evaluate(() => !document.querySelector(".mc1-detail-card")));
+check("390 关闭后详情消失", await page.evaluate(() => !document.querySelector(".mc1-reader")));
 await shot("mc1-390-light");
 
 // --- MC2 / CUSTOM 最小回归 ---
@@ -691,6 +1008,11 @@ for (const id of ["MC2", "CUSTOM"]) {
 
 const uniqueErrors = [...new Set(errors)];
 check("无控制台/网络错误", uniqueErrors.length === 0, uniqueErrors.slice(0, 3).join(" | "));
+
+// 浏览器已不再使用这些案例，最后再删，避免删除瞬间触发自造 404
+for (const id of createdCases) {
+  await fetch(`${URL}/api/cases/${id}`, { method: "DELETE" });
+}
 
 const failed = results.filter((item) => !item.ok);
 fs.writeFileSync(

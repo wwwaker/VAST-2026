@@ -3,7 +3,7 @@ import { useWorkspace } from "../state/workspace";
 import { useTheme } from "../theme/theme";
 import { HOUR_US, SECOND_US, fetchDatasets, fetchRun, formatUtc } from "../data/api";
 
-export function TimeBrush() {
+export function TimeBrush({ compact = false }: { compact?: boolean }) {
   const {
     dataset,
     filters,
@@ -125,18 +125,20 @@ export function TimeBrush() {
           <span className="muted"> / {dataset === "MC1" ? "源时区未知" : "UTC"}</span>
         </span>
 
-        <button
-          type="button"
-          className="info-button"
-          title={
-            masking
-              ? "游标之后的记录不显示；游标之前的记录始终可查。"
-              : "关闭遮蔽后，当前展示全量数据，不代表游标时刻状态。"
-          }
-          aria-label={masking ? "回放遮蔽说明：游标之后的记录不显示" : "回放遮蔽已关闭说明：当前展示全量数据"}
-        >
-          i
-        </button>
+        {!compact && (
+          <button
+            type="button"
+            className="info-button"
+            title={
+              masking
+                ? "游标之后的记录不显示；游标之前的记录始终可查。"
+                : "关闭遮蔽后，当前展示全量数据，不代表游标时刻状态。"
+            }
+            aria-label={masking ? "回放遮蔽说明：游标之后的记录不显示" : "回放遮蔽已关闭说明：当前展示全量数据"}
+          >
+            i
+          </button>
+        )}
 
         <label className="check">
           <input type="checkbox" checked={masking} onChange={(e) => setMasking(e.target.checked)} />

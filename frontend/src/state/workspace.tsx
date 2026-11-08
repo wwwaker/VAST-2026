@@ -24,6 +24,10 @@ interface WorkspaceValue {
   changeTask: (task: TaskId, mode?: Mode) => void;
   snapshot: () => ReturnType<typeof serializeSnapshot>;
   restoreSnapshot: (snapshot: unknown, options: RestoreOptions) => ReturnType<typeof planRestore>;
+  /** 每次成功恢复 +1；页面用它重新应用"选中对象/工具/面板"映射，而不是把 task/mode 当唯一触发器。 */
+  restoreSeq: number;
+  /** 最近一次恢复中被判定缺失的引用；缺失对象保留但不再打开阅读面板。 */
+  restoreMissing: string[];
   dataset: DatasetId; setDataset: (id: DatasetId) => void;
   filters: Filters; setFilters: (patch: Partial<Filters>) => void; clearFilters: () => void; filterSummary: string;
   selectedEventId: string | null; selectedEventAt: number | null;
@@ -108,17 +112,21 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setNotes((prev) => ({ ...prev, items: prev.items.filter((n) => n.note_id !== noteId) }));
   }, []);
   const snapshot = useCallback(() => serializeSnapshot(stateRef.current), []);
+  const [restoreSeq, setRestoreSeq] = useState(0);
+  const [restoreMissing, setRestoreMissing] = useState<string[]>([]);
   const restoreSnapshot = useCallback<WorkspaceValue["restoreSnapshot"]>((value, options) => {
     const plan = planRestore(value, options);
     if (plan.status === "ready") {
       dispatch(restoreAction(plan));
       setActiveCaseState(null); setEvidenceOpen(false);
+      setRestoreMissing(options.missingReferences ?? []);
+      setRestoreSeq((count) => count + 1);
     }
     return plan;
   }, []);
   const value: WorkspaceValue = {
     state, dispatch, dataset, setDataset, filters, filterSummary,
-    changeTask: (task, mode) => dispatch({ type: "task", task, mode }), snapshot, restoreSnapshot,
+    changeTask: (task, mode) => dispatch({ type: "task", task, mode }), snapshot, restoreSnapshot, restoreSeq, restoreMissing,
     setFilters: (patch) => dispatch({ type: "filters", patch }), clearFilters: () => dispatch({ type: "clearFilters" }),
     selectedEventId: state.selection?.kind === "event" ? state.selection.id : null,
     selectedEventAt: state.selection?.kind === "event" ? state.selection.timeUs : null, selectEvent,

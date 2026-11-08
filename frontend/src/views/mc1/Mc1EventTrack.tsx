@@ -28,12 +28,13 @@ export function Mc1EventTrack({
   anchors: Mc1AnchorMark[];
   scrollRef: React.RefObject<HTMLDivElement>;
   onScroll: () => void;
-  onSelectEvent: (eventId: string, timeUs: number) => void;
+  onSelectEvent: (eventId: string, timeUs: number, trigger: Element | null, channel: string | null) => void;
   onPickEnvironment: (record: Mc1EnvironmentRecord, trigger: Element | null) => void;
   selectedEventId?: string | null;
   onFocusAnchor?: () => void;
 }) {
-  const height = TOP + LANE_H * 3 + 22;
+  // 底部预留三行锚点标签的位置，避免相邻锚点（17:00 / 18:00）文字互相压住
+  const height = TOP + LANE_H * 3 + 34;
 
   const pitch = cellWidth + MC1_CELL_GAP;
 
@@ -77,19 +78,26 @@ export function Mc1EventTrack({
   return (
     <div className="mc1-track-wrap">
       {payload.truncated && (
-        <div className="callout callout-warn mc1-track-truncation" role="status" data-testid="mc1-track-truncation">
-          <strong>事件轨已截断：本窗口 {laneTotal} 条消息，只绘制 {drawn} 条</strong>
-          <p className="muted small">
-            接口单窗口上限 {payload.lane_limit} 条；发布轨与消息轨来自同一批记录，未绘制的条目不在图上。
-            {pinned.length > 0
-              ? ` 已额外补入窗口内的关键事件 ${pinned.length} 条（图上带描边）：${pinned.join("、")}。`
-              : " 窗口内的关键事件未落在截断范围内。"}
-          </p>
-          {onFocusAnchor && (
-            <button type="button" className="btn btn-quiet" onClick={onFocusAnchor}>
-              定位到首条内部确认 ±30m
-            </button>
-          )}
+        <div className="mc1-track-status" role="status" data-testid="mc1-track-truncation">
+          <strong>事件轨已截断</strong>
+          <span>
+            本窗口 {laneTotal} 条 · 绘制 {drawn} 条（单窗口上限 {payload.lane_limit}）
+          </span>
+          <span className="muted small">
+            {pinned.length > 0 ? `已补入关键事件 ${pinned.length} 条（带描边）` : "无需补入关键事件"}
+          </span>
+          <details>
+            <summary>范围与补入明细</summary>
+            <p className="muted small">
+              未绘制的条目不在图上。
+              {pinned.length > 0 ? ` 补入：${pinned.join("、")}。` : ""}
+            </p>
+            {onFocusAnchor && (
+              <button type="button" className="btn btn-quiet" onClick={onFocusAnchor}>
+                定位到首条内部确认 ±30m
+              </button>
+            )}
+          </details>
         </div>
       )}
       <div className="mc1-track-scroll" ref={scrollRef} onScroll={onScroll}>
@@ -126,6 +134,28 @@ export function Mc1EventTrack({
             />
           ))}
 
+          {/* 环境/约束只记录轮次精度：按轮次区间画半透明带，另标出记录时刻，避免伪装成精确点 */}
+          {payload.tracks.environment.map((record) => {
+            const x1 = geometry.xOf(record.round_start_us ?? record.time_us);
+            const x2 = geometry.xOf(record.round_end_us ?? record.time_us);
+            if (x1 == null && x2 == null) return null;
+            const left = Math.min(x1 ?? x2!, x2 ?? x1!);
+            const width = Math.max(7, Math.abs((x2 ?? x1!) - (x1 ?? x2!)));
+            return (
+              <rect
+                key={`env-band-${record.context_id}`}
+                x={left}
+                y={laneY(0) - 8}
+                width={width}
+                height={16}
+                rx={2}
+                className="mc1-track-env-band"
+              >
+                <title>{`${record.kind} · 轮次精度 ${record.time_precision ?? ""} · ${record.value}`}</title>
+              </rect>
+            );
+          })}
+
           {payload.tracks.environment.map((record) => {
             const x = geometry.xOf(record.time_us);
             if (x == null) return null;
@@ -151,6 +181,27 @@ export function Mc1EventTrack({
                 }}
               >
                 <title>{`${record.kind} · ${formatUtc(record.time_us)} · ${record.value}`}</title>
+              </rect>
+            );
+          })}
+
+          {payload.tracks.constraints.map((record) => {
+            const x1 = geometry.xOf(record.round_start_us ?? record.time_us);
+            const x2 = geometry.xOf(record.round_end_us ?? record.time_us);
+            if (x1 == null && x2 == null) return null;
+            const left = Math.min(x1 ?? x2!, x2 ?? x1!);
+            const width = Math.max(7, Math.abs((x2 ?? x1!) - (x1 ?? x2!)));
+            return (
+              <rect
+                key={`constraint-band-${record.context_id}`}
+                x={left}
+                y={laneY(0) + 2}
+                width={width}
+                height={7}
+                rx={1.5}
+                className="mc1-track-constraint-band"
+              >
+                <title>{`约束区间 · ${record.constraint_basis ?? record.kind} · ${record.value}`}</title>
               </rect>
             );
           })}
@@ -221,11 +272,13 @@ export function Mc1EventTrack({
                 tabIndex={0}
                 role="button"
                 aria-label={`${formatUtc(item.time_us)} ${item.channel ?? ""} ${item.preview?.slice(0, 40) ?? ""}`}
-                onClick={() => onSelectEvent(item.event_id, item.time_us)}
+                onClick={(event) =>
+                  onSelectEvent(item.event_id, item.time_us, event.currentTarget, item.channel ?? null)
+                }
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
-                    onSelectEvent(item.event_id, item.time_us);
+                    onSelectEvent(item.event_id, item.time_us, event.currentTarget, item.channel ?? null);
                   }
                 }}
               >
@@ -253,11 +306,13 @@ export function Mc1EventTrack({
                 tabIndex={0}
                 role="button"
                 aria-label={`公开发布 ${formatUtc(item.time_us)} ${item.channel ?? ""}`}
-                onClick={() => onSelectEvent(item.event_id, item.time_us)}
+                onClick={(event) =>
+                  onSelectEvent(item.event_id, item.time_us, event.currentTarget, item.channel ?? null)
+                }
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
-                    onSelectEvent(item.event_id, item.time_us);
+                    onSelectEvent(item.event_id, item.time_us, event.currentTarget, item.channel ?? null);
                   }
                 }}
               >
@@ -266,10 +321,12 @@ export function Mc1EventTrack({
             );
           })}
 
-          {anchors.map((anchor) => {
+          {anchors.map((anchor, index) => {
             if (anchor.timeUs == null) return null;
             const x = geometry.xOf(anchor.timeUs);
             if (x == null) return null;
+            // 靠右的锚点标签向左对齐，避免被卡片边缘裁掉
+            const flip = x > geometry.width - 44;
             return (
               <g key={anchor.key}>
                 <line
@@ -279,7 +336,12 @@ export function Mc1EventTrack({
                   y2={height - 18}
                   className={`mc1-track-anchor mc1-anchor-${anchor.tone}`}
                 />
-                <text x={x + 3} y={height - 6} className="mc1-track-anchor-label">
+                <text
+                  x={flip ? x - 3 : x + 3}
+                  y={height - 6 - index * 10}
+                  textAnchor={flip ? "end" : "start"}
+                  className="mc1-track-anchor-label"
+                >
                   {anchor.key === "external" ? "17:00 context" : anchor.key === "confirm" ? "确认" : "解禁"}
                 </text>
               </g>
@@ -287,12 +349,15 @@ export function Mc1EventTrack({
           })}
         </svg>
       </div>
-      <p className="mc1-track-legend muted small">
-        <span>环境/约束：竖条=环境记录 · 短横=禁发/约束（按轮次精度，不是精确时刻）</span>
-        <span>消息：实心=内部 · 空心=公开 · 菱形=人工标记 · 描边=截断后补入</span>
-        <span>发布：方块=公开发布</span>
-        <span>列与热力图共用同一时间桶与列宽，横向滚动同步</span>
-      </p>
+      <details className="mc1-track-legend-box">
+        <summary>图例与列对齐</summary>
+        <p className="mc1-track-legend muted small">
+          <span>环境/约束：区间带=轮次精度范围 · 竖条=记录时刻 · 短横=禁发/约束</span>
+          <span>消息：实心=内部 · 空心=公开 · 菱形=人工标记 · 描边=截断后补入</span>
+          <span>发布：方块=公开发布</span>
+          <span>列与热力图共用同一时间桶与列宽，横向滚动同步</span>
+        </p>
+      </details>
     </div>
   );
 }

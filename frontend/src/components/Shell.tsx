@@ -95,56 +95,100 @@ export function TopBar({
         />
       </label>
 
-      <label className="field">
-        <span>主题</span>
-        <select value={mode} onChange={(e) => setMode(e.target.value as ThemeMode)}>
-          <option value="light">浅色</option>
-          <option value="dark">深色</option>
-          <option value="system">跟随系统</option>
-        </select>
-      </label>
+      {dataset === "MC1" ? (
+        <>
+          <div className="topbar-docks" aria-label="侧栏">
+            <button
+              ref={evidenceTriggerRef}
+              type="button"
+              className={`btn btn-quiet${evidenceOpen ? " btn-active" : ""}`}
+              aria-pressed={evidenceOpen}
+              aria-expanded={evidenceOpen}
+              onClick={onToggleEvidence}
+              title="打开证据与案例工具"
+            >
+              证据
+            </button>
+          </div>
+          <details className="topbar-settings">
+            <summary>设置</summary>
+            <div className="topbar-settings-body">
+              <label className="field">
+                <span>主题</span>
+                <select value={mode} onChange={(e) => setMode(e.target.value as ThemeMode)}>
+                  <option value="light">浅色</option>
+                  <option value="dark">深色</option>
+                  <option value="system">跟随系统</option>
+                </select>
+              </label>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={reducedMotion}
+                  onChange={(e) => setReducedMotion(e.target.checked)}
+                />
+                <span>减少动效</span>
+              </label>
+              <button type="button" className="btn btn-quiet" onClick={onShowHelp}>
+                键盘快捷键
+              </button>
+            </div>
+          </details>
+        </>
+      ) : (
+        <>
+          <label className="field">
+            <span>主题</span>
+            <select value={mode} onChange={(e) => setMode(e.target.value as ThemeMode)}>
+              <option value="light">浅色</option>
+              <option value="dark">深色</option>
+              <option value="system">跟随系统</option>
+            </select>
+          </label>
 
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={reducedMotion}
-          onChange={(e) => setReducedMotion(e.target.checked)}
-        />
-        <span>减少动效</span>
-      </label>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={reducedMotion}
+              onChange={(e) => setReducedMotion(e.target.checked)}
+            />
+            <span>减少动效</span>
+          </label>
 
-      <button type="button" className="btn" onClick={onShowHelp} title="键盘快捷键（?）">
-        ?
-      </button>
+          <button type="button" className="btn" onClick={onShowHelp} title="键盘快捷键（?）">
+            ?
+          </button>
 
-      <div className="topbar-docks" aria-label="侧栏">
-        <button
-          ref={evidenceTriggerRef}
-          type="button"
-          className={`btn btn-quiet${evidenceOpen ? " btn-active" : ""}`}
-          aria-pressed={evidenceOpen}
-          aria-expanded={evidenceOpen}
-          onClick={onToggleEvidence}
-          title="切换证据侧栏"
-        >
-          证据
-        </button>
-        <button
-          ref={eventTriggerRef}
-          type="button"
-          className={`btn btn-quiet${eventOpen ? " btn-active" : ""}`}
-          aria-pressed={eventOpen}
-          aria-expanded={eventOpen}
-          onClick={onToggleEvent}
-          title="切换事件流侧栏"
-        >
-          事件流
-        </button>
-      </div>
+          <div className="topbar-docks" aria-label="侧栏">
+            <button
+              ref={evidenceTriggerRef}
+              type="button"
+              className={`btn btn-quiet${evidenceOpen ? " btn-active" : ""}`}
+              aria-pressed={evidenceOpen}
+              aria-expanded={evidenceOpen}
+              onClick={onToggleEvidence}
+              title="切换证据侧栏"
+            >
+              证据
+            </button>
+            <button
+              ref={eventTriggerRef}
+              type="button"
+              className={`btn btn-quiet${eventOpen ? " btn-active" : ""}`}
+              aria-pressed={eventOpen}
+              aria-expanded={eventOpen}
+              onClick={onToggleEvent}
+              title="切换事件流侧栏"
+            >
+              事件流
+            </button>
+          </div>
 
-      <button type="button" className={`btn${showBench ? " btn-active" : ""}`} onClick={onToggleBench}>
-        {showBench ? "返回调查" : "渲染基准"}
-      </button>
+          <button type="button" className={`btn${showBench ? " btn-active" : ""}`} onClick={onToggleBench}>
+            {showBench ? "返回调查" : "渲染基准"}
+          </button>
+        </>
+      )}
     </header>
   );
 }

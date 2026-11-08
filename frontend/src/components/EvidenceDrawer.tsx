@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { useWorkspace } from "../state/workspace";
-import { fetchDatasets, fetchEvent, type EventDetail } from "../data/api";
+import { fetchEvent, type EventDetail } from "../data/api";
 import { annotationBadge, badgeClass } from "../data/labels";
-import { DualChannel } from "./DualChannel";
 import { NotesPanel } from "./NotesPanel";
 import { EvidenceBasket } from "./EvidenceBasket";
 
@@ -41,21 +40,6 @@ export function EvidenceDrawer() {
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [coverage, setCoverage] = useState<{ withCount: number; total: number } | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchDatasets()
-      .then((list) => {
-        if (cancelled) return;
-        const info = list.find((d) => d.dataset_id === dataset);
-        if (info) setCoverage({ withCount: info.deliberation_count, total: info.event_count });
-      })
-      .catch(() => setCoverage(null));
-    return () => {
-      cancelled = true;
-    };
-  }, [dataset]);
 
   useEffect(() => {
     if (!selectedEventId) {
@@ -87,6 +71,23 @@ export function EvidenceDrawer() {
   if (!evidenceOpen) return null;
 
   const details = event?.details ?? null;
+  // MC1 的正文与原始字段已统一在页面阅读面板里，证据侧栏只保留关联、证据篮和笔记，
+  // 不再提供第二套消息阅读入口。
+  const tabs =
+    dataset === "MC1"
+      ? [
+          { key: "related", label: "关联" },
+          { key: "basket", label: "证据篮" },
+          { key: "notes", label: "笔记" },
+        ]
+      : [
+          { key: "message", label: "消息" },
+          { key: "related", label: "关联" },
+          { key: "raw", label: "原始记录" },
+          { key: "basket", label: "证据篮" },
+          { key: "notes", label: "笔记" },
+        ];
+  const activeTab = tabs.some((t) => t.key === evidenceTab) ? evidenceTab : tabs[0].key;
 
   return (
     <aside className={`drawer${dataset === "MC1" ? " drawer-wide" : ""}`} aria-label="证据侧栏">
@@ -98,19 +99,13 @@ export function EvidenceDrawer() {
       </div>
 
       <div className="tabs" role="tablist">
-        {[
-          { key: "message", label: "消息" },
-          { key: "related", label: "关联" },
-          { key: "raw", label: "原始记录" },
-          { key: "basket", label: "证据篮" },
-          { key: "notes", label: "笔记" },
-        ].map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.key}
             type="button"
             role="tab"
-            aria-selected={evidenceTab === t.key}
-            className={`tab${evidenceTab === t.key ? " tab-active" : ""}`}
+            aria-selected={activeTab === t.key}
+            className={`tab${activeTab === t.key ? " tab-active" : ""}`}
             onClick={() => setEvidenceTab(t.key as typeof evidenceTab)}
           >
             {t.label}
@@ -119,9 +114,9 @@ export function EvidenceDrawer() {
       </div>
 
       <div className="drawer-body">
-        {evidenceTab === "basket" ? (
+        {activeTab === "basket" ? (
           <EvidenceBasket />
-        ) : evidenceTab === "notes" ? (
+        ) : activeTab === "notes" ? (
           <NotesPanel
             notes={notes}
             loading={notesLoading}
@@ -141,7 +136,11 @@ export function EvidenceDrawer() {
         ) : !selectedEventId ? (
           <div className="empty-state">
             <p>尚未选择事件。</p>
-            <p className="muted">在下方事件流中点击任意一行，或点击时间线上的红色三角锚点。</p>
+            <p className="muted">
+              {dataset === "MC1"
+                ? "在热力图、事件轨或回复网络中打开对象后，这里会显示它的参与实体与关系边。"
+                : "在下方事件流中点击任意一行，或点击时间线上的红色三角锚点。"}
+            </p>
             <p className="muted small">
               需要记录结论时可以切到「笔记」页，笔记存在服务端，刷新不会丢。
             </p>
@@ -153,7 +152,7 @@ export function EvidenceDrawer() {
             <strong>读取失败</strong>
             <p>{error}</p>
           </div>
-        ) : !event ? null : evidenceTab === "message" ? (
+        ) : !event ? null : activeTab === "message" ? (
           <div className="evidence">
             <div className="evidence-meta">
               <span className="mono">{event.event_id}</span>
@@ -212,13 +211,9 @@ export function EvidenceDrawer() {
               ))}
             </div>
 
-            {dataset === "MC1" ? (
-              <DualChannel event={event} coverage={coverage} />
-            ) : (
-              details &&
-              typeof details.content === "string" && (
-                <blockquote className="quote">{details.content}</blockquote>
-              )
+            {/* MC1 的正文/内部审议统一在页面阅读面板，这里只承接 MC2/CUSTOM 的内容字段 */}
+            {details && typeof details.content === "string" && (
+              <blockquote className="quote">{details.content}</blockquote>
             )}
             {details && typeof details.content_source === "string" && (
               <div className="callout callout-warn">
@@ -275,7 +270,7 @@ export function EvidenceDrawer() {
               来源指针 <code>{event.source_json_pointer ?? "—"}</code>
             </p>
           </div>
-        ) : evidenceTab === "related" ? (
+        ) : activeTab === "related" ? (
           <div className="evidence">
             <h3>参与者</h3>
             <p className="muted small">点击任一参与者，可在关系图中以它为中心展开。</p>

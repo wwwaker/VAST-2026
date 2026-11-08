@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useWorkspace } from "../state/workspace";
 import { useTheme } from "../theme/theme";
 import { fetchEvents, formatUtc, type EventItem } from "../data/api";
@@ -8,7 +8,7 @@ import { useDebounced } from "../hooks/useDebounced";
 
 const PAGE = 50;
 
-export function EventStream() {
+export function EventStream({ onOpenEvent }: { onOpenEvent?: (item: EventItem) => void } = {}) {
   const { dataset, filters, cursor, masking, selectedEventId, selectEvent } = useWorkspace();
   const { colors } = useTheme();
 
@@ -77,37 +77,33 @@ export function EventStream() {
     return () => controller.abort();
   }, [load, requestKey]);
 
-  // 上下键在事件流内移动选择；输入框内不抢键
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      const el = event.target as HTMLElement | null;
-      if (el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable)) {
-        return;
-      }
-      if (items.length === 0) return;
+  /** 鼠标与键盘共用同一打开动作：选中行、正文、笔记关联与快照都读同一份 selection。 */
+  const openItem = (item: EventItem) => {
+    selectEvent(item.event_id, item.time_us);
+    onOpenEvent?.(item);
+  };
 
-      event.preventDefault();
-      const current = items.findIndex((i) => i.event_id === selectedEventId);
-      let next: number;
-      if (current === -1) {
-        next = event.key === "ArrowDown" ? 0 : items.length - 1;
-      } else {
-        next = event.key === "ArrowDown" ? Math.min(items.length - 1, current + 1) : Math.max(0, current - 1);
-      }
-      const target = items[next];
-      selectEvent(target.event_id, target.time_us);
-      requestAnimationFrame(() => {
-        document
-          .querySelector(`[data-event-id="${CSS.escape(target.event_id)}"]`)
-          ?.scrollIntoView({ block: "nearest" });
-      });
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [items, selectedEventId, selectEvent]);
+  /** 方向键只在事件列表获得焦点时生效，不抢输入框、播放控件或其他图形的方向键。 */
+  const onListKeyDown = (event: ReactKeyboardEvent<HTMLUListElement>) => {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+    const row = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>("button.stream-row");
+    if (!row) return;
+    const rows = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("button.stream-row")];
+    const current = rows.indexOf(row);
+    if (current < 0) return;
+    const next = event.key === "ArrowDown" ? Math.min(rows.length - 1, current + 1) : Math.max(0, current - 1);
+    if (next === current) return;
+    const target = items[next];
+    if (!target) return;
+    event.preventDefault();
+    openItem(target);
+    requestAnimationFrame(() => {
+      const el = rows[next];
+      el.focus();
+      el.scrollIntoView({ block: "nearest" });
+    });
+  };
 
   return (
     <section className="stream" aria-label="事件流">
@@ -152,7 +148,7 @@ export function EventStream() {
       )}
       {error && <p className="stream-error">接口错误：{error}</p>}
 
-      <ul className="stream-list">
+      <ul className="stream-list" onKeyDown={onListKeyDown}>
         {items.map((item) => {
           const badges = item.annotations.map((a) => ({ ...annotationBadge(a), reason: a.reason }));
           return (
@@ -161,7 +157,7 @@ export function EventStream() {
                 type="button"
                 data-event-id={item.event_id}
                 className={`stream-row${selectedEventId === item.event_id ? " stream-row-active" : ""}`}
-                onClick={() => selectEvent(item.event_id, item.time_us)}
+                onClick={() => openItem(item)}
               >
                 <span className="stream-time mono">{formatUtc(item.time_us)}</span>
                 <span

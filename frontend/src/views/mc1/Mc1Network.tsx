@@ -1,10 +1,11 @@
 import { useMemo } from "react";
 import type { Mc1ReplyEdge, Mc1ReplyNetworkPayload } from "../../data/api";
 
-const W = 760;
-const H = 430;
-const CENTER = { x: W / 2, y: H / 2 + 6 };
-const RADIUS = 148;
+/** 单列侧栏里约 370px 可用：用近方形画布，标签缩放后仍可读 */
+const W = 420;
+const H = 420;
+const CENTER = { x: W / 2, y: H / 2 };
+const RADIUS = 140;
 
 export function edgeKey(edge: Mc1ReplyEdge): string {
   return `${edge.source}>${edge.target}|${edge.kind}|${edge.reply_class}`;
@@ -66,6 +67,12 @@ export function Mc1Network({
     () => Math.max(1, ...(payload?.nodes ?? []).map((node) => node.messages)),
     [payload],
   );
+
+  /** 默认只标出最强的几条边，其余计数留在 title 与边证据里，避免侧栏被数字占满。 */
+  const labelThreshold = useMemo(() => {
+    const counts = (payload?.edges ?? []).map((edge) => edge.evidence_count).sort((a, b) => b - a);
+    return counts.length ? counts[Math.min(2, counts.length - 1)] : 0;
+  }, [payload]);
 
   const drawnEdges = useMemo(() => {
     const edges = payload?.edges ?? [];
@@ -135,10 +142,10 @@ export function Mc1Network({
               let labelX: number;
               let labelY: number;
               if (isSelf) {
-                const reach = 52 + Math.abs(offset) * 0.4;
-                d = `M ${from.x - 12} ${from.y - 12} C ${from.x - reach} ${from.y - 110}, ${from.x + reach} ${from.y - 110}, ${from.x + 12} ${from.y - 12}`;
+                const reach = 44 + Math.abs(offset) * 0.4;
+                d = `M ${from.x - 12} ${from.y - 12} C ${from.x - reach} ${from.y - 96}, ${from.x + reach} ${from.y - 96}, ${from.x + 12} ${from.y - 12}`;
                 labelX = from.x;
-                labelY = from.y - 96;
+                labelY = from.y - 82;
               } else {
                 const mx = (from.x + to.x) / 2;
                 const my = (from.y + to.y) / 2;
@@ -175,7 +182,7 @@ export function Mc1Network({
                       {`${style.label} · ${edge.source.split(":").pop()} → ${edge.target.split(":").pop()} · ${edge.evidence_count} 条`}
                     </title>
                   </path>
-                  {edge.evidence_count >= 30 || selectedEdgeKey === key ? (
+                  {edge.evidence_count >= labelThreshold || selectedEdgeKey === key ? (
                     <text x={labelX} y={labelY} className="mc1-edge-label" textAnchor="middle">
                       {edge.evidence_count}
                     </text>
@@ -187,7 +194,7 @@ export function Mc1Network({
             {nodes.map((node) => {
               const pos = layout.get(node.id);
               if (!pos) return null;
-              const r = 15 + Math.sqrt(node.messages / maxMessages) * 17;
+              const r = 13 + Math.sqrt(node.messages / maxMessages) * 14;
               return (
                 <g
                   key={node.id}

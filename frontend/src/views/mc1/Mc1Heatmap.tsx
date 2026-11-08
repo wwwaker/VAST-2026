@@ -34,6 +34,7 @@ export function Mc1Heatmap({
   onPick,
   scrollRef,
   onScroll,
+  cellWidth: preferredCellWidth,
 }: {
   payload: Mc1ActivityPayload | null;
   loading: boolean;
@@ -45,6 +46,8 @@ export function Mc1Heatmap({
   onPick: (agentId: string, column: Mc1Bucket, trigger: HTMLElement | null) => void;
   scrollRef?: React.RefObject<HTMLDivElement>;
   onScroll?: () => void;
+  /** 与事件轨共用的列宽：由页面按可用宽度计算后传入，保证两图对齐 */
+  cellWidth?: number;
 }) {
   const cellMap = useMemo(() => {
     const map = new Map<string, Mc1ActivityPayload["cells"][number]>();
@@ -73,7 +76,7 @@ export function Mc1Heatmap({
     return map;
   }, [anchors, payload]);
 
-  const cellWidth = mc1CellWidth(granularity);
+  const cellWidth = preferredCellWidth ?? mc1CellWidth(granularity);
 
   const shortLabel = (column: Mc1Bucket) => {
     if (!column.start_us) return column.label;

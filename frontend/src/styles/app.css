@@ -137,6 +137,47 @@ select:focus-visible {
   gap: var(--space-1);
 }
 
+/* MC1 的紧凑设置区：主题/减少动效/快捷键收进一个入口 */
+.topbar-settings {
+  position: relative;
+}
+
+.topbar-settings > summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 5px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  white-space: nowrap;
+}
+
+.topbar-settings > summary::-webkit-details-marker {
+  display: none;
+}
+
+.topbar-settings[open] > summary {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.topbar-settings-body {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 180px;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
 .btn {
   font: inherit;
   font-size: 12px;
@@ -2878,15 +2919,7 @@ code {
   gap: 2px;
 }
 
-/* ---------- MC1 活动矩阵与决策泳道 ---------- */
-
-.mc1-workspace {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  overflow: auto;
-  padding-bottom: var(--space-5);
-}
+/* ---------- MC1 先兆候选 ---------- */
 
 .mc1-block {
   display: flex;
@@ -2896,141 +2929,6 @@ code {
   border-radius: var(--radius-md);
   background: var(--panel);
   padding: var(--space-3);
-}
-
-.activity-grid-wrap {
-  overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-}
-
-.activity-table {
-  border-collapse: separate;
-  border-spacing: 1px;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-
-.activity-table th {
-  font-weight: 600;
-  color: var(--text-muted);
-  padding: 2px 4px;
-  white-space: nowrap;
-}
-
-.activity-table thead th {
-  font-weight: 500;
-}
-
-.activity-table tbody th {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  background: var(--panel);
-  text-align: right;
-  padding-right: var(--space-2);
-}
-
-.activity-cell {
-  min-width: 30px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--panel);
-  color: var(--text);
-  cursor: pointer;
-}
-
-.activity-cell:hover {
-  border-color: var(--accent);
-}
-
-.activity-cell:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-.activity-cell-empty {
-  color: var(--text-faint);
-  background: transparent;
-  border-style: dotted;
-}
-
-.activity-count {
-  min-width: 13px;
-  padding: 0 2px;
-  border-radius: 3px;
-  font-size: 10px;
-  line-height: 15px;
-  text-align: center;
-}
-
-.activity-public {
-  background: var(--accent-soft);
-  color: var(--accent);
-  border: 1px solid var(--accent);
-}
-
-.activity-internal {
-  background: var(--panel);
-  color: var(--text-muted);
-  border: 1px solid var(--border-strong);
-}
-
-.mc1-anchors {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  align-items: center;
-}
-
-.mc1-anchor {
-  display: inline-flex;
-  gap: 4px;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  font-size: 11px;
-}
-
-.mc1-anchor-env {
-  border-color: var(--warn);
-  color: var(--warn);
-  background: var(--warn-soft);
-}
-
-.mc1-anchor-agent {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--accent-soft);
-}
-
-.mc1-anchor-lift {
-  border-color: var(--border-strong);
-  color: var(--text-muted);
-}
-
-.mc1-lanes {
-  width: 100%;
-  min-height: 200px;
-  border: 1px solid var(--grid);
-  border-radius: var(--radius-sm);
-  background: var(--panel);
-}
-
-.mc1-lane-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
-}
-
-.mc1-detail .callout {
-  margin: 0;
 }
 
 .mc1-audit {
@@ -3214,12 +3112,73 @@ code {
   font-weight: 600;
 }
 
-.mc1-anchor-row {
+/* 证据/案例/对照/事件查询/先兆共用一个“工具”入口，避免工具条继续堆按钮 */
+.mc1-tools {
+  position: relative;
+}
+
+.mc1-tools > summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.mc1-tools > summary::-webkit-details-marker {
+  display: none;
+}
+
+.mc1-tools[open] > summary {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.mc1-tools-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  min-width: 148px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.mc1-tools-menu button {
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.mc1-tools-menu button:hover,
+.mc1-tools-menu button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.mc1-context {
   display: flex;
   flex-wrap: wrap;
   gap: 6px var(--space-2);
   align-items: center;
   font-size: 11.5px;
+  padding: 0 2px;
 }
 
 .mc1-window {
@@ -3254,15 +3213,6 @@ code {
 
 .mc1-anchor-chip .mono {
   white-space: nowrap;
-}
-
-.mc1-anchor-id {
-  max-width: 210px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text-faint);
-  font-size: 10.5px;
 }
 
 .mc1-anchor-action {
@@ -3367,27 +3317,31 @@ code {
   color: var(--text);
 }
 
-.mc1-columns {
-  /* flex-basis 必须是 0：basis=auto 会让列按内容宽度撑开，热力图就不再有横向滚动 */
+/* 主区（热力图 → 事件轨 → 工具）与右侧栏（阅读面板 → 回复网络） */
+.mc1-layout {
   flex: 1 1 0;
   min-width: 0;
   display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.mc1-columns.is-side-by-side {
-  flex-direction: row;
   align-items: flex-start;
+  gap: var(--space-3);
 }
 
-.mc1-col {
+.mc1-main {
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  min-width: 0;
+}
+
+.mc1-aside {
+  flex: 0 0 392px;
+  width: 392px;
   max-width: 100%;
-  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 .mc1-card {
@@ -3544,12 +3498,30 @@ code {
   gap: 4px;
 }
 
-.mc1-track-truncation {
-  margin-bottom: 4px;
+/* 截断状态是一条常显细带：条数与补入可见，明细按需展开 */
+.mc1-track-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px var(--space-2);
+  padding: 4px 8px;
+  border-left: 3px solid var(--warn);
+  border-radius: var(--radius-sm);
+  background: var(--warn-soft);
+  font-size: 11px;
 }
 
-.mc1-track-truncation p {
-  margin: 2px 0 6px;
+.mc1-track-status details {
+  flex-basis: 100%;
+}
+
+.mc1-track-status summary {
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.mc1-track-status p {
+  margin: 4px 0;
 }
 
 .mc1-scope-note {
@@ -3608,6 +3580,18 @@ code {
   opacity: 0.7;
 }
 
+.mc1-track-env-band {
+  fill: var(--accent);
+  opacity: 0.14;
+  pointer-events: none;
+}
+
+.mc1-track-constraint-band {
+  fill: var(--warn);
+  opacity: 0.18;
+  pointer-events: none;
+}
+
 .mc1-track-env {
   fill: var(--accent);
   opacity: 0.7;
@@ -3662,26 +3646,17 @@ code {
   fill: var(--text-faint);
 }
 
+.mc1-track-legend-box summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 .mc1-track-legend {
   display: flex;
   flex-wrap: wrap;
   gap: 2px var(--space-3);
-  margin: 0;
-}
-
-.mc1-flow-details {
-  gap: 4px;
-}
-
-.mc1-flow-details > summary {
-  cursor: pointer;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.mc1-flow-details[open] > summary {
-  margin-bottom: var(--space-2);
-  color: var(--text);
+  margin: 4px 0 0;
 }
 
 .mc1-heat-legend {
@@ -3696,7 +3671,9 @@ code {
   margin-left: auto;
 }
 
-.mc1-detail-card {
+/* 单一对象阅读面板：桌面在右侧栏顶部（网络之上），窄屏为底部浮层 */
+.mc1-reader {
+  order: -1;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -3704,7 +3681,25 @@ code {
   border: 1px solid var(--accent);
   border-radius: var(--radius-md);
   background: var(--panel-raised);
-  box-shadow: var(--shadow);
+  box-shadow: 0 12px 32px rgb(15 35 31 / 18%);
+  min-width: 0;
+}
+
+.mc1-reader-title {
+  min-width: 0;
+}
+
+.mc1-reader-title strong {
+  display: block;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.mc1-reader-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .mc1-detail-head {
@@ -3722,6 +3717,7 @@ code {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+  flex: none;
 }
 
 .mc1-msgs {
@@ -3866,6 +3862,65 @@ code {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.mc1-msg-raw-details summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.mc1-msg-raw-details[open] summary {
+  color: var(--text);
+}
+
+/* 阅读面板只有 ~380px 宽：双声道改上下排列，正文各自可滚动 */
+.mc1-reader .dual-grid {
+  grid-template-columns: 1fr;
+}
+
+/* 原始载荷默认折叠；展开后自身限高滚动，不把侧栏撑成整页 */
+.mc1-raw-details {
+  margin: 2px 0 0;
+}
+
+.mc1-reader .raw pre {
+  max-height: 220px;
+  padding: var(--space-2);
+  font-size: 10.5px;
+}
+
+.mc1-reader .dual-body {
+  max-height: 200px;
+}
+
+.mc1-reader .mc1-msg-head {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "time actor badges"
+    "channel preview preview";
+  row-gap: 1px;
+}
+
+.mc1-reader .mc1-msg-time {
+  grid-area: time;
+}
+
+.mc1-reader .mc1-msg-actor {
+  grid-area: actor;
+}
+
+.mc1-reader .mc1-msg-channel {
+  grid-area: channel;
+}
+
+.mc1-reader .mc1-msg-preview {
+  grid-area: preview;
+}
+
+.mc1-reader .mc1-msg-badges {
+  grid-area: badges;
 }
 
 .mc1-net {
@@ -3878,7 +3933,7 @@ code {
 .mc1-net-svg {
   width: 100%;
   height: auto;
-  max-height: 44vh;
+  max-height: 52vh;
   background: var(--bg-sunken);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -3901,12 +3956,17 @@ code {
 }
 
 .mc1-node-label {
-  font-size: 10px;
+  font-size: 12px;
   fill: var(--text-muted);
+  /* 标签压在连线之上，加一圈底色描边保证可读 */
+  paint-order: stroke;
+  stroke: var(--bg-sunken);
+  stroke-width: 3px;
+  stroke-linejoin: round;
 }
 
 .mc1-node-count {
-  font-size: 10px;
+  font-size: 12.5px;
   font-weight: 650;
   fill: var(--text);
 }
@@ -3989,29 +4049,40 @@ code {
   background: var(--text-faint);
 }
 
-.mc1-net-notes summary,
-.mc1-flow-audit summary {
+.mc1-net-notes summary {
   font-size: 11px;
   color: var(--text-muted);
   cursor: pointer;
 }
 
-.mc1-flow-audit .mc1-audit {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding-top: 4px;
-}
-
+/* 中等宽度以下改单列；阅读面板改为底部浮层，关闭按钮始终在视口内 */
 @media (max-width: 1180px) {
-  .mc1-columns.is-side-by-side {
+  .mc1-layout {
     flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mc1-aside {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .mc1-reader {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    z-index: 70;
+    width: auto;
+    max-height: 70vh;
+    overflow: auto;
   }
 }
 
 @media (max-width: 900px) {
   .mc1-body {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .mc1-filters {
@@ -4022,24 +4093,18 @@ code {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   }
 
-  .mc1-msg-head {
-    grid-template-columns: 1fr auto;
-    gap: 2px 8px;
+  .mc1-tools-menu {
+    right: auto;
+    left: 0;
   }
 
-  .mc1-msg-time,
-  .mc1-msg-actor,
-  .mc1-msg-channel {
-    grid-column: 1;
-  }
-
-  .mc1-msg-preview {
-    grid-column: 1 / -1;
-  }
-
-  .mc1-msg-badges {
-    grid-column: 2;
-    grid-row: 1;
+  .mc1-reader {
+    top: auto;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: auto;
+    max-height: 72vh;
   }
 
   .mc1-msg-deliberation > div,

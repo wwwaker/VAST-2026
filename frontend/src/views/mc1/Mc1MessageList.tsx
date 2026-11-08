@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useWorkspace } from "../../state/workspace";
 import { fetchEvent, formatUtc, type EventDetail, type EventItem } from "../../data/api";
+import { Mc1EventDetail } from "./Mc1EventDetail";
 
 /**
- * 参考项目 messagePanels 的本地化版本：列表只给摘要，正文/内部审议/原始字段按需展开。
- * 数据来自 /api/events（列表）与 /api/events/{id}（详情），点击不改变全局筛选。
+ * 消息集合：列表只给摘要，展开后交给统一的 Mc1EventDetail 读正文/审议/原始字段。
+ * 数据来自 /api/events（列表）与 /api/events/{id}（详情），展开不改变全局筛选。
  */
 export function Mc1MessageList({
   items,
@@ -13,6 +14,7 @@ export function Mc1MessageList({
   emptyText,
   total,
   scopeNote,
+  coverage,
 }: {
   items: EventItem[];
   loading: boolean;
@@ -20,8 +22,9 @@ export function Mc1MessageList({
   emptyText: string;
   total?: number | null;
   scopeNote?: string;
+  coverage?: { withCount: number; total: number } | null;
 }) {
-  const { dataset, selectEvent, setEvidenceOpen, setEvidenceTab } = useWorkspace();
+  const { dataset, selectEvent } = useWorkspace();
   const [openId, setOpenId] = useState<string | null>(null);
   const [details, setDetails] = useState<Record<string, EventDetail>>({});
   const [detailLoading, setDetailLoading] = useState<string | null>(null);
@@ -99,101 +102,7 @@ export function Mc1MessageList({
                         <p className="muted small">{detailError.message}</p>
                       </div>
                     )}
-                    {detail && (
-                      <>
-                        <section className="mc1-msg-channel-block">
-                          <h4>外发内容</h4>
-                          <p className="mc1-msg-text">
-                            {detail.outgoing_text ?? "该事件没有可读的外发正文（可能是动作或状态记录）。"}
-                          </p>
-                        </section>
-                        <section className="mc1-msg-channel-block">
-                          <h4>
-                            内部审议
-                            {detail.deliberation ? (
-                              <span className="tag tag-delib">已记录</span>
-                            ) : (
-                              <span className="tag">无记录</span>
-                            )}
-                          </h4>
-                          {detail.deliberation ? (
-                            <dl className="mc1-msg-deliberation">
-                              {Object.entries(detail.deliberation).map(([key, value]) => (
-                                <div key={key}>
-                                  <dt className="mono">{key}</dt>
-                                  <dd>{value}</dd>
-                                </div>
-                              ))}
-                            </dl>
-                          ) : (
-                            <p className="muted small">
-                              源记录没有 internal_state 字段，不能据正文推测内部审议。
-                            </p>
-                          )}
-                        </section>
-                        <section className="mc1-msg-channel-block">
-                          <h4>原始字段</h4>
-                          <dl className="mc1-msg-raw">
-                            <div>
-                              <dt>event_id</dt>
-                              <dd className="mono">{detail.event_id}</dd>
-                            </div>
-                            <div>
-                              <dt>source_record_id</dt>
-                              <dd className="mono">{detail.source_record_id ?? "—"}</dd>
-                            </div>
-                            <div>
-                              <dt>源时间</dt>
-                              <dd className="mono">
-                                {detail.timestamp_raw}（{detail.timezone_status === "unknown" ? "源时区未知" : detail.timezone_status}）
-                              </dd>
-                            </div>
-                            <div>
-                              <dt>类型 / 渠道</dt>
-                              <dd className="mono">
-                                {detail.event_type} · {detail.channel_id ?? "—"}
-                              </dd>
-                            </div>
-                            <div>
-                              <dt>来源定位</dt>
-                              <dd className="mono">
-                                {detail.source_file ?? "—"}
-                                {detail.source_json_pointer ? ` · ${detail.source_json_pointer}` : ""}
-                              </dd>
-                            </div>
-                            {detail.parent_event_id && (
-                              <div>
-                                <dt>父事件</dt>
-                                <dd className="mono">{detail.parent_event_id}</dd>
-                              </div>
-                            )}
-                          </dl>
-                        </section>
-                        <div className="mc1-msg-actions">
-                          <button
-                            type="button"
-                            className="btn btn-quiet"
-                            onClick={() => {
-                              selectEvent(detail.event_id, detail.time_us);
-                              setEvidenceTab("message");
-                              setEvidenceOpen(true);
-                            }}
-                          >
-                            在证据面板查看
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-quiet"
-                            onClick={() => {
-                              selectEvent(detail.event_id, detail.time_us);
-                              setEvidenceTab("basket");
-                            }}
-                          >
-                            去证据篮标注支持/反证
-                          </button>
-                        </div>
-                      </>
-                    )}
+                    {detail && <Mc1EventDetail detail={detail} coverage={coverage} />}
                   </div>
                 )}
               </li>

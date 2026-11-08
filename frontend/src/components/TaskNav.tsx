@@ -15,7 +15,7 @@ const MODE_LABELS: Record<Mode, string> = {
   window: "时间窗", history: "历史", transitions: "转移", runPair: "运行对照", claims: "结论", notes: "笔记",
 };
 
-export function TaskNav({ onParallel, compact = false }: { onParallel: () => void; compact?: boolean }) {
+export function TaskNav({ onParallel }: { onParallel: () => void }) {
   const { dataset, state, changeTask } = useWorkspace();
   const modes = CAPABILITIES[dataset][state.task];
 
@@ -35,13 +35,8 @@ export function TaskNav({ onParallel, compact = false }: { onParallel: () => voi
             {task.label}
           </button>
         ))}
-        {compact && (
-          <button type="button" className="btn btn-quiet parallel-toggle" onClick={onParallel} title="同时打开证据详述和事件辅助区">
-            并列核对
-          </button>
-        )}
       </div>
-      {!compact && (
+      {(
         <div className="task-nav-secondary" role="tablist" aria-label={`${state.task} 模式`}>
           <span className="task-nav-label">{TASKS.find((task) => task.id === state.task)?.label}</span>
           {modes.map((mode) => (

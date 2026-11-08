@@ -18,6 +18,8 @@ page.on("request", (r) => requests.push(r.url()));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const check = (label, fn) => { fn(); checks.push(label); console.log(`PASS ${label}`); };
 async function task(label) {
+  // MC1 已退出四任务导航；其余数据集仍按任务/模式进入
+  if (!(await page.$(".task-nav"))) return;
   await clickText(".task-tab", label);
 }
 async function mode(label) {
@@ -26,6 +28,22 @@ async function mode(label) {
   await clickText(".mode-tab", label);
 }
 async function ensureEventStream() {
+  if (await page.$(".mc1-page")) {
+    // MC1 的通用事件查询收在页面「工具」菜单里
+    if (await page.$(".mc1-card .stream-row")) return;
+    await page.evaluate(() => {
+      const tools = document.querySelector(".mc1-tools");
+      if (tools instanceof HTMLDetailsElement) tools.open = true;
+    });
+    await page.evaluate(() => {
+      const btn = [...document.querySelectorAll(".mc1-tools-menu button")].find(
+        (n) => n.textContent?.trim() === "事件查询",
+      );
+      btn?.click();
+    });
+    await page.waitForSelector(".mc1-card .stream-row");
+    return;
+  }
   if (!(await page.$(".event-dock"))) {
     await clickText(".topbar-docks button", "事件流");
   }
@@ -173,6 +191,136 @@ try {
   await page.waitForSelector(".mc1-page");
   check("MC1 save/read/restore returns current activity container", () => {});
   await page.screenshot({ path: path.join(out, "mc1-activity.png") });
+
+  // 旧 task/mode 恢复映射：对照 → 页面内对照工具；结论/笔记 → 证据面板笔记
+  const postMc1Case = async (snapshot, title) => {
+    const res = await fetch(`${base}/api/cases`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataset_id: "MC1", title, snapshot }),
+    });
+    assert.equal(res.status, 201);
+    const item = await res.json();
+    created.push(item.case_id);
+    return item;
+  };
+  const withTaskMode = (task, mode, patch = {}) => {
+    const snapshot = structuredClone(mc1.snapshot);
+    snapshot.task = task;
+    snapshot.mode = mode;
+    snapshot.task_modes[task] = mode;
+    Object.assign(snapshot, patch);
+    return snapshot;
+  };
+  const compareCase = await postMc1Case(
+    withTaskMode("compare", "window", {
+      comparison: { kind: "window", dimension: "event_type", currentUs: null, baselineMode: "auto", baselineUs: null },
+      return_point: null,
+    }),
+    `MC1 compare ${Date.now()}`,
+  );
+  await page.reload({ waitUntil: "networkidle0" });
+  await page.select(".dataset-field select", "MC1");
+  await page.waitForSelector(".mc1-page");
+  await restoreFromBasket(compareCase.case_id);
+  await page.waitForSelector('.mc1-card[aria-label="时间窗对照"]', { timeout: 15000 });
+  check("MC1 对照快照恢复到页面内对照工具", () => {});
+  await page.screenshot({ path: path.join(out, "mc1-restore-compare.png") });
+  await clickText('.mc1-card[aria-label="时间窗对照"] .btn-quiet', "返回 MC1");
+  await page.waitForSelector(".mc1-heat-cell");
+  const compareClosed = await page.evaluate(
+    () => !document.querySelector('.mc1-card[aria-label="时间窗对照"]'),
+  );
+  check("返回 MC1 后退出对照工具", () => assert.equal(compareClosed, true));
+
+  const notesCase = await postMc1Case(
+    withTaskMode("findings", "notes", { comparison: null, return_point: null }),
+    `MC1 notes ${Date.now()}`,
+  );
+  await page.reload({ waitUntil: "networkidle0" });
+  await page.select(".dataset-field select", "MC1");
+  await page.waitForSelector(".mc1-page");
+  await restoreFromBasket(notesCase.case_id);
+  await page.waitForSelector(".drawer .notes", { timeout: 15000 });
+  check("MC1 结论/笔记快照恢复到证据面板笔记页", () => {});
+  await page.screenshot({ path: path.join(out, "mc1-restore-notes.png") });
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll(".drawer .drawer-head .btn")].find(
+      (n) => n.textContent?.trim() === "关闭",
+    );
+    btn?.click();
+  });
+  await sleep(400);
+
+  // C2：同一笔记案例重复恢复也必须重新打开笔记面板（只改 task/mode 不足）
+  await restoreFromBasket(notesCase.case_id);
+  await page.waitForSelector(".drawer .notes", { timeout: 15000 });
+  const repeatedNotes = await page.evaluate(() => ({
+    drawer: !!document.querySelector(".drawer"),
+    notes: !!document.querySelector(".drawer .notes"),
+    activeTab: document.querySelector(".tabs .tab-active")?.textContent?.trim() ?? null,
+  }));
+  check("同一笔记案例重复恢复仍打开笔记", () => assert.equal(repeatedNotes.notes, true));
+  await page.screenshot({ path: path.join(out, "mc1-restore-notes-repeated.png") });
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll(".drawer .drawer-head .btn")].find(
+      (n) => n.textContent?.trim() === "关闭",
+    );
+    btn?.click();
+  });
+  await sleep(400);
+
+  // C2：有效事件恢复到唯一阅读面板；隐藏的事件轨应自动展开
+  const decisionTarget = "MC1:event:20460605_21_026";
+  const decisionCase = await postMc1Case(
+    withTaskMode("trace", "decision", {
+      selection: { kind: "event", id: decisionTarget, timeUs: null },
+      comparison: null,
+      return_point: null,
+    }),
+    `MC1 decision ${Date.now()}`,
+  );
+  await page.reload({ waitUntil: "networkidle0" });
+  await page.select(".dataset-field select", "MC1");
+  await page.waitForSelector(".mc1-page");
+  await page.waitForSelector('.mc1-card[aria-label="事件轨"]', { timeout: 15000 });
+  await page.evaluate(() => {
+    const toggle = [...document.querySelectorAll(".mc1-toggle")].find((n) => n.textContent?.trim() === "事件轨");
+    if (toggle?.getAttribute("aria-pressed") === "true") toggle.click();
+  });
+  await sleep(500);
+  const flowHidden = await page.evaluate(() => !document.querySelector('.mc1-card[aria-label="事件轨"]'));
+  assert.equal(flowHidden, true, "事件轨应已隐藏");
+  await restoreFromBasket(decisionCase.case_id);
+  await page.waitForSelector('.mc1-card[aria-label="事件轨"]', { timeout: 15000 });
+  await page.waitForSelector('[data-testid="mc1-event-detail"]', { timeout: 15000 });
+  await sleep(400);
+  const decisionRestore = await page.evaluate(() => ({
+    readers: document.querySelectorAll(".mc1-reader").length,
+    text: document.querySelector('[data-testid="mc1-event-detail"]')?.textContent ?? "",
+    flow: !!document.querySelector('.mc1-card[aria-label="事件轨"]'),
+    drawer: !!document.querySelector(".drawer"),
+  }));
+  check("MC1 有效事件恢复到阅读面板", () =>
+    assert.ok(decisionRestore.readers === 1 && decisionRestore.text.includes("MC1:event:20460605_21_026"), JSON.stringify(decisionRestore)),
+  );
+  check("恢复时自动展开已隐藏的事件轨", () => assert.equal(decisionRestore.flow, true));
+  await page.screenshot({ path: path.join(out, "mc1-restore-selection.png") });
+
+  const decisionSaved = await save(`MC1 decision resaved ${Date.now()}`);
+  check("恢复的选中事件再次保存仍为同一事件", () => {
+    assert.equal(decisionSaved.snapshot.selection.kind, "event");
+    assert.equal(decisionSaved.snapshot.selection.id, decisionTarget);
+    assert.equal(decisionSaved.snapshot.mode, "decision");
+    assert.equal(decisionSaved.snapshot.task, "trace");
+  });
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll(".drawer .drawer-head .btn")].find(
+      (n) => n.textContent?.trim() === "关闭",
+    );
+    btn?.click();
+  });
+  await sleep(300);
 
   // Use API-created missing reference fixture; still restores through the actual UI entry.
   const missingSnapshot = structuredClone(mc1.snapshot);

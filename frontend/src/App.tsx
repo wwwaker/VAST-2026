@@ -70,6 +70,10 @@ function ViewTabs() {
 }
 
 function renderTaskContent(dataset: DatasetId, state: ReturnType<typeof useWorkspace>["state"]) {
+  // MC1 使用参考风格单页：热力图 / 事件轨 / 回复网络在同一页内显隐，详情在同一阅读面板。
+  // 旧 task/mode 不再是导航；恢复快照时由页面按 task/mode 映射到工具或区域。
+  if (dataset === "MC1") return <Mc1ReferencePage />;
+
   if (state.task === "findings") return <FindingsWorkspace />;
 
   if (state.task === "compare") {
@@ -77,12 +81,6 @@ function renderTaskContent(dataset: DatasetId, state: ReturnType<typeof useWorks
     if (dataset === "MC2" && (state.mode === "history" || state.mode === "transitions")) return <SourceTrace />;
     if (dataset === "CUSTOM" && state.mode === "runPair") return <CustomWorkspace />;
     return <CompareView />;
-  }
-
-  // MC1 使用参考风格单页：热力图 / 事件轨 / 回复网络在同一页内显隐与并排，
-  // 不再按 task/mode 切成多套画布。比较与结论仍复用既有视图。
-  if (dataset === "MC1") {
-    return <Mc1ReferencePage />;
   }
 
   if (state.task === "trace") {
@@ -101,7 +99,8 @@ function renderTaskContent(dataset: DatasetId, state: ReturnType<typeof useWorks
 }
 
 function Workspace() {
-  const [showBench, setShowBench] = useState(false);
+  // 渲染基准移出常规产品界面；仍可用 ?bench=1 直接进入，供开发与测试访问。
+  const [showBench, setShowBench] = useState(() => new URLSearchParams(window.location.search).get("bench") === "1");
   const [showHelp, setShowHelp] = useState(false);
   const [eventOpen, setEventOpen] = useState(false);
   const [evidenceSize, setEvidenceSize] = useState(392);
@@ -120,7 +119,9 @@ function Workspace() {
     filterSummary,
     dispatch,
   } = useWorkspace();
-  const layoutPrefix = `mas-workspace.${dataset}.${state.task}`;
+  // MC1 的任务/模式不再是导航，布局偏好按数据集记忆；
+  // 否则恢复快照换了 task 会重新套用旧的侧栏开合状态，把刚恢复的证据面板关掉。
+  const layoutPrefix = dataset === "MC1" ? `mas-workspace.${dataset}` : `mas-workspace.${dataset}.${state.task}`;
   const layoutKey = `${layoutPrefix}.layout`;
 
   useEffect(() => {
@@ -195,10 +196,12 @@ function Workspace() {
         eventOpen={eventOpen}
         onToggleEvent={() => { const next = !eventOpen; setEventOpen(next); if (next && window.innerWidth < 900) setEvidenceOpen(false); persist({ eventOpen: next, ...(next && window.innerWidth < 900 ? { evidenceOpen: false } : {}) }); }}
       />
-      <div className="workspace-heading">
-        <TaskNav onParallel={parallel} compact={dataset === "MC1"} />
-        <span className="workspace-status" aria-live="polite">{taskModeLabel(dataset, state.task, state.mode)}</span>
-      </div>
+      {dataset !== "MC1" && (
+        <div className="workspace-heading">
+          <TaskNav onParallel={parallel} />
+          <span className="workspace-status" aria-live="polite">{taskModeLabel(dataset, state.task, state.mode)}</span>
+        </div>
+      )}
       <div className="workbench" style={{ "--event-size": `${eventSize}px`, "--evidence-size": `${evidenceSize}px` } as CSSProperties}>
         <div className={`body${eventOpen ? " body-event-open" : ""}${evidenceOpen ? " body-evidence-open" : ""}`}>
           <main className="canvas-area">
@@ -218,13 +221,13 @@ function Workspace() {
             <div className="dock-resizer dock-resizer-left" role="separator" tabIndex={0} aria-valuemin={280} aria-valuemax={560} aria-valuenow={evidenceSize} aria-orientation="vertical" aria-label="调整证据面板宽度" onPointerDown={(e) => resizePanel("evidence", e)} onKeyDown={(e) => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); const next = Math.max(280, Math.min(560, evidenceSize + (e.key === "ArrowLeft" ? 16 : -16))); setEvidenceSize(next); persist({ evidenceSize: next }); } }} />
             <EvidenceDrawer />
           </div>}
-          {eventOpen && <aside className="event-dock event-dock-bottom">
+          {dataset !== "MC1" && eventOpen && <aside className="event-dock event-dock-bottom">
             <div className="dock-resizer dock-resizer-top" role="separator" tabIndex={0} aria-valuemin={240} aria-valuemax={520} aria-valuenow={eventSize} aria-orientation="horizontal" aria-label="调整事件面板高度" onPointerDown={(e) => resizePanel("event", e)} onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); const next = Math.max(240, Math.min(520, eventSize + (e.key === "ArrowUp" ? 16 : -16))); setEventSize(next); persist({ eventSize: next }); } }} />
             <EventPanel onClose={() => { setEventOpen(false); persist({ eventOpen: false }); }} />
           </aside>}
         </div>
       </div>
-      <div className="controlbar"><TimeBrush /><StatusBar /></div>
+      <div className="controlbar"><TimeBrush compact={dataset === "MC1"} />{dataset !== "MC1" && <StatusBar />}</div>
       {showHelp && <ShortcutsHelp onClose={() => setShowHelp(false)} />}
     </div>
   );
