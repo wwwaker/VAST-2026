@@ -10,7 +10,10 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const URL = process.argv[2] ?? "http://127.0.0.1:8021";
-const OUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "build", "reference-ui", "MC1-cleanup");
+// 结果目录：默认沿用历史位置；UI_CHECK_OUT 可指向当前阶段目录，避免下一阶段覆盖历史证据。
+const OUT = process.env.UI_CHECK_OUT
+  ? path.resolve(process.env.UI_CHECK_OUT)
+  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "build", "reference-ui", "MC1-cleanup");
 const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 fs.mkdirSync(OUT, { recursive: true });
 

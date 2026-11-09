@@ -42,7 +42,12 @@ function buildMatrix(series: OverviewSeries | undefined): Matrix | null {
   return { byCategory, totals, max };
 }
 
-export function OverviewView() {
+/**
+ * 活动分布概览。MC2 单页（F2）以 `compact` 复用同一份 overview 聚合：
+ * 只保留粒度、悬停读数、图形、类别图例与锚点，标题/干预说明由页面卡片承担，
+ * 不再新建第二套活动聚合服务。
+ */
+export function OverviewView({ compact = false }: { compact?: boolean } = {}) {
   const {
     dataset,
     filters,
@@ -385,20 +390,22 @@ export function OverviewView() {
   return (
     <div className="overview">
       <div className="overview-head">
-        <div>
-          <h2>系统活动概览</h2>
-          <p className="muted">
-            匹配 {overview.filtered.matched_events.toLocaleString()} 条
-            {active && ` · 全局背景 ${overview.global_context.matched_events.toLocaleString()} 条`}
-            {" · "}源时区 {overview.timezone_status === "unknown" ? "未知" : "UTC"}
-            {loading && " · 更新中…"}
-          </p>
-          <p className="muted small">
-            横轴按真实时间线性映射；没有记录的时段保留空白，不当作零活动。
-            {overview.filtered.coverage.coverage_status === "partial" &&
-              " 当前窗口只有部分落在数据范围内。"}
-          </p>
-        </div>
+        {!compact && (
+          <div>
+            <h2>系统活动概览</h2>
+            <p className="muted">
+              匹配 {overview.filtered.matched_events.toLocaleString()} 条
+              {active && ` · 全局背景 ${overview.global_context.matched_events.toLocaleString()} 条`}
+              {" · "}源时区 {overview.timezone_status === "unknown" ? "未知" : "UTC"}
+              {loading && " · 更新中…"}
+            </p>
+            <p className="muted small">
+              横轴按真实时间线性映射；没有记录的时段保留空白，不当作零活动。
+              {overview.filtered.coverage.coverage_status === "partial" &&
+                " 当前窗口只有部分落在数据范围内。"}
+            </p>
+          </div>
+        )}
         <div className="overview-tools">
           <div className="seg">
             {(["day", "hour"] as const).map((g) => (
@@ -428,6 +435,16 @@ export function OverviewView() {
           </div>
         </div>
       </div>
+
+      {compact && (
+        <p className="muted small overview-compact-summary">
+          匹配 {overview.filtered.matched_events.toLocaleString()} 条
+          {active && ` · 全局背景 ${overview.global_context.matched_events.toLocaleString()} 条`}
+          {" · "}源时区 {overview.timezone_status === "unknown" ? "未知" : "UTC"}
+          {loading && " · 更新中…"}
+          {overview.filtered.coverage.coverage_status === "partial" && " · 当前窗口只有部分落在数据范围内"}
+        </p>
+      )}
 
       <div className="chart-wrap" ref={setWrap}>
         <canvas
@@ -493,7 +510,8 @@ export function OverviewView() {
         </div>
       )}
 
-      {info?.intervention && (
+      {/* 干预论证在 MC2 单页有独立卡片，概览里不再重复同一段说明 */}
+      {!compact && info?.intervention && (
         <div className="callout intervention">
           <strong>候选干预点（待证据核验）</strong>
           <p>{info.intervention}</p>

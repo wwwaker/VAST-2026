@@ -12,10 +12,20 @@ let count = 0;
 const test = (name, fn) => { fn(); count++; console.log(`PASS ${name}`); };
 const reduce = m.workspaceReducer;
 let state = m.initialWorkspace("MC2");
-test("MC2 defaults to system overview", () => {
+// F2：MC2 已统一为单页（来源链 + 活动 + 系统背景），默认视角不再是旧的“系统背景”模式。
+test("MC2 defaults to the unified page in time mode", () => {
   assert.equal(state.task, "overview");
-  assert.equal(state.mode, "system");
-  assert.equal(state.taskModes.overview, "system");
+  assert.equal(state.mode, "time");
+  assert.equal(state.taskModes.overview, "time");
+});
+test("MC2 default root action sets the chain root without pushing return history", () => {
+  const next = reduce(m.initialWorkspace("MC2"), { type: "traceRoot", rootEventId: "MC2:event:373902" });
+  assert.equal(next.traceObject.rootEventId, "MC2:event:373902");
+  assert.equal(next.task, "overview"); assert.equal(next.mode, "time"); assert.equal(next.returnStack.length, 0);
+  const file = reduce(next, { type: "traceFile", fileId: "MC2:file_path:SwiftWren.txt" });
+  assert.equal(file.traceObject.fileId, "MC2:file_path:SwiftWren.txt");
+  assert.deepEqual(file.selection, { kind: "file", id: "MC2:file_path:SwiftWren.txt" });
+  assert.equal(file.returnStack.length, 0);
 });
 state = reduce(state, { type: "openTrace", rootEventId: "MC2:event:373902", fileId: "MC2:missing-file" });
 state = reduce(state, { type: "inspect", selection: { kind: "event", id: "MC2:event:21202", timeUs: 0 } });
@@ -118,12 +128,25 @@ test("resolved automatic pair and window enter snapshot; late responses do not o
   assert.deepEqual(m.serializeSnapshot(s).comparison.baselineUs, [0, 10]);
   assert.equal(reduce(s, { type: "resolvedWindow", currentUs: [20, 30], baselineUs: [10, 20] }), s);
 });
+// F2：MC2 单页的来源链/活动/文件轨迹/转移都按游标遮蔽，回放不再由旧 mode 决定整页暂停；
+// 仍不可回放的固定对照（CUSTOM runPair）保持暂停语义与游标。
 test("unsupported playback views pause, preserve cursor and never resume on return", () => {
-  let s = reduce(m.initialWorkspace("MC2"), { type: "replay", cursorUs: 9, playing: true });
-  s = reduce(s, { type: "task", task: "overview", mode: "system" });
+  let s = reduce(m.initialWorkspace("CUSTOM"), { type: "task", task: "compare", mode: "runPair" });
+  s = reduce(s, { type: "replay", cursorUs: 9, playing: true });
   assert.equal(s.playing, false); assert.equal(s.replay.cursorUs, 9);
   s = reduce(s, { type: "togglePlaying" }); assert.equal(s.playing, false);
   s = reduce(s, { type: "canvas", view: "timeline" }); assert.equal(s.playing, false);
+});
+test("MC2 unified page keeps playback while the cursor still drives its figures", () => {
+  let s = reduce(m.initialWorkspace("MC2"), { type: "task", task: "overview", mode: "system" });
+  s = reduce(s, { type: "replay", cursorUs: 9, playing: true });
+  assert.equal(s.playing, true); assert.equal(s.replay.cursorUs, 9);
+  s = reduce(s, { type: "togglePlaying" }); assert.equal(s.playing, false);
+  s = reduce(s, { type: "togglePlaying" }); assert.equal(s.playing, true);
+  s = reduce(s, { type: "traceRoot", rootEventId: "MC2:event:373902" });
+  s = reduce(s, { type: "canvas", view: "timeline" });
+  assert.equal(s.playing, false);
+  assert.equal(s.traceObject.rootEventId, "MC2:event:373902");
 });
 test("functional cursor updates compose atomically without entering return history", () => {
   let s = reduce(m.initialWorkspace("MC1"), { type: "cursor", value: 0 });

@@ -37,7 +37,12 @@ function widthOf(count: number): number {
 }
 
 /** 类型级系统背景：不画 15,538 个实体，展开后才给真实 ID。 */
-export function SystemMap() {
+export function SystemMap({
+  onPickMember,
+}: {
+  /** 提供时把成员点击交给所在页面（MC2 单页用阅读面板看该实体的事件），否则沿用聚焦实体图。 */
+  onPickMember?: (entityId: string, label: string) => void;
+} = {}) {
   const { focusEntity, traceRootId, selectedEventId, openTrace } = useWorkspace();
   const { colors } = useTheme();
   const [payload, setPayload] = useState<SystemOverviewPayload | null>(null);
@@ -253,7 +258,11 @@ export function SystemMap() {
                       <button
                         type="button"
                         className="trace-item"
-                        onClick={() => focusEntity(member.entity_id)}
+                        onClick={() =>
+                          onPickMember
+                            ? onPickMember(member.entity_id, member.label)
+                            : focusEntity(member.entity_id)
+                        }
                         title={member.entity_id}
                       >
                         <span className="mono small">{member.label}</span>

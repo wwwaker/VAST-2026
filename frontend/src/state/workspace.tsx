@@ -28,6 +28,12 @@ interface WorkspaceValue {
   restoreSeq: number;
   /** 最近一次恢复中被判定缺失的引用；缺失对象保留但不再打开阅读面板。 */
   restoreMissing: string[];
+  /**
+   * 最近一次成功恢复落在哪个数据集；切换数据集会清空。
+   * 页面用它区分"当前这份调查来自快照"与"本次会话曾经恢复过"，避免恢复过的会话
+   * 永久跳过新调查的默认初始化（如 MC2 的目标帖链根）。
+   */
+  restoreDataset: DatasetId | null;
   dataset: DatasetId; setDataset: (id: DatasetId) => void;
   filters: Filters; setFilters: (patch: Partial<Filters>) => void; clearFilters: () => void; filterSummary: string;
   selectedEventId: string | null; selectedEventAt: number | null;
@@ -64,6 +70,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [evidenceTab, setEvidenceTab] = useState<EvidenceTab>("message");
   const [activeCaseState, setActiveCaseState] = useState<(ActiveCase & { dataset: DatasetId }) | null>(null);
+  const [restoreDataset, setRestoreDataset] = useState<DatasetId | null>(null);
   const [findingDrafts, setFindingDrafts] = useState<Record<string, FindingDraft>>({});
   const [noteDrafts, setNoteDrafts] = useState<Partial<Record<DatasetId, string>>>({});
   const [notesState, setNotes] = useState<{ dataset: DatasetId; items: NoteItem[] }>({ dataset: state.dataset, items: [] });
@@ -93,6 +100,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (id === stateRef.current.dataset) return;
     dispatch({ type: "dataset", dataset: id });
     setActiveCaseState(null); setEvidenceOpen(false);
+    // 新数据集是全新调查：恢复意图随旧调查结束
+    setRestoreDataset(null);
   }, []);
   const selectEvent = useCallback((id: string | null, atUs?: number | null) => {
     dispatch({ type: "inspect", selection: id ? { kind: "event", id, timeUs: atUs ?? null } : null });
@@ -120,13 +129,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       dispatch(restoreAction(plan));
       setActiveCaseState(null); setEvidenceOpen(false);
       setRestoreMissing(options.missingReferences ?? []);
+      setRestoreDataset(stateRef.current.dataset);
       setRestoreSeq((count) => count + 1);
     }
     return plan;
   }, []);
   const value: WorkspaceValue = {
     state, dispatch, dataset, setDataset, filters, filterSummary,
-    changeTask: (task, mode) => dispatch({ type: "task", task, mode }), snapshot, restoreSnapshot, restoreSeq, restoreMissing,
+    changeTask: (task, mode) => dispatch({ type: "task", task, mode }), snapshot, restoreSnapshot, restoreSeq, restoreMissing, restoreDataset,
     setFilters: (patch) => dispatch({ type: "filters", patch }), clearFilters: () => dispatch({ type: "clearFilters" }),
     selectedEventId: state.selection?.kind === "event" ? state.selection.id : null,
     selectedEventAt: state.selection?.kind === "event" ? state.selection.timeUs : null, selectEvent,

@@ -71,21 +71,42 @@ const ensureEventDock = () => ensureDock(".event-dock", "事件流");
 const ensureEvidenceDock = () => ensureDock(".evidence-dock", "证据");
 
 /**
- * 旧脚本的既有断言基于 MC2 时间视图。MC1 现在默认是参考风格单页（无 canvas 概览、
- * 无兼容 view-tab），所以每次重载后先回到 MC2 时间视图；MC1 相关路径改在
- * check_reference_ui.mjs 与 check_s0_ui.mjs 覆盖。
+ * F2 起 MC2 与 MC1 一致，默认就是单页（无四任务/模式/视图标签），因此这里只负责
+ * 重载并停在 MC2 单页。通用事件查询改由页面“工具 → 事件查询”打开，
+ * 旧事件流侧栏与状态栏断言已随模板替换（见 交接/F2-交接报告.md）。
  */
 async function open(theme = "light") {
   await page.goto(`${URL}/?theme=${theme}`, { waitUntil: "networkidle0" });
   await page.waitForSelector(".topbar", { timeout: 20000 });
-  if (await page.$(".mc1-page")) {
+  if (!(await page.$('[data-testid="mc2-page"]'))) {
     await page.select(".dataset-field select", "MC2");
-    await wait(600);
   }
+  await page.waitForSelector('[data-testid="mc2-page"]', { timeout: 20000 });
+  await wait(600);
+}
+
+/** 打开页面“工具”菜单里的某一项（事件查询 / 历史实例 / 干预论证 / 转移矩阵 / 时间窗对照…）。 */
+async function openTool(label) {
   await page.evaluate(() => {
-    const tab = [...document.querySelectorAll(".mode-tab")].find((n) => n.textContent?.trim() === "时间");
-    tab?.click();
+    const tools = document.querySelector(".mc2-tools");
+    if (tools instanceof HTMLDetailsElement) tools.open = true;
   });
+  const clicked = await page.evaluate((text) => {
+    const btn = [...document.querySelectorAll(".mc2-tools-menu button")].find(
+      (n) => n.textContent?.trim() === text,
+    );
+    btn?.click();
+    return !!btn;
+  }, label);
+  if (!clicked) throw new Error(`工具菜单缺少「${label}」`);
+  await wait(500);
+}
+
+/** 通用事件查询卡：F2 用它替代旧事件流侧栏，保留“选中事件→证据/笔记”的路径。 */
+async function openEventQuery() {
+  if (await page.$('[aria-label="事件查询"] .stream-row')) return;
+  await openTool("事件查询");
+  await page.waitForSelector('[aria-label="事件查询"] .stream-row', { timeout: 20000 });
   await wait(400);
 }
 
@@ -108,21 +129,35 @@ async function measureLayout(tag) {
   return info;
 }
 
-console.log("== 概览 ==");
+console.log("== 单页首屏 ==");
 await open("light");
 await page.waitForSelector(".chart-wrap canvas", { timeout: 20000 });
-// 新入口不再默认展开事件流侧栏：按真实用户动作打开，而不是假设初始状态
-if (!(await page.$(".event-dock"))) {
-  await page.evaluate(() => {
-    const btn = [...document.querySelectorAll(".topbar-docks button")].find((n) =>
-      n.textContent?.trim().includes("事件流"),
-    );
-    btn?.click();
-  });
-  await wait(500);
-}
-await page.waitForSelector(".stream-row", { timeout: 20000 });
+await page.waitForSelector(".trace-lanes", { timeout: 20000 });
 await wait(600);
+const firstScreen = await page.evaluate(() => ({
+  taskTabs: document.querySelectorAll(".task-tab").length,
+  modeTabs: document.querySelectorAll(".mode-tab").length,
+  viewTabs: document.querySelectorAll(".view-tab").length,
+  eventDock: !!document.querySelector(".event-dock"),
+  statusbar: !!document.querySelector(".statusbar"),
+  chainRoot: document.querySelector(".mc2-root-event")?.textContent?.trim() ?? "",
+  canvas: !!document.querySelector(".chart-wrap canvas"),
+  systemNodes: document.querySelectorAll(".system-node").length,
+  context: [...document.querySelectorAll(".mc2-context > *")].map((n) => n.textContent?.replace(/\s+/g, " ").trim()),
+}));
+if (firstScreen.taskTabs || firstScreen.modeTabs || firstScreen.viewTabs) {
+  throw new Error(`MC2 不应再有四任务/模式/视图重复导航：${JSON.stringify(firstScreen)}`);
+}
+if (!firstScreen.canvas || firstScreen.systemNodes < 8) {
+  throw new Error(`首屏缺少真实活动图或系统背景：${JSON.stringify(firstScreen)}`);
+}
+if (!/MC2:event:\d+/.test(firstScreen.chainRoot)) {
+  throw new Error(`首屏来源链没有默认目标帖链根：${firstScreen.chainRoot}`);
+}
+console.log("[单页首屏]", JSON.stringify(firstScreen));
+// 事件查询卡替代旧事件流侧栏
+await openEventQuery();
+await wait(400);
 await measureLayout("light");
 await page.screenshot({ path: path.join(OUT, "ui-light.png") });
 
@@ -133,18 +168,12 @@ const dockState = () =>
   page.evaluate(() => ({
     event: !!document.querySelector(".event-dock"),
     evidence: !!document.querySelector(".evidence-dock"),
-    eventPressed: document
-      .querySelectorAll(".topbar-docks button")[1]
-      ?.getAttribute("aria-pressed"),
+    reader: !!document.querySelector(".mc2-reader"),
   }));
 
 const dockInitial = await dockState();
-if (!dockInitial.event) throw new Error("右侧事件流侧栏默认未显示");
-// 两个侧栏默认开合状态不同（事件流开、证据关），按各自初始状态验证“翻转一次再还原”
-for (const [label, key] of [
-  ["事件流", "event"],
-  ["证据", "evidence"],
-]) {
+// 单页只保留证据侧栏；事件流改为页面内查询卡，不再占停靠位
+for (const [label, key] of [["证据", "evidence"]]) {
   await page.evaluate(`(${dockButton(label)}).click()`);
   await wait(250);
   const toggled = await dockState();
@@ -201,28 +230,51 @@ await page.screenshot({ path: path.join(OUT, "ui-dark.png") });
 
 console.log("== 选择事件并查看证据 ==");
 await open("light");
-await ensureEventDock();
-await page.waitForSelector(".stream-row", { timeout: 20000 });
-const rows = await page.$$(".stream-row");
+await openEventQuery();
+const rows = await page.$$('[aria-label="事件查询"] .stream-row');
 await rows[0].click();
+// 点事件行打开页面唯一的阅读面板（替代旧事件流→详情抽屉）
+await page.waitForSelector('[data-testid="mc2-event-detail"] .mc2-msg-meta', { timeout: 15000 });
+const readerState = await page.evaluate(() => ({
+  id: document.querySelector('[data-testid="mc2-event-detail"] .mc2-msg-meta .mono')?.textContent?.trim(),
+  raw: document.querySelectorAll('[data-testid="mc2-event-detail"] .mc2-raw-details').length,
+  selected: document.querySelector('.stream-row.stream-row-active')?.getAttribute('data-event-id') ?? null,
+}));
+if (!readerState.id) throw new Error(`阅读面板没有事件 ID：${JSON.stringify(readerState)}`);
+if (readerState.raw < 2) throw new Error(`阅读面板缺少 raw/details 完整载荷：${JSON.stringify(readerState)}`);
+console.log("[阅读面板]", JSON.stringify(readerState));
 await ensureEvidenceDock();
 await page.waitForSelector(".drawer .evidence, .drawer .empty-state", { timeout: 10000 });
 await wait(500);
 await page.screenshot({ path: path.join(OUT, "ui-evidence.png") });
 
-console.log("== 锚点：定位到目标帖子附近 ==");
+console.log("== 锚点：定位到目标帖子 ==");
+await open("light");
+await page.waitForSelector(".trace-lanes", { timeout: 20000 });
+const beforeLocate = await page.evaluate(() => ({
+  window: document.querySelector(".mc2-window")?.textContent?.trim(),
+  root: document.querySelector(".mc2-root-event")?.textContent?.trim(),
+}));
 await page.evaluate(() => {
-  const chip = [...document.querySelectorAll(".anchor-chip")].find((c) =>
+  const chip = [...document.querySelectorAll(".mc2-anchor-chip")].find((c) =>
     c.textContent?.includes("目标帖子"),
   );
-  chip?.click();
+  const action = chip ? [...chip.querySelectorAll(".mc2-anchor-action")].find((b) => b.textContent?.trim() === "定位") : null;
+  action?.click();
 });
-await wait(800);
+await wait(1200);
 const anchorState = await page.evaluate(() => ({
-  summary: document.querySelector(".status-summary")?.textContent,
-  rows: document.querySelectorAll(".stream-row").length,
+  window: document.querySelector(".mc2-window")?.textContent?.trim(),
+  root: document.querySelector(".mc2-root-event")?.textContent?.trim(),
+  rows: document.querySelectorAll('[aria-label="事件查询"] .stream-row').length,
+  reader: !!document.querySelector(".mc2-reader"),
 }));
-console.log("[锚点后]", JSON.stringify(anchorState));
+// 定位目标帖只改链根/当前文件，不动统一时间窗（旧版“点锚点就换窗口”已弃用）
+if (anchorState.window !== beforeLocate.window) {
+  throw new Error(`定位目标帖不应改动统一时间窗：${beforeLocate.window} → ${anchorState.window}`);
+}
+if (!anchorState.root) throw new Error(`定位后缺少链根：${JSON.stringify(anchorState)}`);
+console.log("[定位后]", JSON.stringify({ beforeLocate, ...anchorState }));
 await page.screenshot({ path: path.join(OUT, "ui-anchor.png") });
 
 console.log("== 切到自建数据集 ==");
@@ -327,10 +379,8 @@ try {
   }
 }
 
-// 回到运行列表，继续测运行级筛选
+// 回到运行列表，继续测运行级筛选（CUSTOM 仍保留旧事件流侧栏与状态栏）
 await open("light");
-await ensureEventDock();
-await page.waitForSelector(".stream-row", { timeout: 20000 });
 await page.select(".topbar select", "CUSTOM");
 await page.waitForSelector(".run-row-button", { timeout: 15000 });
 await ensureEventDock();
@@ -460,18 +510,17 @@ await page.screenshot({ path: path.join(OUT, "ui-dual.png") });
 
 console.log("== 关系图 ==");
 await open("light");
-await ensureEventDock();
-await page.waitForSelector(".stream-row", { timeout: 20000 });
-const rows3 = await page.$$(".stream-row");
-await rows3[0].click();
-await wait(600);
+// F2：先由系统背景成员建立焦点，再用“工具 → 实体关系”打开局部图（旧视图标签已移除）
+await page.waitForSelector(".system-node", { timeout: 20000 });
 await page.evaluate(() => {
-  const tab = [...document.querySelectorAll(".view-tab")].find((t) =>
-    t.textContent?.includes("关系图"),
-  );
-  tab?.click();
+  const node = [...document.querySelectorAll(".system-node")].find((n) => n.textContent?.includes("Agent 执行者")) ?? document.querySelector(".system-node");
+  node?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 });
-await page.waitForSelector(".graph-node", { timeout: 15000 });
+await page.waitForSelector(".system-side .trace-item", { timeout: 15000 });
+await page.evaluate(() => document.querySelector(".system-side .trace-item")?.click());
+await page.waitForSelector('[data-testid="mc2-entity-detail"]', { timeout: 15000 });
+await openTool("实体关系");
+await page.waitForSelector(".graph-node", { timeout: 20000 });
 await wait(600);
 const graph1 = await page.evaluate(() => ({
   nodes: document.querySelectorAll(".graph-node").length,
@@ -493,11 +542,11 @@ console.log("[切换中心]", graph2);
 await page.screenshot({ path: path.join(OUT, "ui-graph2.png") });
 
 console.log("== MC2 系统背景 ==");
+// 系统背景是单页常驻卡片；若被显隐按钮关掉，先打开再滚到卡片
 await page.evaluate(() => {
-  const btn = [...document.querySelectorAll(".canvas-subbar .seg-item")].find((b) =>
-    b.textContent?.includes("系统背景"),
-  );
-  btn?.click();
+  const toggle = [...document.querySelectorAll(".mc2-toggle")].find((b) => b.textContent?.trim() === "系统背景");
+  if (toggle && toggle.getAttribute("aria-pressed") === "false") toggle.click();
+  document.querySelector('[aria-label="系统背景"]')?.scrollIntoView({ block: "start" });
 });
 await page.waitForSelector(".system-canvas", { timeout: 20000 });
 await wait(900);
@@ -529,13 +578,7 @@ await page.screenshot({ path: path.join(OUT, "ui-system-expand.png") });
 
 console.log("== MC2 来源链 ==");
 await open("light");
-await ensureEventDock();
-await page.waitForSelector(".stream-row", { timeout: 20000 });
-await page.evaluate(() => {
-  const tab = [...document.querySelectorAll(".view-tab")].find((t) => t.textContent?.includes("来源链"));
-  tab?.click();
-});
-await page.waitForSelector(".trace-view", { timeout: 15000 });
+await page.waitForSelector(".trace-lanes", { timeout: 20000 });
 await page.waitForSelector(".trace-roots .seg-item", { timeout: 15000 });
 // 用第一个日志明确记录的 content_source 事件作为链根
 await page.evaluate(() => document.querySelector(".trace-roots .seg-item")?.click());
@@ -572,13 +615,8 @@ console.log("[文件轨迹]", JSON.stringify(fileTrack));
 await page.screenshot({ path: path.join(OUT, "ui-file-track.png") });
 
 console.log("== MC2 历史实例与干预论证 ==");
-await page.evaluate(() => {
-  const btn = [...document.querySelectorAll(".canvas-subbar .seg-item")].find((b) =>
-    b.textContent?.includes("历史实例"),
-  );
-  btn?.click();
-});
-await page.waitForSelector(".pattern-table", { timeout: 15000 });
+await openTool("历史实例");
+await page.waitForSelector('[aria-label="历史实例阶段对齐"] .pattern-table', { timeout: 15000 });
 await wait(500);
 const patterns = await page.evaluate(() => ({
   columns: document.querySelectorAll(".pattern-table thead th").length,
@@ -591,13 +629,8 @@ if (patterns.missing < 2) throw new Error(`应保留缺失阶段单元格，实�
 console.log("[历史实例]", JSON.stringify(patterns));
 await page.screenshot({ path: path.join(OUT, "ui-patterns.png") });
 
-await page.evaluate(() => {
-  const btn = [...document.querySelectorAll(".canvas-subbar .seg-item")].find((b) =>
-    b.textContent?.includes("干预论证"),
-  );
-  btn?.click();
-});
-await page.waitForSelector(".intervention-view", { timeout: 15000 });
+await openTool("干预论证");
+await page.waitForSelector('[aria-label="候选干预"] .intervention-view', { timeout: 15000 });
 await wait(600);
 const intervention = await page.evaluate(() => ({
   coverage: document.querySelector(".intervention-view h3")?.textContent ?? "",
@@ -610,13 +643,8 @@ console.log("[干预论证]", JSON.stringify(intervention));
 await page.screenshot({ path: path.join(OUT, "ui-intervention.png") });
 
 console.log("== MC2 转移矩阵 ==");
-await page.evaluate(() => {
-  const btn = [...document.querySelectorAll(".canvas-subbar .seg-item")].find((b) =>
-    b.textContent?.includes("转移矩阵"),
-  );
-  btn?.click();
-});
-await page.waitForSelector(".transition-table", { timeout: 20000 });
+await openTool("转移矩阵");
+await page.waitForSelector('[aria-label="转移矩阵"] .transition-table', { timeout: 30000 });
 await wait(600);
 const matrixState = await page.evaluate(() => {
   const cells = [...document.querySelectorAll(".transition-cell")].filter(
@@ -694,17 +722,12 @@ await page.screenshot({ path: path.join(OUT, "ui-mc1.png") });
 
 console.log("== 基线比较 ==");
 await open("light");
-await page.waitForSelector(".anchor-chip", { timeout: 20000 });
-await page.evaluate(() => document.querySelector(".anchor-chip")?.click());
+// 活动分布的锚点仍写统一时间窗；对照改由“工具 → 时间窗对照”打开
+await page.waitForSelector('[aria-label="活动时间分布"] .anchor-chip', { timeout: 20000 });
+await page.evaluate(() => document.querySelector('[aria-label="活动时间分布"] .anchor-chip')?.click());
 await wait(900);
-// 通过主画布视图标签打开基线比较
-await page.evaluate(() => {
-  const tab = [...document.querySelectorAll(".view-tab")].find((c) =>
-    c.textContent?.includes("时间窗对照"),
-  );
-  tab?.click();
-});
-await page.waitForSelector(".compare-row", { timeout: 15000 });
+await openTool("时间窗对照");
+await page.waitForSelector('[aria-label="时间窗对照"] .compare-row', { timeout: 15000 });
 await wait(700);
 const cmp = await page.evaluate(() => {
   const rows = [...document.querySelectorAll(".compare-row")].slice(1);
@@ -783,10 +806,10 @@ await page.screenshot({ path: path.join(OUT, "ui-compare-return.png") });
 
 console.log("== 调查笔记 ==");
 await open("light");
-await ensureEventDock();
-await page.waitForSelector(".stream-row", { timeout: 20000 });
-const rows4 = await page.$$(".stream-row");
+await openEventQuery();
+const rows4 = await page.$$('[aria-label="事件查询"] .stream-row');
 await rows4[0].click();
+await ensureEvidenceDock();
 await wait(500);
 await page.evaluate(() => {
   const tab = [...document.querySelectorAll(".tab")].find((t) => t.textContent?.includes("笔记"));
@@ -810,11 +833,13 @@ const notesState = await page.evaluate(() => ({
 console.log("[笔记]", JSON.stringify(notesState));
 await page.screenshot({ path: path.join(OUT, "ui-notes.png") });
 
-// 刷新页面，确认笔记没有丢
+// 刷新页面，确认笔记没有丢（单页没有常驻事件流，需重新打开查询卡）
 await page.reload({ waitUntil: "networkidle0" });
-await page.waitForSelector(".stream-row", { timeout: 20000 });
-const rows5 = await page.$$(".stream-row");
+await page.waitForSelector('[data-testid="mc2-page"]', { timeout: 20000 });
+await openEventQuery();
+const rows5 = await page.$$('[aria-label="事件查询"] .stream-row');
 await rows5[0].click();
+await ensureEvidenceDock();
 await wait(500);
 await page.evaluate(() => {
   const tab = [...document.querySelectorAll(".tab")].find((t) => t.textContent?.includes("笔记"));
@@ -837,8 +862,7 @@ console.log(`[清理后] 笔记数 ${cleaned}`);
 
 console.log("== 键盘操作 ==");
 await open("light");
-await ensureEventDock();
-await page.waitForSelector(".stream-row", { timeout: 20000 });
+await openEventQuery();
 await page.evaluate(() => document.body.focus());
 await wait(400);
 
@@ -875,18 +899,23 @@ await wait(700);
 const kbdSelect = await page.evaluate(() => ({
   focused: document.activeElement?.getAttribute("data-event-id") ?? null,
   selected: document.querySelector(".stream-row-active")?.getAttribute("data-event-id") ?? null,
-  drawer: !!document.querySelector(".drawer"),
+  reader: !!document.querySelector(".mc2-reader"),
 }));
 console.log("[↓ / Enter]", JSON.stringify(kbdSelect));
 if (!kbdSelect.focused || kbdSelect.focused !== kbdSelect.selected) {
   failures.push(`事件列表方向键未同步选中行：${JSON.stringify(kbdSelect)}`);
 }
+if (!kbdSelect.reader) failures.push("事件列表方向键未打开阅读面板");
 
-// Esc 关闭侧栏
+// Esc 先关阅读面板（页面捕获阶段），不顺手清时间窗
 await page.keyboard.press("Escape");
 await wait(400);
-const drawerClosed = await page.evaluate(() => !document.querySelector(".drawer"));
-console.log(`[Esc 关侧栏] ${drawerClosed}`);
+const readerClosed = await page.evaluate(() => ({
+  reader: !!document.querySelector(".mc2-reader"),
+  drawer: !!document.querySelector(".drawer"),
+}));
+console.log(`[Esc 关详情] ${JSON.stringify(readerClosed)}`);
+if (readerClosed.reader) failures.push("Esc 未能关闭阅读面板");
 
 // / 聚焦关键词
 await page.keyboard.press("/");
@@ -896,13 +925,13 @@ console.log(`[/] 焦点=${focused}`);
 
 console.log("== 证据篮与结论导出 ==");
 await open("light");
-await ensureEventDock();
-await page.waitForSelector(".stream-row", { timeout: 20000 });
+await openEventQuery();
 const caseTitle = `自检案例 ${Date.now()}`;
 let caseId = null;
 try {
-  const rows5 = await page.$$(".stream-row");
+  const rows5 = await page.$$('[aria-label="事件查询"] .stream-row');
   await rows5[0].click();
+  await ensureEvidenceDock();
   await wait(500);
   // 加入证据篮（支持）
   await page.waitForSelector(".basket-add .btn", { timeout: 10000 });
@@ -968,15 +997,9 @@ try {
 }
 
 console.log("== 渲染基准 ==");
-await open("light");
-await page.waitForSelector(".topbar", { timeout: 10000 });
-await page.evaluate(() => {
-  const btn = [...document.querySelectorAll(".topbar .btn")].find((b) =>
-    b.textContent?.includes("渲染基准"),
-  );
-  btn?.click();
-});
-await page.waitForSelector(".bench-actions .btn", { timeout: 10000 });
+// 单页的控制条不再放开发用“渲染基准”按钮；基准视图仍可用 ?bench=1 进入（与 MC1 相同）
+await page.goto(`${URL}/?theme=light&bench=1`, { waitUntil: "networkidle0" });
+await page.waitForSelector(".bench-actions .btn", { timeout: 20000 });
 await wait(600);
 
 const labels = await page.$$eval(".bench-actions .btn", (ns) => ns.map((n) => n.textContent.trim()));

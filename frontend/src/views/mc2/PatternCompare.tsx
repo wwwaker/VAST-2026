@@ -16,7 +16,12 @@ function durationText(us: number): string {
 }
 
 /** 三次“文件为内容源”的发布实例按阶段对齐；缺失阶段留空，不补。 */
-export function PatternCompare() {
+export function PatternCompare({
+  onOpenEvent,
+}: {
+  /** 阶段事件被点击时交给所在页面打开正文；只 select 会让阅读面板停在旧对象。 */
+  onOpenEvent?: (eventId: string, trigger: HTMLElement) => void;
+} = {}) {
   const { selectEvent } = useWorkspace();
   const [payload, setPayload] = useState<PatternPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +103,10 @@ export function PatternCompare() {
                               key={id}
                               type="button"
                               className="btn btn-quiet pattern-event"
-                              onClick={() => selectEvent(id, null)}
+                              onClick={(event) => {
+                                selectEvent(id, null);
+                                onOpenEvent?.(id, event.currentTarget);
+                              }}
                               title={id}
                             >
                               {id.replace(/^MC2:event:/, "#")}

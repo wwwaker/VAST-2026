@@ -4,7 +4,9 @@ import type { BaseEventFilters, CanvasView, CompareState, ComparisonContext, Dat
 
 export const CAPABILITIES: Record<DatasetId, Record<TaskId, readonly Mode[]>> = {
   MC1: { overview: ["activity", "time", "relations"], trace: ["decision", "localGraph"], compare: ["window"], findings: ["claims", "notes"] },
-  MC2: { overview: ["system", "time", "relations"], trace: ["source", "localGraph", "intervention"], compare: ["history", "window", "transitions"], findings: ["claims", "notes"] },
+  // MC2 已统一为单页（F2）：默认视角是来源链/时间，不再是旧的“系统背景”模式；
+  // 系统、关系、历史、干预、转移仍是状态里的 mode，用来把恢复的调查落到对应卡片。
+  MC2: { overview: ["time", "system", "relations"], trace: ["source", "localGraph", "intervention"], compare: ["history", "window", "transitions"], findings: ["claims", "notes"] },
   CUSTOM: { overview: ["runs", "time", "relations"], trace: ["run", "localGraph"], compare: ["runPair", "window"], findings: ["claims", "notes"] },
 };
 export function baseFilters(filters: Filters): BaseEventFilters {
@@ -31,6 +33,10 @@ export function currentWindow(base: BaseEventFilters): [number, number] | null {
   return base.startUs != null && base.endUs != null ? [base.startUs, base.endUs] : null;
 }
 export function supportsPlayback(state: Investigation): boolean {
+  // MC2 是统一单页：来源链、活动分布、文件轨迹与转移矩阵都按游标遮蔽；
+  // 系统背景、历史实例与干预是固定全量聚合，由卡片自己常显范围例外，
+  // 不再用旧 mode 让整页暂停（否则会出现“链可见但时间控制被禁用”的错位）。
+  if (state.dataset === "MC2") return true;
   return !(state.mode === "system" || state.mode === "history" || state.mode === "intervention" || state.mode === "runPair");
 }
 export function windowComparison(state: Investigation): Extract<ComparisonContext, { kind: "window" }> {
@@ -75,6 +81,8 @@ export type WorkspaceAction =
   | { type: "inspect"; selection: SelectedRef | null }
   | { type: "focus"; id: string | null; switchView?: boolean; onlyIfEmpty?: boolean }
   | { type: "openTrace"; rootEventId?: string | null; fileId?: string | null }
+  | { type: "traceRoot"; rootEventId: string }
+  | { type: "traceFile"; fileId: string | null }
   | { type: "openRun"; runId: string; baselineRunId?: string | null; complete?: boolean; compare?: boolean }
   | { type: "comparison"; comparison: ComparisonContext | null }
   | { type: "comparePatch"; patch: Partial<CompareState> }
@@ -114,7 +122,9 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       if (action.view === "trace") return state.dataset === "MC2" ? chooseMode(state, "trace", "source") : { ...chooseMode(state, "overview"), notice: "来源链仅 MC2 支持，已返回概览" };
       if (action.view === "compare") return { ...chooseMode(state, "compare", "window"), comparison: windowComparison(state) };
       if (action.view === "graph") return chooseMode(state, "overview", "relations");
-      return { ...chooseMode(state, "overview", state.dataset === "CUSTOM" ? "runs" : state.dataset === "MC1" ? "activity" : "time"), traceObject: emptyTrace(state.dataset) };
+      // MC2 的链根/文件是调查上下文，普通回退不能清掉；CUSTOM/MC1 维持原语义。
+      return { ...chooseMode(state, "overview", state.dataset === "CUSTOM" ? "runs" : state.dataset === "MC1" ? "activity" : "time"),
+        traceObject: state.dataset === "MC2" ? state.traceObject : emptyTrace(state.dataset) };
     }
     case "filters": {
       const { runId, ...patch } = action.patch;
@@ -136,6 +146,20 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       if ("rootEventId" in action) object.rootEventId = action.rootEventId ?? null;
       if ("fileId" in action) object.fileId = action.fileId ?? null;
       return { ...chooseMode(state, "trace", "source"), traceObject: object, returnStack: pushReturn(state) };
+    }
+    /**
+     * 默认锚点与阅读用的链根：只写追踪对象，不改 task/mode、不入返回栈。
+     * 显式换根仍走 openTrace（可返回上次调查）。
+     */
+    case "traceRoot": {
+      if (state.dataset !== "MC2" || state.traceObject.dataset !== "MC2") return { ...state, notice: "来源链仅 MC2 支持" };
+      return { ...state, traceObject: { ...state.traceObject, rootEventId: action.rootEventId } };
+    }
+    /** 当前文件对象：供文件轨迹与快照使用；普通查看不改筛选、不入返回栈。 */
+    case "traceFile": {
+      if (state.dataset !== "MC2" || state.traceObject.dataset !== "MC2") return state;
+      return { ...state, traceObject: { ...state.traceObject, fileId: action.fileId },
+        selection: action.fileId ? { kind: "file", id: action.fileId } : state.selection };
     }
     case "openRun": {
       if (state.dataset !== "CUSTOM") return { ...state, notice: "运行仅 CUSTOM 支持" };

@@ -4112,3 +4112,695 @@ code {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- MC2 参考风格单页（F2） ----------
+   与 MC1 共用同一套控制条/卡片/阅读面板的视觉与密度，但选择器限定在 .mc2-*，
+   不影响 MC1/CUSTOM 现有布局。颜色全部取自 tokens。 */
+
+.mc2-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-bottom: var(--space-5);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.mc2-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+}
+
+.mc2-target-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.mc2-target-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.mc2-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.mc2-toggle {
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.mc2-toggle:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.mc2-toggle.is-on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.mc2-tools {
+  position: relative;
+}
+
+.mc2-tools > summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.mc2-tools > summary::-webkit-details-marker {
+  display: none;
+}
+
+.mc2-tools[open] > summary {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.mc2-tools-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  min-width: 148px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.mc2-tools-menu button {
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.mc2-tools-menu button:hover,
+.mc2-tools-menu button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.mc2-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px var(--space-2);
+  align-items: center;
+  font-size: 11.5px;
+  padding: 0 2px;
+}
+
+.mc2-window {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.mc2-anchor-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text);
+  max-width: 100%;
+}
+
+.mc2-anchor-chip.mc2-anchor-accent {
+  border-left-color: var(--accent);
+}
+
+.mc2-anchor-chip .mono {
+  white-space: nowrap;
+}
+
+.mc2-anchor-action {
+  font: inherit;
+  font-size: 10.5px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.mc2-anchor-action:hover,
+.mc2-anchor-action:focus-visible {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.mc2-body {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.mc2-filters {
+  flex: 0 0 216px;
+  width: 216px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  position: sticky;
+  top: var(--space-2);
+}
+
+.mc2-filter-group h3 {
+  margin: 0 0 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.mc2-filter-group p {
+  margin: 0 0 4px;
+}
+
+.mc2-filter-group > summary {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+
+.mc2-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.mc2-chip {
+  font: inherit;
+  font-size: 11px;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.mc2-chip.is-on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.mc2-layout {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.mc2-main {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.mc2-aside {
+  flex: 0 0 392px;
+  width: 392px;
+  max-width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.mc2-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  min-width: 0;
+}
+
+.mc2-card-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 2px var(--space-2);
+}
+
+.mc2-card-head h2 {
+  grid-column: 1;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.mc2-card-head p {
+  grid-column: 1;
+  margin: 0;
+}
+
+.mc2-card-head > button {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+}
+
+.mc2-lanes-wrap {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* 手机宽度下 SVG 保留全部标签，改为卡片内横向滚动，而不是把字压没 */
+@media (max-width: 620px) {
+  .mc2-lanes-wrap {
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .mc2-lanes-wrap .trace-lanes {
+    min-width: 620px;
+  }
+}
+
+/* 记录/候选与内容可用性并排，缩短卡片高度；窄屏仍回到单列 */
+.mc2-card .trace-body {
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+}
+
+@media (max-width: 900px) {
+  .mc2-card .trace-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.mc2-root-event {
+  font: inherit;
+  font-size: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.mc2-svg-hit {
+  cursor: pointer;
+}
+
+.mc2-svg-hit:focus-visible {
+  outline: none;
+}
+
+.mc2-svg-hit:focus-visible circle,
+.mc2-svg-hit:focus-visible line {
+  stroke: var(--selection);
+  stroke-width: 3;
+}
+
+.mc2-svg-hit:focus-visible text {
+  fill: var(--text);
+  font-weight: 600;
+}
+
+.mc2-overview-summary {
+  margin: 0;
+}
+
+.mc2-reader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--panel-raised);
+  box-shadow: 0 12px 32px rgb(15 35 31 / 18%);
+  min-width: 0;
+}
+
+.mc2-reader-title {
+  min-width: 0;
+}
+
+.mc2-reader-title strong {
+  display: block;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.mc2-reader-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.mc2-detail-head {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.mc2-detail-head p {
+  margin: 2px 0 0;
+}
+
+.mc2-detail-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: none;
+}
+
+.mc2-msg-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px var(--space-2);
+  align-items: baseline;
+  font-size: 11px;
+}
+
+.mc2-msgs-scope {
+  margin: 0;
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+.mc2-facts {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 4px var(--space-2);
+  margin: 0;
+  font-size: 11.5px;
+}
+
+.mc2-facts dt {
+  color: var(--text-muted);
+}
+
+.mc2-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.mc2-fact-row {
+  display: contents;
+}
+
+.mc2-msg-block h4 {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.mc2-participants {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+}
+
+.mc2-participants li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  align-items: center;
+  padding-bottom: 3px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.mc2-raw-details summary {
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.mc2-raw-details pre {
+  max-height: 220px;
+  overflow: auto;
+  font-size: 10.5px;
+}
+
+.mc2-msg-actions,
+.mc2-reader-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.mc2-msg-actions {
+  padding-top: 4px;
+  border-top: 1px dashed var(--border);
+}
+
+.mc2-reader-actions {
+  margin-top: 4px;
+}
+
+.mc2-entity-events {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.mc2-file-search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.mc2-file-search-row {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.mc2-file-search-row input {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+}
+
+@media (max-width: 1180px) {
+  .mc2-layout {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mc2-aside {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .mc2-reader {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    z-index: 70;
+    width: auto;
+    max-height: 70vh;
+    overflow: auto;
+  }
+}
+
+@media (max-width: 900px) {
+  .mc2-body {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mc2-filters {
+    width: 100%;
+    flex: 0 0 auto;
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+
+  .mc2-tools-menu {
+    right: auto;
+    left: 0;
+  }
+
+  .mc2-reader {
+    top: auto;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: auto;
+    max-height: 72vh;
+  }
+
+  .mc2-facts {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 阅读面板里的文件轨迹与实体事件：392px 列内换行显示，不横向溢出 */
+.mc2-reader .file-track {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.mc2-reader .file-events .stream-row,
+.mc2-reader .mc2-entity-events .stream-row {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+.mc2-reader .file-events .stream-actor {
+  flex: 1 1 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mc2-reader .file-events .stream-preview,
+.mc2-reader .mc2-entity-events .stream-preview {
+  flex: 1 1 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- F2 复核修复（R1/K1/K2） ---------- */
+
+/*
+ * R1：阅读面板在长页面上固定。
+ * 从页面底部的事件查询/历史/矩阵打开对象时，侧列仍在顶部；sticky 让面板
+ * 停在滚动容器顶部，正文在面板内部滚动，关闭按钮始终可达。
+ */
+.mc2-aside {
+  position: sticky;
+  top: var(--space-2);
+  max-height: calc(100vh - 148px);
+}
+
+.mc2-reader {
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.mc2-reader .mc2-detail-head {
+  flex: none;
+}
+
+.mc2-reader-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 1180px) {
+  .mc2-aside {
+    position: static;
+    max-height: none;
+  }
+
+  .mc2-reader {
+    max-height: 70vh;
+  }
+
+  .mc2-reader-body {
+    overflow-y: auto;
+  }
+}
+
+/* K2：文件行改为“行按钮 + 明确的设为链根按钮”，首击不再卸载列表 */
+.file-track-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid var(--grid);
+}
+
+.file-track-row > .stream-row {
+  width: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  border-bottom: 0;
+}
+
+.file-track-root {
+  flex: none;
+  white-space: nowrap;
+  font-size: 10.5px;
+}

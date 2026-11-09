@@ -95,7 +95,7 @@ export function TopBar({
         />
       </label>
 
-      {dataset === "MC1" ? (
+      {dataset === "MC1" || dataset === "MC2" ? (
         <>
           <div className="topbar-docks" aria-label="侧栏">
             <button

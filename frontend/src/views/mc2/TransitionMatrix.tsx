@@ -19,7 +19,12 @@ interface Selection {
 }
 
 /** M2-04：MC2 相邻操作转移矩阵。未做 actor 校正前只显示支持数与 actor 数。 */
-export function TransitionMatrix() {
+export function TransitionMatrix({
+  onOpenEvent,
+}: {
+  /** 证据行的源/后继被点击时交给所在页面打开正文；只 select 会让阅读面板停在旧对象。 */
+  onOpenEvent?: (eventId: string, atUs: number | null, trigger: HTMLElement) => void;
+} = {}) {
   const { filters, cursor, masking, selectEvent, state, dispatch } = useWorkspace();
   const comparison = state.comparison?.kind === "transitions" ? state.comparison : null;
   const windowMinutes: 5 | 30 = comparison?.maxLagUs === 30 * 60_000_000 ? 30 : 5;
@@ -213,7 +218,10 @@ export function TransitionMatrix() {
             <EvidenceList
               selection={selected}
               windowMinutes={windowMinutes}
-              onSelectEvent={(eventId, atUs) => selectEvent(eventId, atUs)}
+              onSelectEvent={(eventId, atUs, trigger) => {
+                selectEvent(eventId, atUs);
+                onOpenEvent?.(eventId, atUs, trigger);
+              }}
             />
           )}
         </>
@@ -229,7 +237,7 @@ function EvidenceList({
 }: {
   selection: Selection;
   windowMinutes: 5 | 30;
-  onSelectEvent: (eventId: string, atUs: number) => void;
+  onSelectEvent: (eventId: string, atUs: number, trigger: HTMLElement) => void;
 }) {
   const { filters, cursor, masking } = useWorkspace();
   const [items, setItems] = useState<TransitionEvidenceItem[]>([]);
@@ -324,7 +332,7 @@ function EvidenceList({
               <button
                 type="button"
                 className="trace-item"
-                onClick={() => onSelectEvent(item.source.event_id, item.source.time_us)}
+                onClick={(event) => onSelectEvent(item.source.event_id, item.source.time_us, event.currentTarget)}
               >
                 <span className="tag">源</span>
                 <span className="mono small">{formatUtc(item.source.time_us)}</span>
@@ -334,7 +342,7 @@ function EvidenceList({
               <button
                 type="button"
                 className="trace-item"
-                onClick={() => onSelectEvent(item.next.event_id, item.next.time_us)}
+                onClick={(event) => onSelectEvent(item.next.event_id, item.next.time_us, event.currentTarget)}
               >
                 <span className="tag">后继</span>
                 <span className="mono small">{formatUtc(item.next.time_us)}</span>

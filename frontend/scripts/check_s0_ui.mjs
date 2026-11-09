@@ -28,20 +28,26 @@ async function mode(label) {
   await clickText(".mode-tab", label);
 }
 async function ensureEventStream() {
-  if (await page.$(".mc1-page")) {
-    // MC1 的通用事件查询收在页面「工具」菜单里
-    if (await page.$(".mc1-card .stream-row")) return;
-    await page.evaluate(() => {
-      const tools = document.querySelector(".mc1-tools");
+  const page_ = await page.evaluate(() => ({
+    mc1: !!document.querySelector(".mc1-page"),
+    mc2: !!document.querySelector('[data-testid="mc2-page"]'),
+  }));
+  if (page_.mc1 || page_.mc2) {
+    // MC1/MC2 的通用事件查询收在页面「工具」菜单里
+    const prefix = page_.mc1 ? ".mc1-tools" : ".mc2-tools";
+    const card = page_.mc1 ? ".mc1-card" : '[aria-label="事件查询"]';
+    if (await page.$(`${card} .stream-row`)) return;
+    await page.evaluate((sel) => {
+      const tools = document.querySelector(sel);
       if (tools instanceof HTMLDetailsElement) tools.open = true;
-    });
-    await page.evaluate(() => {
-      const btn = [...document.querySelectorAll(".mc1-tools-menu button")].find(
+    }, prefix);
+    await page.evaluate((sel) => {
+      const btn = [...document.querySelectorAll(`${sel}-menu button`)].find(
         (n) => n.textContent?.trim() === "事件查询",
       );
       btn?.click();
-    });
-    await page.waitForSelector(".mc1-card .stream-row");
+    }, prefix);
+    await page.waitForSelector(`${card} .stream-row`);
     return;
   }
   if (!(await page.$(".event-dock"))) {
@@ -93,7 +99,8 @@ async function restoreFromBasket(id) {
 }
 try {
   await page.goto(`${base}/?theme=light`, { waitUntil: "networkidle0" });
-  await page.waitForSelector(".task-nav");
+  // F2：MC2 默认即单页，不再有四任务导航
+  await page.waitForSelector('[data-testid="mc2-page"]');
   await openTimeline("MC2");
   const presets = await (await fetch(`${base}/api/cases?dataset=CUSTOM`)).json();
   const target = presets.items.find((c) => c.baseline_run_id);
@@ -148,13 +155,16 @@ try {
   check("return overview removes derived runId", () => {});
 
   await openTimeline("MC2");
-  await task("追踪");
-  await mode("来源");
   await page.waitForSelector(".trace-roots button");
   await page.click(".trace-roots button");
   await page.waitForSelector(".trace-head .mono");
   const rootId = await page.$eval(".trace-head .mono", (n) => n.textContent);
-  await clickText('[aria-label="来源链子模式"] button', "干预论证");
+  // F2：干预论证从页面“工具”菜单打开（旧来源链子模式标签已移除）
+  await page.evaluate(() => {
+    const tools = document.querySelector(".mc2-tools");
+    if (tools instanceof HTMLDetailsElement) tools.open = true;
+  });
+  await clickText(".mc2-tools-menu button", "干预论证");
   await page.waitForSelector(".intervention-view");
   await ensureEventStream();
   await clickText(".intervention-view button", "选为干预位置");
@@ -339,7 +349,8 @@ try {
     ["MC1", mc1.snapshot, "overview", "timeline", "time", ".mc1-page"],
     ["CUSTOM", pair.snapshot, "overview", "local", "relations", ".graph-workspace"],
     ["MC1", mc1.snapshot, "trace", "messages", "decision", ".mc1-page"],
-    ["MC2", mc2.snapshot, "trace", "file", "source", ".trace-view"],
+    // F2：来源链是单页默认区域，不再有独立 .trace-view；用来源链卡片作为落点
+    ["MC2", mc2.snapshot, "trace", "file", "source", '[data-testid="mc2-trace-card"]'],
   ]) {
     const snapshot = structuredClone(template);
     snapshot.task = savedTask; snapshot.mode = alias; snapshot.task_modes[savedTask] = alias;

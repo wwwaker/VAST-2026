@@ -8,7 +8,10 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const URL = process.argv[2] ?? "http://127.0.0.1:8021";
-const OUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "build", "reference-ui", "F1");
+// 结果目录：默认沿用历史位置；UI_CHECK_OUT 可指向当前阶段目录，避免覆盖历史证据。
+const OUT = process.env.UI_CHECK_OUT
+  ? path.resolve(process.env.UI_CHECK_OUT)
+  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "build", "reference-ui", "F1");
 const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -39,16 +42,12 @@ const shot = (name) => page.screenshot({ path: path.join(OUT, `${name}.png`) });
 await page.goto(URL, { waitUntil: "networkidle0" });
 await page.waitForSelector(".topbar");
 
-// --- MC2 来源链 ---
+// --- MC2 来源链（F2 单页默认区域，不再有视图标签）---
 await page.select(".dataset-field select", "MC2");
 await wait(1200);
-const clickedTrace = await page.evaluate(() => {
-  const tab = [...document.querySelectorAll(".view-tab")].find((n) => n.textContent?.includes("来源链"));
-  tab?.click();
-  return !!tab;
-});
-check("MC2 来源链入口存在", clickedTrace);
-await page.waitForSelector(".trace-view", { timeout: 20000 });
+await page.waitForSelector('[data-testid="mc2-page"]', { timeout: 20000 });
+check("MC2 单页与来源链卡片存在", !!(await page.$('[data-testid="mc2-trace-card"]')));
+await page.waitForSelector(".trace-lanes", { timeout: 20000 });
 await page.waitForSelector(".trace-roots .seg-item", { timeout: 20000 });
 await page.evaluate(() => document.querySelector(".trace-roots .seg-item")?.click());
 await page.waitForSelector(".trace-lanes", { timeout: 20000 });
@@ -65,20 +64,12 @@ await shot("regression-mc2-trace");
 await page.goto(URL, { waitUntil: "networkidle0" });
 await page.select(".dataset-field select", "MC2");
 await wait(1200);
-const clickedSystem = await page.evaluate(() => {
-  const btn = [...document.querySelectorAll(".canvas-subbar .seg-item")].find((b) =>
-    b.textContent?.includes("系统背景"),
-  );
-  btn?.click();
-  return !!btn;
+// 系统背景是单页常驻卡片：必要时用显隐按钮打开，再滚到卡片
+await page.evaluate(() => {
+  const toggle = [...document.querySelectorAll(".mc2-toggle")].find((b) => b.textContent?.trim() === "系统背景");
+  if (toggle && toggle.getAttribute("aria-pressed") === "false") toggle.click();
+  document.querySelector('[aria-label="系统背景"]')?.scrollIntoView({ block: "start" });
 });
-if (!clickedSystem) {
-  // 概览模式的系统切换在任务/模式导航里
-  await page.evaluate(() => {
-    const tab = [...document.querySelectorAll(".mode-tab")].find((n) => n.textContent?.trim() === "系统");
-    tab?.click();
-  });
-}
 await page.waitForSelector(".system-canvas", { timeout: 20000 });
 await wait(800);
 const system = await page.evaluate(() => ({

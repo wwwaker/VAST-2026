@@ -10,15 +10,14 @@ import { StatusBar, TopBar } from "./components/Shell";
 import { TimeBrush } from "./components/TimeBrush";
 import { EvidenceDrawer } from "./components/EvidenceDrawer";
 import { EventStream } from "./components/EventStream";
-import { OverviewView } from "./views/OverviewView";
 import { CompareView } from "./views/CompareView";
 import { ShortcutsHelp } from "./components/ShortcutsHelp";
 import { useHotkeys } from "./hooks/useHotkeys";
 import { RenderBenchView } from "./views/RenderBenchView";
 import { CustomWorkspace } from "./views/custom/CustomWorkspace";
 import { GraphWorkspace } from "./views/GraphWorkspace";
-import { SourceTrace } from "./views/mc2/SourceTrace";
 import { Mc1ReferencePage } from "./views/mc1/Mc1ReferencePage";
+import { Mc2ReferencePage } from "./views/mc2/Mc2ReferencePage";
 import { TaskNav, taskModeLabel } from "./components/TaskNav";
 import { FindingsWorkspace } from "./views/FindingsWorkspace";
 
@@ -71,31 +70,25 @@ function ViewTabs() {
 
 function renderTaskContent(dataset: DatasetId, state: ReturnType<typeof useWorkspace>["state"]) {
   // MC1 使用参考风格单页：热力图 / 事件轨 / 回复网络在同一页内显隐，详情在同一阅读面板。
+  // MC2 使用同一模板（F2）：来源链/文件/活动/系统/历史/干预/转移/对照都在页内按 task/mode 展开。
   // 旧 task/mode 不再是导航；恢复快照时由页面按 task/mode 映射到工具或区域。
   if (dataset === "MC1") return <Mc1ReferencePage />;
+  if (dataset === "MC2") return <Mc2ReferencePage />;
 
   if (state.task === "findings") return <FindingsWorkspace />;
 
   if (state.task === "compare") {
-    if (state.mode === "window") return <CompareView />;
-    if (dataset === "MC2" && (state.mode === "history" || state.mode === "transitions")) return <SourceTrace />;
-    if (dataset === "CUSTOM" && state.mode === "runPair") return <CustomWorkspace />;
+    if (state.mode === "runPair") return <CustomWorkspace />;
     return <CompareView />;
   }
 
   if (state.task === "trace") {
-    if (dataset === "MC2" && (state.mode === "source" || state.mode === "intervention")) return <SourceTrace />;
-    if (dataset === "CUSTOM" && state.mode === "run") return <CustomWorkspace />;
-    if (dataset === "CUSTOM" && state.mode === "localGraph") return <GraphWorkspace />;
+    if (state.mode === "run") return <CustomWorkspace />;
     return <GraphWorkspace />;
   }
 
-  if (dataset === "CUSTOM") {
-    if (state.mode === "relations") return <GraphWorkspace />;
-    return <CustomWorkspace />;
-  }
-  if (state.mode === "system" || state.mode === "relations") return <GraphWorkspace />;
-  return <OverviewView />;
+  if (state.mode === "relations") return <GraphWorkspace />;
+  return <CustomWorkspace />;
 }
 
 function Workspace() {
@@ -119,9 +112,10 @@ function Workspace() {
     filterSummary,
     dispatch,
   } = useWorkspace();
-  // MC1 的任务/模式不再是导航，布局偏好按数据集记忆；
+  // MC1/MC2 的任务/模式不再是导航，布局偏好按数据集记忆；
   // 否则恢复快照换了 task 会重新套用旧的侧栏开合状态，把刚恢复的证据面板关掉。
-  const layoutPrefix = dataset === "MC1" ? `mas-workspace.${dataset}` : `mas-workspace.${dataset}.${state.task}`;
+  const pageLayout = dataset === "MC1" || dataset === "MC2";
+  const layoutPrefix = pageLayout ? `mas-workspace.${dataset}` : `mas-workspace.${dataset}.${state.task}`;
   const layoutKey = `${layoutPrefix}.layout`;
 
   useEffect(() => {
@@ -196,7 +190,7 @@ function Workspace() {
         eventOpen={eventOpen}
         onToggleEvent={() => { const next = !eventOpen; setEventOpen(next); if (next && window.innerWidth < 900) setEvidenceOpen(false); persist({ eventOpen: next, ...(next && window.innerWidth < 900 ? { evidenceOpen: false } : {}) }); }}
       />
-      {dataset !== "MC1" && (
+      {!pageLayout && (
         <div className="workspace-heading">
           <TaskNav onParallel={parallel} />
           <span className="workspace-status" aria-live="polite">{taskModeLabel(dataset, state.task, state.mode)}</span>
@@ -206,7 +200,7 @@ function Workspace() {
         <div className={`body${eventOpen ? " body-event-open" : ""}${evidenceOpen ? " body-evidence-open" : ""}`}>
           <main className="canvas-area">
             {showBench ? <RenderBenchView /> : <>
-              {dataset !== "MC1" && (
+              {!pageLayout && (
                 <div className="canvas-toolbar">
                   <ViewTabs />
                 </div>
@@ -221,13 +215,13 @@ function Workspace() {
             <div className="dock-resizer dock-resizer-left" role="separator" tabIndex={0} aria-valuemin={280} aria-valuemax={560} aria-valuenow={evidenceSize} aria-orientation="vertical" aria-label="调整证据面板宽度" onPointerDown={(e) => resizePanel("evidence", e)} onKeyDown={(e) => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); const next = Math.max(280, Math.min(560, evidenceSize + (e.key === "ArrowLeft" ? 16 : -16))); setEvidenceSize(next); persist({ evidenceSize: next }); } }} />
             <EvidenceDrawer />
           </div>}
-          {dataset !== "MC1" && eventOpen && <aside className="event-dock event-dock-bottom">
+          {!pageLayout && eventOpen && <aside className="event-dock event-dock-bottom">
             <div className="dock-resizer dock-resizer-top" role="separator" tabIndex={0} aria-valuemin={240} aria-valuemax={520} aria-valuenow={eventSize} aria-orientation="horizontal" aria-label="调整事件面板高度" onPointerDown={(e) => resizePanel("event", e)} onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); const next = Math.max(240, Math.min(520, eventSize + (e.key === "ArrowUp" ? 16 : -16))); setEventSize(next); persist({ eventSize: next }); } }} />
             <EventPanel onClose={() => { setEventOpen(false); persist({ eventOpen: false }); }} />
           </aside>}
         </div>
       </div>
-      <div className="controlbar"><TimeBrush compact={dataset === "MC1"} />{dataset !== "MC1" && <StatusBar />}</div>
+      <div className="controlbar"><TimeBrush compact={pageLayout} />{!pageLayout && <StatusBar />}</div>
       {showHelp && <ShortcutsHelp onClose={() => setShowHelp(false)} />}
     </div>
   );

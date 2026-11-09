@@ -25,7 +25,16 @@ function statusClass(status: ContentStatus): string {
 }
 
 /** 单个文件的操作轨迹。内容缺失时明确说缺什么，不提供伪造预览。 */
-export function FileTrack({ fileId, onPickRoot }: { fileId: string; onPickRoot?: (eventId: string) => void }) {
+export function FileTrack({
+  fileId,
+  onPickRoot,
+  onOpenEvent,
+}: {
+  fileId: string;
+  onPickRoot?: (eventId: string) => void;
+  /** 提供时单击行会打开所在页面的阅读面板；否则只更新共享选中事件。 */
+  onOpenEvent?: (eventId: string, timeUs: number, trigger?: Element | null) => void;
+}) {
   const { filters, cursor, masking, selectedEventId, selectEvent } = useWorkspace();
   const { colors } = useTheme();
   const [payload, setPayload] = useState<FileTrackPayload | null>(null);
@@ -147,12 +156,15 @@ export function FileTrack({ fileId, onPickRoot }: { fileId: string; onPickRoot?:
 
       <ul className="stream-list file-events">
         {items.map((item) => (
-          <li key={item.event_id}>
+          <li key={item.event_id} className={onPickRoot ? "file-track-row" : undefined}>
             <button
               type="button"
               className={`stream-row${selectedEventId === item.event_id ? " stream-row-active" : ""}`}
-              onClick={() => selectEvent(item.event_id, item.time_us)}
-              onDoubleClick={() => onPickRoot?.(item.event_id)}
+              title="查看该事件的原始记录"
+              onClick={(event) => {
+                selectEvent(item.event_id, item.time_us);
+                onOpenEvent?.(item.event_id, item.time_us, event.currentTarget);
+              }}
             >
               <span className="stream-time mono">{formatUtc(item.time_us)}</span>
               <span
@@ -165,6 +177,16 @@ export function FileTrack({ fileId, onPickRoot }: { fileId: string; onPickRoot?:
               <span className="stream-preview">{item.preview || "（无正文摘要）"}</span>
               <span className="role-chip">{item.file_relations.join("/")}</span>
             </button>
+            {onPickRoot && (
+              <button
+                type="button"
+                className="btn btn-quiet file-track-root"
+                title="以该事件为链根重新追踪"
+                onClick={() => onPickRoot(item.event_id)}
+              >
+                设为链根
+              </button>
+            )}
           </li>
         ))}
       </ul>
