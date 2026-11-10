@@ -43,7 +43,7 @@
 
 .brand-sub {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-faint);
 }
 
@@ -82,7 +82,7 @@
 .dataset-question-hint strong {
   color: var(--accent);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -92,7 +92,7 @@
 }
 
 .field > span {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -223,7 +223,7 @@ select:focus-visible {
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* ---------- 当前问题 ---------- */
@@ -245,7 +245,7 @@ select:focus-visible {
 
 .question-tag {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   padding: 1px 6px;
   border-radius: var(--radius-sm);
   background: var(--panel);
@@ -306,7 +306,7 @@ select:focus-visible {
   flex: none;
   margin-right: var(--space-2);
   color: var(--text-faint);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .mode-tab {
@@ -329,7 +329,7 @@ select:focus-visible {
   flex: none;
   color: var(--text-faint);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -405,7 +405,7 @@ select:focus-visible {
 
 .dock-label {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -602,7 +602,7 @@ select:focus-visible {
   top: var(--space-2);
   right: var(--space-3);
   padding: 2px 8px;
-  font-size: 11px;
+  font-size: 12px;
   border-radius: 999px;
   background: var(--warn-soft);
   color: var(--warn);
@@ -657,7 +657,7 @@ select:focus-visible {
 }
 
 .anchor-label {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-faint);
 }
 
@@ -999,7 +999,7 @@ select:focus-visible {
 .stream-time {
   color: var(--text-faint);
   white-space: nowrap;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .stream-dot {
@@ -1033,7 +1033,7 @@ select:focus-visible {
 }
 
 .tag {
-  font-size: 10.5px;
+  font-size: 12px;
   padding: 0 6px;
   border-radius: 999px;
   border: 1px solid currentColor;
@@ -1131,7 +1131,7 @@ select:focus-visible {
 
 .mono {
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 12px;
   word-break: break-all;
 }
 
@@ -1203,7 +1203,7 @@ select:focus-visible {
 }
 
 .role-chip {
-  font-size: 10.5px;
+  font-size: 12px;
   padding: 0 6px;
   border-radius: 999px;
   background: var(--accent-soft);
@@ -1212,7 +1212,7 @@ select:focus-visible {
 }
 
 .prov {
-  font-size: 10.5px;
+  font-size: 12px;
   padding: 0 6px;
   border-radius: var(--radius-sm);
   border: 1px solid currentColor;
@@ -1245,7 +1245,7 @@ select:focus-visible {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
   overflow-x: auto;
   max-height: 420px;
@@ -1304,7 +1304,7 @@ select:focus-visible {
 
 .notes-error {
   margin: var(--space-1) 0 0;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--risk);
 }
 
@@ -1329,14 +1329,14 @@ select:focus-visible {
   align-items: center;
   gap: var(--space-2);
   margin-top: 4px;
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--text-faint);
 }
 
 .note-del {
   margin-left: auto;
   padding: 0 6px;
-  font-size: 10.5px;
+  font-size: 12px;
 }
 
 .note-filter {
@@ -1410,7 +1410,7 @@ select:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-1);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
   margin-bottom: var(--space-1);
@@ -1434,13 +1434,13 @@ select:focus-visible {
 .dual-hint {
   display: block;
   margin-top: 6px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-faint);
 }
 
 .dual-source {
   margin: var(--space-1) 0 0;
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--text-faint);
   border-top: 1px dashed var(--grid);
   padding-top: 3px;
@@ -1455,7 +1455,7 @@ select:focus-visible {
 
 .dual-tab {
   font: inherit;
-  font-size: 10.5px;
+  font-size: 12px;
   padding: 1px 6px;
   border-radius: 999px;
   border: 1px solid var(--border);
@@ -1527,7 +1527,7 @@ select:focus-visible {
 .compare-header {
   color: var(--text-faint);
   background: var(--bg-sunken);
-  font-size: 11px;
+  font-size: 12px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -1566,18 +1566,18 @@ select:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .cmp-num {
   text-align: right;
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
 .cmp-bar-head {
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .cmp-bar {
@@ -1608,7 +1608,7 @@ select:focus-visible {
   right: 0;
   top: 0;
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--text-faint);
 }
 
@@ -1890,7 +1890,7 @@ select:focus-visible {
 kbd {
   display: inline-block;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   padding: 1px 6px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-strong);
@@ -1907,7 +1907,7 @@ kbd {
 }
 
 .small {
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .empty-state {
@@ -2041,7 +2041,7 @@ code {
     max-width: 108px;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-size: 10px;
+    font-size: 12px;
   }
 
   .timebrush .btn {
@@ -2067,7 +2067,7 @@ code {
   }
 
   .status-actions .btn {
-    font-size: 10px;
+    font-size: 12px;
     padding-block: 2px;
   }
 
@@ -2127,7 +2127,7 @@ code {
   gap: var(--space-1);
   padding: 5px var(--space-3);
   border-bottom: 1px solid var(--grid);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .run-row:last-child {
@@ -2137,7 +2137,7 @@ code {
 .run-header {
   color: var(--text-faint);
   background: var(--bg-sunken);
-  font-size: 10.5px;
+  font-size: 12px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -2261,7 +2261,7 @@ code {
   gap: var(--space-2);
   padding: 4px var(--space-3);
   border-bottom: 1px solid var(--grid);
-  font-size: 11.5px;
+  font-size: 12px;
   cursor: default;
 }
 
@@ -2285,20 +2285,11 @@ code {
 }
 
 .audit-evidence-btn {
-  font-size: 10px;
+  font-size: 12px;
   padding: 0 4px;
 }
 
 /* ---------------------------------------------------------------- MC2 来源链 */
-
-.trace-view {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-height: 0;
-  overflow: auto;
-  padding: var(--space-3);
-}
 
 .trace-head {
   display: flex;
@@ -2329,8 +2320,7 @@ code {
   }
 }
 
-.trace-chain,
-.trace-file {
+.trace-chain {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -2408,7 +2398,7 @@ code {
   grid-template-columns: 88px minmax(0, 1fr);
   gap: 4px var(--space-2);
   margin: 0;
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .file-facts dt {
@@ -2496,7 +2486,7 @@ code {
 
 .pattern-present {
   color: var(--ok);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .pattern-events {
@@ -2506,7 +2496,7 @@ code {
 }
 
 .pattern-event {
-  font-size: 10.5px;
+  font-size: 12px;
   padding: 0 4px;
 }
 
@@ -2740,7 +2730,7 @@ code {
 .transition-table {
   border-collapse: separate;
   border-spacing: 2px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .transition-table caption {
@@ -2822,7 +2812,7 @@ code {
 
 .transition-cell-actors {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .transition-evidence {
@@ -2937,7 +2927,7 @@ code {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -3109,13 +3099,13 @@ code {
   flex-wrap: wrap;
   gap: 6px var(--space-2);
   align-items: center;
-  font-size: 11.5px;
+  font-size: 12px;
   padding: 0 2px;
 }
 
 .mc1-window {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .mc1-anchor-chip {
@@ -3149,7 +3139,7 @@ code {
 
 .mc1-anchor-action {
   font: inherit;
-  font-size: 10.5px;
+  font-size: 12px;
   padding: 0 6px;
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -3206,7 +3196,7 @@ code {
 
 .mc1-filter-group h3 {
   margin: 0 0 4px;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
 }
@@ -3234,7 +3224,7 @@ code {
 
 .mc1-actor {
   font: inherit;
-  font-size: 11px;
+  font-size: 12px;
   padding: 1px 8px;
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -3328,7 +3318,7 @@ code {
   display: flex;
   align-items: flex-end;
   padding: 2px 4px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-faint);
 }
 
@@ -3339,7 +3329,7 @@ code {
   justify-content: flex-end;
   gap: 2px;
   padding-bottom: 2px;
-  font-size: 9.5px;
+  font-size: 12px;
   color: var(--text-muted);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -3359,7 +3349,7 @@ code {
   align-items: center;
   justify-content: flex-end;
   padding-right: 8px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
@@ -3374,7 +3364,7 @@ code {
   background: var(--panel);
   color: var(--text);
   font: inherit;
-  font-size: 10.5px;
+  font-size: 12px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -3440,7 +3430,7 @@ code {
   border-left: 3px solid var(--warn);
   border-radius: var(--radius-sm);
   background: var(--warn-soft);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .mc1-track-status details {
@@ -3462,7 +3452,7 @@ code {
   border-radius: 999px;
   border: 1px solid var(--warn);
   color: var(--text);
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -3496,7 +3486,7 @@ code {
 }
 
 .mc1-track-lane-label {
-  font-size: 9.5px;
+  font-size: 12px;
   fill: var(--text-faint);
 }
 
@@ -3574,13 +3564,13 @@ code {
 }
 
 .mc1-track-anchor-label {
-  font-size: 9px;
+  font-size: 12px;
   fill: var(--text-faint);
 }
 
 .mc1-track-legend-box summary {
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -3595,7 +3585,7 @@ code {
   display: flex;
   flex-wrap: wrap;
   gap: 4px var(--space-3);
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -3661,7 +3651,7 @@ code {
 
 .mc1-msgs-scope {
   margin: 0;
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -3698,7 +3688,7 @@ code {
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 11.5px;
+  font-size: 12px;
   text-align: left;
   cursor: pointer;
 }
@@ -3708,7 +3698,7 @@ code {
 }
 
 .mc1-msg-time {
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--text-faint);
 }
 
@@ -3719,7 +3709,7 @@ code {
 }
 
 .mc1-msg-channel {
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3749,7 +3739,7 @@ code {
 
 .mc1-msg-channel-block h4 {
   margin: 0 0 4px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
   display: flex;
@@ -3769,7 +3759,7 @@ code {
   margin: 0;
   display: grid;
   gap: 2px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .mc1-msg-deliberation > div,
@@ -3799,7 +3789,7 @@ code {
 
 .mc1-msg-raw-details summary {
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -3820,7 +3810,7 @@ code {
 .mc1-reader .raw pre {
   max-height: 220px;
   padding: var(--space-2);
-  font-size: 10.5px;
+  font-size: 12px;
 }
 
 .mc1-reader .dual-body {
@@ -3944,7 +3934,7 @@ code {
 }
 
 .mc1-edge-label {
-  font-size: 9.5px;
+  font-size: 12px;
   fill: var(--text-muted);
   paint-order: stroke;
   stroke: var(--bg-sunken);
@@ -3956,7 +3946,7 @@ code {
   flex-wrap: wrap;
   gap: 4px var(--space-3);
   align-items: center;
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -3982,7 +3972,7 @@ code {
 }
 
 .mc1-net-notes summary {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
   cursor: pointer;
 }
@@ -4185,13 +4175,13 @@ code {
   flex-wrap: wrap;
   gap: 6px var(--space-2);
   align-items: center;
-  font-size: 11.5px;
+  font-size: 12px;
   padding: 0 2px;
 }
 
 .mc2-window {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .mc2-anchor-chip {
@@ -4217,7 +4207,7 @@ code {
 
 .mc2-anchor-action {
   font: inherit;
-  font-size: 10.5px;
+  font-size: 12px;
   padding: 0 6px;
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -4256,7 +4246,7 @@ code {
 
 .mc2-filter-group h3 {
   margin: 0 0 4px;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
 }
@@ -4266,7 +4256,7 @@ code {
 }
 
 .mc2-filter-group > summary {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
   cursor: pointer;
@@ -4281,7 +4271,7 @@ code {
 
 .mc2-chip {
   font: inherit;
-  font-size: 11px;
+  font-size: 12px;
   padding: 1px 8px;
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -4475,12 +4465,12 @@ code {
   flex-wrap: wrap;
   gap: 4px var(--space-2);
   align-items: baseline;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .mc2-msgs-scope {
   margin: 0;
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -4489,7 +4479,7 @@ code {
   grid-template-columns: 96px minmax(0, 1fr);
   gap: 4px var(--space-2);
   margin: 0;
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .mc2-facts dt {
@@ -4507,7 +4497,7 @@ code {
 
 .mc2-msg-block h4 {
   margin: 0 0 4px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
 }
@@ -4519,7 +4509,7 @@ code {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .mc2-participants li {
@@ -4532,7 +4522,7 @@ code {
 }
 
 .mc2-raw-details summary {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
   cursor: pointer;
 }
@@ -4540,7 +4530,7 @@ code {
 .mc2-raw-details pre {
   max-height: 220px;
   overflow: auto;
-  font-size: 10.5px;
+  font-size: 12px;
 }
 
 .mc2-msg-actions,
@@ -4734,7 +4724,7 @@ code {
 .file-track-root {
   flex: none;
   white-space: nowrap;
-  font-size: 10.5px;
+  font-size: 12px;
 }
 
 /* ================================================================ F3 · CUSTOM 单页
@@ -4768,7 +4758,7 @@ code {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-muted);
   padding: 2px 8px;
   border: 1px solid var(--border);
@@ -4787,7 +4777,7 @@ code {
 
 .custom-chip-action {
   font: inherit;
-  font-size: 10.5px;
+  font-size: 12px;
   padding: 0 6px;
   border: 1px solid var(--border-strong);
   border-radius: 999px;
@@ -4897,7 +4887,7 @@ code {
   flex-wrap: wrap;
   gap: 6px var(--space-2);
   align-items: center;
-  font-size: 11.5px;
+  font-size: 12px;
   padding: 0 2px;
 }
 
@@ -4932,7 +4922,7 @@ code {
   align-items: center;
   gap: 6px;
   font: inherit;
-  font-size: 11.5px;
+  font-size: 12px;
   padding: 3px 9px;
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -4975,7 +4965,7 @@ code {
 .custom-user-cases > summary {
   cursor: pointer;
   color: var(--text-muted);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 /* ---------- 主区与阅读区 ---------- */
@@ -5070,7 +5060,7 @@ code {
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 /* ---------- 运行 × 阶段概览 ---------- */
@@ -5103,7 +5093,7 @@ code {
   gap: var(--space-1);
   padding: 3px var(--space-2);
   border-bottom: 1px solid var(--grid);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .custom-overview-row:last-child {
@@ -5127,7 +5117,7 @@ code {
 .custom-overview-head {
   color: var(--text-faint);
   background: var(--bg-sunken);
-  font-size: 10.5px;
+  font-size: 12px;
   border-bottom: 1px solid var(--border);
   padding-top: 5px;
   padding-bottom: 5px;
@@ -5165,12 +5155,12 @@ code {
 }
 
 .custom-run-id {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
 }
 
 .custom-run-meta {
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--text-faint);
   max-width: 100%;
   overflow: hidden;
@@ -5184,7 +5174,7 @@ code {
   justify-content: center;
   height: 24px;
   font: inherit;
-  font-size: 10.5px;
+  font-size: 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: transparent;
@@ -5232,7 +5222,7 @@ code {
 
 .custom-stage-dash,
 .custom-stage-unknown {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-faint);
 }
 
@@ -5241,7 +5231,7 @@ code {
   flex-direction: column;
   align-items: flex-start;
   gap: 1px;
-  font-size: 10.5px;
+  font-size: 12px;
   min-width: 0;
 }
 
@@ -5300,7 +5290,7 @@ code {
 
 .custom-audit-rules > summary {
   cursor: pointer;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-muted);
   padding: 2px 0;
 }
@@ -5316,7 +5306,7 @@ code {
   grid-template-columns: var(--custom-pair-label) 28px minmax(0, 1fr) var(--custom-pair-count);
   align-items: center;
   gap: var(--space-2);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-faint);
 }
 
@@ -5330,7 +5320,7 @@ code {
   position: absolute;
   bottom: 1px;
   transform: translateX(-50%);
-  font-size: 9.5px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -5357,12 +5347,12 @@ code {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  font-size: 11.5px;
+  font-size: 12px;
   min-width: 0;
 }
 
 .custom-pair-label strong {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -5382,7 +5372,7 @@ code {
 }
 
 .custom-track-side {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-faint);
   white-space: nowrap;
 }
@@ -5441,7 +5431,7 @@ code {
 }
 
 .custom-track-count {
-  font-size: 10.5px;
+  font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5452,7 +5442,7 @@ code {
   align-items: center;
   height: 16px;
   padding: 0 6px;
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--text-faint);
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius-sm);
@@ -5473,7 +5463,7 @@ code {
 
 .custom-metrics > summary {
   cursor: pointer;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -5492,7 +5482,7 @@ code {
   gap: var(--space-2);
   padding: 3px var(--space-2);
   border-bottom: 1px solid var(--grid);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .custom-metrics-row:last-child {
@@ -5502,7 +5492,7 @@ code {
 .custom-metrics-head {
   color: var(--text-faint);
   background: var(--bg-sunken);
-  font-size: 10.5px;
+  font-size: 12px;
 }
 
 .custom-metrics-row.is-different {
@@ -5570,7 +5560,7 @@ code {
   flex-wrap: wrap;
   gap: 4px 8px;
   align-items: center;
-  font-size: 11.5px;
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
 
@@ -5579,7 +5569,7 @@ code {
   grid-template-columns: 88px minmax(0, 1fr);
   gap: 3px var(--space-2);
   margin: 0;
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .custom-facts dt {
@@ -5603,7 +5593,7 @@ code {
 
 .custom-msg-block h4 {
   margin: 0;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
 }
@@ -5692,4 +5682,356 @@ code {
     grid-row: auto;
     justify-self: start;
   }
+}
+
+/* ==========================================================================
+   视觉基线 v2（2026-11-10）
+   目的：解决三类具体问题——正文过小、层级扁平、框线过多导致"表格感"。
+   只改可读性与层次，不动结构与交互；整段删除即可回到 F1 原样式。
+   ========================================================================== */
+
+/* 1) 页面与卡片：一个主色强调，其余靠留白和字重分层 ------------------- */
+
+:root {
+  --measure: 74ch;
+}
+
+.app {
+  font-size: 13.5px;
+}
+
+.mc1-page {
+  gap: var(--space-4);
+  padding-bottom: var(--space-6);
+}
+
+.mc1-card {
+  padding: var(--space-4);
+  gap: var(--space-3);
+  border-radius: var(--radius-lg);
+  box-shadow: none;
+}
+
+.mc1-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.mc1-card-head h2 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+  color: var(--text);
+}
+
+.mc1-card-head p {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* 顶部工具条与锚点条：降到辅助层，不再与卡片标题争夺视觉权重 */
+.mc1-topbar {
+  padding-bottom: var(--space-1);
+}
+
+.mc1-context {
+  row-gap: var(--space-2);
+  font-size: 12px;
+}
+
+.mc1-anchor-chip {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+.mc1-window {
+  font-weight: 600;
+}
+
+/* 2) 热力图：去掉"Excel 网格"，让数量成为图形 ------------------------- */
+
+.mc1-heat-grid {
+  gap: 3px;
+}
+
+.mc1-heat-corner,
+.mc1-heat-col {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.mc1-heat-col.has-anchor {
+  color: var(--text);
+}
+
+.mc1-heat-label {
+  padding-right: 10px;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.mc1-heat-cell {
+  height: 32px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--bg-sunken);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: outline-color var(--motion-fast) ease, filter var(--motion-fast) ease;
+}
+
+.mc1-heat-cell:hover {
+  filter: saturate(1.15) brightness(0.98);
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.mc1-heat-cell.is-selected {
+  outline: 2px solid var(--selection);
+  outline-offset: 0;
+  box-shadow: 0 0 0 3px var(--selection-soft);
+}
+
+.mc1-heat-cell.is-empty {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--grid);
+}
+
+.mc1-cell-dash {
+  color: var(--text-faint);
+  font-weight: 400;
+}
+
+/* 公开/内部两个数：用分隔线断开，避免"1 10"被读成"110" */
+.mc1-cell-nums {
+  gap: 0;
+  align-items: baseline;
+}
+
+.mc1-num-public,
+.mc1-num-internal {
+  padding: 0 4px;
+  font-size: inherit;
+}
+
+.mc1-num-public + .mc1-num-internal {
+  border-left: 1px solid color-mix(in srgb, currentColor 34%, transparent);
+}
+
+.mc1-heat-legend {
+  gap: 6px var(--space-4);
+  font-size: 12px;
+}
+
+/* 3) 事件轨：提高刻度与锚点可读性 ------------------------------------- */
+
+.mc1-track-lane-label,
+.mc1-track-anchor-label {
+  font-size: 11px;
+}
+
+.mc1-track-anchor-label {
+  fill: var(--text-muted);
+  font-weight: 600;
+}
+
+.mc1-track-grid {
+  stroke-dasharray: 0;
+  opacity: 0.5;
+}
+
+.mc1-track-msg {
+  fill: var(--accent);
+}
+
+.mc1-track-legend {
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 4) 回复网络：先看结构，再按需看权重 --------------------------------- */
+
+.mc1-net-svg {
+  background: var(--panel);
+  border-radius: var(--radius-md);
+}
+
+.mc1-edge-line {
+  opacity: 0.3;
+  transition: opacity var(--motion-fast) ease;
+}
+
+.mc1-edge:hover .mc1-edge-line,
+.mc1-edge:focus-within .mc1-edge-line {
+  opacity: 0.95;
+}
+
+.mc1-edge.is-selected .mc1-edge-line {
+  opacity: 1;
+}
+
+.mc1-node circle {
+  stroke-width: 2;
+  filter: drop-shadow(0 1px 2px rgb(15 35 31 / 14%));
+}
+
+.mc1-node-label {
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--text);
+  stroke-width: 4px;
+}
+
+.mc1-node-count {
+  font-size: 12.5px;
+}
+
+.mc1-edge-label {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--text-muted);
+  paint-order: stroke;
+  stroke: var(--panel);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.mc1-net-legend {
+  gap: 4px var(--space-3);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 5) 消息列表与阅读面板：正文回到 13px，元信息 12px ------------------- */
+
+.mc1-msg-head {
+  grid-template-columns: 120px 132px 96px minmax(80px, 1fr) auto;
+  gap: var(--space-3);
+  padding: 6px 8px;
+  font-size: 12.5px;
+  border-radius: var(--radius-sm);
+}
+
+.mc1-msg-time,
+.mc1-msg-channel {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.mc1-msg-preview {
+  color: var(--text);
+}
+
+.mc1-msg-text,
+.mc1-candidate-excerpt {
+  font-size: 13.5px;
+  line-height: 1.7;
+  max-width: var(--measure);
+}
+
+.mc1-reader-title strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mc1-reader-body {
+  font-size: 13px;
+}
+
+/* 6) 通用：说明文字不再用 11px 的浅灰一层层堆叠 ----------------------- */
+
+.muted.small,
+.small {
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.callout,
+.callout .muted.small {
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.btn {
+  font-size: 12.5px;
+}
+
+.tag {
+  font-size: 11.5px;
+}
+/* 7) 顶栏与底栏：控件高度、边框和留白统一 ----------------------------- */
+
+.topbar {
+  padding: var(--space-2) var(--space-5);
+  gap: var(--space-5);
+  min-height: 52px;
+}
+
+.topbar .field > span {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+
+input[type="search"],
+select {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  background: var(--bg-sunken);
+}
+
+input[type="search"]:hover,
+select:hover {
+  border-color: var(--border-strong);
+}
+
+.btn {
+  min-height: 30px;
+  padding: 4px 12px;
+  border-radius: var(--radius-md);
+}
+
+.controlbar {
+  padding: var(--space-2) var(--space-5);
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+}
+
+/* 8) 网络图再降一档噪声：连线更淡，节点更实 --------------------------- */
+
+.mc1-edge-line {
+  opacity: 0.22;
+}
+
+.mc1-node circle {
+  stroke-width: 2.2;
+}
+
+.mc1-heat-cell.is-empty:hover {
+  outline: none;
+  filter: none;
+}
+/* 9) 热力格内两个计数不再依赖颜色区分：字重 + 分隔线 + 继承格子文字色 -- */
+
+.mc1-heat-cell .mc1-num-public,
+.mc1-heat-cell .mc1-num-internal {
+  color: inherit;
+}
+
+.mc1-heat-cell .mc1-num-public {
+  font-weight: 700;
+}
+
+.mc1-heat-cell .mc1-num-internal {
+  font-weight: 500;
+}
+
+.mc1-heat-cell .mc1-num-public + .mc1-num-internal {
+  border-left-color: currentColor;
+  opacity: 0.86;
 }

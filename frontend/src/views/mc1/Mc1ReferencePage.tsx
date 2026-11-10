@@ -152,8 +152,8 @@ export function Mc1ReferencePage() {
   const cellWidth = useMemo(() => {
     const base = mc1CellWidth(granularity);
     if (!columnCount || mainWidth <= 0) return base;
-    // 热力格标签列 132px，卡片内边距与列间距也要扣掉
-    const usable = mainWidth - 24 - (132 + 12) - 2 * columnCount;
+    // 热力格标签列 156px，卡片内边距与列间距也要扣掉
+    const usable = mainWidth - 32 - (156 + 12) - 3 * columnCount;
     return Math.max(base, Math.min(96, Math.floor(usable / columnCount)));
   }, [columnCount, granularity, mainWidth]);
 

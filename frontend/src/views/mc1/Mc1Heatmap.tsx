@@ -89,8 +89,10 @@ export function Mc1Heatmap({
   const cellFill = (value: number) => {
     if (value <= 0) return undefined;
     const ratio = Math.min(1, Math.sqrt(value / maxCount));
-    const pct = Math.round(12 + ratio * 62);
-    return { background: `color-mix(in srgb, var(--accent) ${pct}%, var(--panel))` };
+    const pct = Math.round(8 + ratio * 64);
+    // 深色格子改用对比色文字，否则深青底 + 深色数字在浅色主题里读不出来
+    const color = ratio > 0.56 ? "var(--accent-contrast)" : "var(--text)";
+    return { background: `color-mix(in srgb, var(--accent) ${pct}%, var(--panel))`, color };
   };
 
   if (error) {
@@ -111,7 +113,7 @@ export function Mc1Heatmap({
             <div
               className="mc1-heat-grid"
               style={{
-                gridTemplateColumns: `132px repeat(${Math.max(1, payload.columns.length)}, ${cellWidth}px)`,
+                gridTemplateColumns: `156px repeat(${Math.max(1, payload.columns.length)}, ${cellWidth}px)`,
                 gap: `${MC1_CELL_GAP}px`,
               }}
               aria-label="角色活动热力图"

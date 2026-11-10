@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { formatUtc, type Mc1Bucket, type Mc1DecisionPayload, type Mc1EnvironmentRecord } from "../../data/api";
 import { MC1_CELL_GAP, type Mc1AnchorMark } from "./Mc1Heatmap";
 
-const LABEL_W = 132;
+const LABEL_W = 156;
 const LANE_H = 24;
 const TOP = 18;
 
