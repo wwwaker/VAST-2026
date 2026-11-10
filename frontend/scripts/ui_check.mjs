@@ -70,6 +70,23 @@ async function ensureDock(selector, label) {
 const ensureEventDock = () => ensureDock(".event-dock", "事件流");
 const ensureEvidenceDock = () => ensureDock(".evidence-dock", "证据");
 
+/** F3：CUSTOM 单页没有事件流坞，通用事件查询改为页面「工具 → 事件查询」卡片。 */
+async function ensureCustomStream() {
+  if (!(await page.$('[data-testid="custom-page"]'))) return false;
+  if (await page.$('[aria-label="事件查询"] .stream-row')) return true;
+  await page.evaluate(() => {
+    const tools = document.querySelector(".custom-tools");
+    if (tools instanceof HTMLDetailsElement) tools.open = true;
+    const btn = [...document.querySelectorAll(".custom-tools-menu button")].find(
+      (n) => n.textContent?.trim() === "事件查询",
+    );
+    btn?.click();
+  });
+  await page.waitForSelector('[aria-label="事件查询"] .stream-row', { timeout: 15000 });
+  return true;
+}
+const ensureStream = async () => ((await page.$('[data-testid="custom-page"]')) ? ensureCustomStream() : ensureEventDock());
+
 /**
  * F2 起 MC2 与 MC1 一致，默认就是单页（无四任务/模式/视图标签），因此这里只负责
  * 重载并停在 MC2 单页。通用事件查询改由页面“工具 → 事件查询”打开，
@@ -289,14 +306,14 @@ console.log("[CUSTOM]", JSON.stringify(customState));
 await page.screenshot({ path: path.join(OUT, "ui-custom.png") });
 
 console.log("== CUSTOM 冻结案例 ==");
-await page.waitForSelector(".case-chip", { timeout: 15000 });
+await page.waitForSelector(".custom-case-chip", { timeout: 15000 });
 const caseState = await page.evaluate(() => {
-  const chips = [...document.querySelectorAll(".case-chip")];
-  const bad = [...document.querySelectorAll(".case-chip .tag-warn, .case-chip .tag-risk")];
+  const chips = [...document.querySelectorAll(".custom-case-chip")];
+  const bad = [...chips].flatMap((chip) => [...chip.querySelectorAll(".tag-warn, .tag-risk")]);
   return {
     count: chips.length,
-    ok: document.querySelectorAll(".case-chip .tag-ok").length,
-    titles: chips.map((chip) => chip.querySelector(".case-title")?.textContent?.trim()),
+    ok: document.querySelectorAll(".custom-case-chip .tag-ok").length,
+    titles: chips.map((chip) => chip.textContent?.replace(/\s+/g, " ").trim() ?? ""),
     flagged: bad.map((node) => node.textContent?.trim()),
   };
 });
@@ -306,27 +323,22 @@ console.log("[冻结案例]", JSON.stringify(caseState));
 await page.screenshot({ path: path.join(OUT, "ui-cases.png") });
 
 // 点“审批绕过”必须直接进入它冻结的对照，而不是自动挑一个别的正常运行
-await page.evaluate(() => {
-  const chip = [...document.querySelectorAll(".case-chip")].find((node) =>
-    node.textContent?.includes("审批绕过"),
-  );
-  chip?.click();
-});
-await page.waitForSelector(".run-compare", { timeout: 20000 });
+await page.click('.custom-case-chip[data-case-id="custom-bypass-review"]');
+await page.waitForSelector('[data-testid="custom-pair"]', { timeout: 20000 });
 await wait(600);
-const caseCompare = await page.evaluate(() => ({
-  pair: document.querySelector(".run-compare .run-detail-head p")?.textContent?.trim() ?? "",
-  auto: (document.querySelector(".run-compare .run-detail-head p")?.textContent ?? "").includes("自动选择"),
-}));
+const caseCompare = await page.evaluate(() => {
+  const head = document.querySelector('[data-testid="custom-pair"] .custom-card-head')?.textContent ?? "";
+  return { pair: head.replace(/\s+/g, " ").trim(), auto: head.includes("自动选择") };
+});
 if (!caseCompare.pair.includes("run-06309bfc") || !caseCompare.pair.includes("run-93d3d84d")) {
   throw new Error(`案例对照未使用冻结配对：${caseCompare.pair}`);
 }
+if (caseCompare.auto) throw new Error(`固定 baseline 的案例被当作自动解析：${caseCompare.pair}`);
 console.log("[案例对照]", JSON.stringify(caseCompare));
 await page.screenshot({ path: path.join(OUT, "ui-case-compare.png") });
 
 console.log("== 预置案例结论导出 ==");
-await ensureEventDock();
-await ensureEvidenceDock();
+await ensureStream();
 const presetCases = await (await fetch(`${URL}/api/cases?dataset=CUSTOM`)).json();
 const presetCase = (presetCases.items ?? []).find((item) => item.title.includes("审批绕过"));
 if (!presetCase) throw new Error("找不到“审批绕过”预置案例");
@@ -334,11 +346,13 @@ const presetClaim = `自检预置案例结论 ${Date.now()}`;
 try {
   const presetRows = await page.$$(".stream-row");
   await presetRows[0].click();
-  await page.waitForSelector(".basket-add .btn", { timeout: 10000 });
+  // F3：加入证据篮在页面阅读区（唯一正文入口）
+  await page.waitForSelector(".custom-msg-actions .btn", { timeout: 10000 });
   await page.evaluate(() => {
-    const btn = [...document.querySelectorAll(".basket-add .btn")].find((b) => b.textContent?.includes("支持"));
+    const btn = [...document.querySelectorAll(".custom-msg-actions .btn")].find((b) => b.textContent?.includes("支持"));
     btn?.click();
   });
+  await ensureEvidenceDock();
   await page.evaluate(() => {
     const tab = [...document.querySelectorAll(".tabs .tab")].find((t) => t.textContent?.includes("证据篮"));
     tab?.click();
@@ -379,35 +393,32 @@ try {
   }
 }
 
-// 回到运行列表，继续测运行级筛选（CUSTOM 仍保留旧事件流侧栏与状态栏）
+// 回到运行列表，继续测运行级筛选（F3：CUSTOM 单页，事件查询是页内工具卡）
 await open("light");
 await page.select(".topbar select", "CUSTOM");
-await page.waitForSelector(".run-row-button", { timeout: 15000 });
-await ensureEventDock();
+await page.waitForSelector('[data-testid="custom-overview"]', { timeout: 15000 });
+await page.waitForFunction(() => document.querySelectorAll(".custom-overview-body").length > 0);
+await ensureStream();
 await wait(600);
 
 console.log("== CUSTOM 运行级筛选 ==");
-await page.evaluate(() => document.querySelector(".run-row-button")?.click());
-await page.waitForSelector(".run-detail-head", { timeout: 15000 });
+await page.evaluate(() => document.querySelector(".custom-run-identity")?.click());
+await page.waitForSelector('[data-testid="custom-run"]', { timeout: 15000 });
 await wait(1200);
-// 选中运行会切换 task/mode，侧栏按新 layoutKey 重置，必须再次打开后再比计数
-await ensureEventDock();
+await ensureStream();
 await page.waitForSelector(".stream-head", { timeout: 10000 });
 await wait(900);
 const runState = await page.evaluate(() => ({
-  summary: document.querySelector(".status-summary")?.textContent ?? "",
-  lane: document.querySelector(".run-detail-head")?.textContent ?? "",
+  chip: document.querySelector('[data-testid="custom-object-chip"]')?.textContent?.trim() ?? "",
+  scope: document.querySelector('[data-testid="custom-run-scope"]')?.textContent?.replace(/\s+/g, " ").trim() ?? "",
+  lane: document.querySelector('[data-testid="custom-run"] .custom-card-head')?.textContent ?? "",
   stream: document.querySelector(".stream-head .muted")?.textContent ?? "",
   streamHead: document.querySelector(".stream-head")?.textContent ?? "",
   rows: document.querySelectorAll(".stream-row").length,
 }));
-const laneEvents = Number(
-  (runState.lane.match(/([\d,]+)\s*条事件/) ?? [])[1]?.replace(/,/g, "") ?? NaN,
-);
-const streamMatched = Number(
-  (runState.stream.match(/([\d,]+)\s*条匹配/) ?? [])[1]?.replace(/,/g, "") ?? NaN,
-);
-if (!/运行/.test(runState.summary)) throw new Error(`选中运行后筛选摘要未写入 run_id：${runState.summary}`);
+const laneEvents = Number((runState.scope.match(/当前可见\s*([\d,]+)/) ?? [])[1]?.replace(/,/g, "") ?? NaN);
+const streamMatched = Number((runState.stream.match(/([\d,]+)\s*条匹配/) ?? [])[1]?.replace(/,/g, "") ?? NaN);
+if (!runState.chip.includes("运行 ")) throw new Error(`选中运行后对象摘要未写入 run：${runState.chip}`);
 if (!Number.isFinite(laneEvents) || streamMatched !== laneEvents) {
   // 业务断言不允许降级为日志：累计失败并在结束时以非零退出码体现
   failures.push(
@@ -417,31 +428,28 @@ if (!Number.isFinite(laneEvents) || streamMatched !== laneEvents) {
     `FAIL 运行画布与事件流口径：画布 ${laneEvents} 条，事件流 ${streamMatched} 条（stream-head 为空或未打开事件流）`,
   );
 } else {
-  console.log(`[运行级筛选] 摘要=${runState.summary} · 画布 ${laneEvents} 条 = 事件流 ${streamMatched} 条`);
+  console.log(`[运行级筛选] 对象=${runState.chip} · 画布 ${laneEvents} 条 = 事件流 ${streamMatched} 条`);
 }
 await page.screenshot({ path: path.join(OUT, "ui-custom-run.png") });
 
 // 「与正常对照比较」入口：必须能从有已核验配对的运行进入对照
 await page.evaluate(() => {
-  const back = [...document.querySelectorAll(".run-detail-tools .btn")].find((b) =>
-    b.textContent?.includes("返回运行列表"),
+  const back = [...document.querySelectorAll(".custom-run .custom-card-actions .btn")].find((b) =>
+    b.textContent?.includes("返回运行集合"),
   );
   back?.click();
 });
-await page.waitForSelector(".run-row-button", { timeout: 15000 });
+await page.waitForSelector('[data-testid="custom-overview"]', { timeout: 15000 });
 const runsPayload = await (await fetch(`${URL}/api/runs?dataset=CUSTOM`)).json();
 const pairedRun = (runsPayload.items ?? []).find((item) => item.has_pair);
 if (!pairedRun) throw new Error("没有可用于「与正常对照比较」的已核验配对运行");
 await page.evaluate((runId) => {
-  const row = [...document.querySelectorAll(".run-row-button")].find((n) =>
-    (n.getAttribute("title") ?? "").includes(runId),
-  );
-  row?.click();
+  document.querySelector(`.custom-overview-row[data-run-id="${runId}"] .custom-run-identity`)?.click();
 }, pairedRun.run_id);
-await page.waitForSelector(".run-detail-head", { timeout: 15000 });
+await page.waitForSelector('[data-testid="custom-run"]', { timeout: 15000 });
 await wait(800);
 const compareEntry = await page.evaluate(() => {
-  const btn = [...document.querySelectorAll(".run-detail-tools .btn")].find((b) =>
+  const btn = [...document.querySelectorAll('[data-testid="custom-run"] .custom-card-actions .btn')].find((b) =>
     b.textContent?.includes("与正常对照比较"),
   );
   return btn ? { text: btn.textContent?.trim(), title: btn.getAttribute("title"), disabled: btn.disabled } : null;
@@ -449,20 +457,21 @@ const compareEntry = await page.evaluate(() => {
 if (!compareEntry) throw new Error("运行详情缺少「与正常对照比较」入口");
 if (compareEntry.disabled) throw new Error(`已核验配对的运行入口仍被禁用：${compareEntry.title}`);
 await page.evaluate(() => {
-  const btn = [...document.querySelectorAll(".run-detail-tools .btn")].find((b) =>
+  const btn = [...document.querySelectorAll('[data-testid="custom-run"] .custom-card-actions .btn')].find((b) =>
     b.textContent?.includes("与正常对照比较"),
   );
   btn?.click();
 });
-await page.waitForSelector(".run-compare", { timeout: 20000 });
+await page.waitForSelector('[data-testid="custom-pair"]', { timeout: 20000 });
 await wait(600);
 const compareEntryState = await page.evaluate(() => ({
-  pair: document.querySelector(".run-compare .run-detail-head p")?.textContent?.trim() ?? "",
-  normal: document.querySelectorAll(".run-compare .pattern-table").length,
+  pair: document.querySelector('[data-testid="custom-pair"] .custom-card-head')?.textContent?.replace(/\s+/g, " ").trim() ?? "",
+  normal: document.querySelectorAll(".custom-pair-row").length,
 }));
 if (!compareEntryState.pair.includes(pairedRun.normal_run_id)) {
   throw new Error(`「与正常对照比较」未进入该运行的已核验配对：${compareEntryState.pair}`);
 }
+if (compareEntryState.normal !== 7) throw new Error(`配对阶段行应为 7，实际 ${compareEntryState.normal}`);
 console.log("[对照入口]", JSON.stringify({ ...compareEntry, run: pairedRun.run_id, ...compareEntryState }));
 await page.screenshot({ path: path.join(OUT, "ui-compare-entry.png") });
 

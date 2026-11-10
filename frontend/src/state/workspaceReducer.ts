@@ -105,9 +105,11 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
     case "reset": return initialWorkspace(state.dataset);
     case "task": {
       let next = chooseMode(state, action.task, action.mode);
-      // CUSTOM runs are scoped to the trace/run task. MC2's root/file context is
-      // investigation context and must survive ordinary task navigation.
-      if (action.task === "overview" && state.dataset === "CUSTOM") next = { ...next, traceObject: emptyTrace(state.dataset) };
+      // CUSTOM 只有“回到运行集合”（overview/runs）才清除运行作用域；
+      // 系统总览/实体关系等工具卡不能顺手丢掉当前运行。MC2 的根/文件是调查上下文，同样保留。
+      if (action.task === "overview" && next.mode === "runs" && state.dataset === "CUSTOM") {
+        next = { ...next, traceObject: emptyTrace(state.dataset) };
+      }
       if (action.task === "compare") {
         const comparison = next.mode === "window" ? windowComparison(next) :
           next.mode === "history" ? (state.comparison?.kind === "history" ? state.comparison : { kind: "history" as const, targetRootId: state.traceObject.dataset === "MC2" ? state.traceObject.rootEventId : null, includedRootIds: [], alignment: "stage" as const, beforeUs: null }) :
@@ -166,12 +168,15 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       const compare = action.compare || !!action.baselineRunId;
       const next = chooseMode(state, compare ? "compare" : "trace", compare ? "runPair" : "run");
       const base = action.complete ? baseFilters(EMPTY_FILTERS) : state.baseEventFilters;
+      // 游标属于运行作用域：换运行必须重置；同一运行进入配对只是换视图，保留已有时刻
+      const sameRun = state.traceObject.dataset === "CUSTOM" && state.traceObject.runId === action.runId;
       return { ...next, traceObject: { dataset: "CUSTOM", runId: action.runId },
         baseEventFilters: base,
         comparison: compare ? { kind: "runPair", runId: action.runId, baselineRunId: action.baselineRunId ?? null } :
           state.comparison?.kind === "runPair" ? { ...state.comparison, runId: action.runId, baselineRunId: state.comparison.runId === action.runId ? state.comparison.baselineRunId : null } :
           state.comparison?.kind === "window" ? { ...state.comparison, currentUs: currentWindow(base) } : state.comparison,
-        selection: null, replay: { ...state.replay, cursorUs: null }, returnStack: pushReturn(state) };
+        selection: null, replay: { ...state.replay, cursorUs: sameRun ? state.replay.cursorUs : null },
+        returnStack: pushReturn(state) };
     }
     case "comparison": {
       const c = action.comparison;

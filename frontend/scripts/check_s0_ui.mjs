@@ -31,10 +31,11 @@ async function ensureEventStream() {
   const page_ = await page.evaluate(() => ({
     mc1: !!document.querySelector(".mc1-page"),
     mc2: !!document.querySelector('[data-testid="mc2-page"]'),
+    custom: !!document.querySelector('[data-testid="custom-page"]'),
   }));
-  if (page_.mc1 || page_.mc2) {
-    // MC1/MC2 的通用事件查询收在页面「工具」菜单里
-    const prefix = page_.mc1 ? ".mc1-tools" : ".mc2-tools";
+  if (page_.mc1 || page_.mc2 || page_.custom) {
+    // MC1/MC2/CUSTOM 的通用事件查询收在页面「工具」菜单里（F3：CUSTOM 不再有事件坞）
+    const prefix = page_.mc1 ? ".mc1-tools" : page_.mc2 ? ".mc2-tools" : ".custom-tools";
     const card = page_.mc1 ? ".mc1-card" : '[aria-label="事件查询"]';
     if (await page.$(`${card} .stream-row`)) return;
     await page.evaluate((sel) => {
@@ -107,16 +108,17 @@ try {
   assert.ok(target);
 
   await page.select(".dataset-field select", "CUSTOM");
-  await task("概览");
-  await page.waitForSelector(".case-chip");
-  await page.evaluate((title) => [...document.querySelectorAll(".case-chip")].find((n) => n.textContent.includes(title))?.click(), target.title);
-  await page.waitForSelector(".run-compare");
+  await page.waitForSelector('[data-testid="custom-page"]');
+  await page.waitForSelector(".custom-case-chip");
+  await page.evaluate((caseId) => document.querySelector(`.custom-case-chip[data-case-id="${caseId}"]`)?.click(), target.case_id);
+  await page.waitForSelector('[data-testid="custom-pair"]');
   await page.waitForNetworkIdle({ idleTime: 500 });
   await ensureEventStream();
   await page.click(".stream-row");
-  if (!(await page.$(".drawer"))) await clickText(".topbar-docks button", "证据");
-  await page.waitForSelector(".basket-add");
-  await clickText(".basket-add button", "支持");
+  // F3：正文统一在页面阅读区，加入证据篮也在那里
+  await page.waitForSelector('[data-testid="custom-reader"]');
+  await page.waitForSelector(".custom-msg-actions .btn", { timeout: 20000 });
+  await clickText(".custom-msg-actions .btn", "支持");
   const pair = await save(`S0 CUSTOM pair ${Date.now()}`);
   check("CUSTOM actual save stores shared runPair, run and selected event", () => {
     assert.equal(pair.snapshot.ui_state_version, 1);
@@ -127,11 +129,10 @@ try {
   });
   await task("概览");
   await mode("运行");
-  await ensureEventStream();
-  await page.waitForSelector(".run-row-button");
-  await page.waitForFunction((id) => [...document.querySelectorAll(".case-picker .trace-item")].some((n) => n.textContent.includes(id)), {}, pair.case_id);
-  await page.evaluate((id) => [...document.querySelectorAll(".case-picker .trace-item")].find((n) => n.textContent.includes(id))?.querySelector(".restore-investigation")?.click(), pair.case_id);
-  await page.waitForSelector(".run-compare");
+  await page.waitForSelector('[data-testid="custom-overview"]');
+  await page.waitForFunction((id) => [...document.querySelectorAll(".custom-user-cases .trace-item")].some((n) => n.textContent.includes(id)), {}, pair.case_id);
+  await page.evaluate((id) => [...document.querySelectorAll(".custom-user-cases .trace-item")].find((n) => n.textContent.includes(id))?.querySelector(".restore-investigation")?.click(), pair.case_id);
+  await page.waitForSelector('[data-testid="custom-pair"]');
   check("CasePicker restore changes actual CUSTOM pair consumer", () => {});
   await page.screenshot({ path: path.join(out, "custom-pair.png") });
   const pairAgain = await save(`S0 CUSTOM restored ${Date.now()}`);
@@ -142,16 +143,18 @@ try {
     assert.deepEqual(pairAgain.snapshot.pinned_evidence, pair.snapshot.pinned_evidence);
     assert.ok(!("playing" in pairAgain.snapshot.replay));
   });
-  await clickText(".run-compare .btn", "返回运行");
-  await page.waitForSelector(".run-detail");
-  await clickText(".custom-workspace .canvas-subbar button", "查看完整运行");
+  await clickText('[data-testid="custom-pair"] .custom-card-actions .btn', "返回运行");
+  await page.waitForSelector('[data-testid="custom-run"]');
+  // 事件关键词是附加条件：清除后仍保留当前运行
+  await page.type(".topbar input[type='search']", "publish");
+  await sleep(700);
+  await clickText(".custom-scope .btn", "查看完整运行");
   await page.waitForNetworkIdle({ idleTime: 400 });
-  await page.waitForSelector(".run-detail-tools button");
-  const scope = await page.$eval(".status-summary", (n) => n.textContent);
-  check("clear filters keeps CUSTOM run scope visible", () => assert.ok(scope.includes("运行")));
-  await clickText(".run-detail-tools button", "返回运行列表");
-  await page.waitForSelector(".run-row-button");
-  await page.waitForFunction(() => !document.querySelector(".status-summary")?.textContent.includes("运行 "));
+  const scope = await page.$eval('[data-testid="custom-object-chip"]', (n) => n.textContent ?? "");
+  check("clear filters keeps CUSTOM run scope visible", () => assert.ok(scope.includes("运行 "), scope));
+  await clickText(".custom-run .custom-card-actions .btn", "返回运行集合");
+  await page.waitForSelector('[data-testid="custom-overview"]');
+  await page.waitForFunction(() => document.querySelector('[data-testid="custom-object-chip"]')?.textContent?.includes("未选择运行"));
   check("return overview removes derived runId", () => {});
 
   await openTimeline("MC2");
@@ -347,7 +350,8 @@ try {
   await page.screenshot({ path: path.join(out, "missing-reference.png") });
   for (const [dataset, template, savedTask, alias, canonical, selector] of [
     ["MC1", mc1.snapshot, "overview", "timeline", "time", ".mc1-page"],
-    ["CUSTOM", pair.snapshot, "overview", "local", "relations", ".graph-workspace"],
+    // F3：CUSTOM 局部关系是页内工具卡，不再是独立的 .graph-workspace
+    ["CUSTOM", pair.snapshot, "overview", "local", "relations", '[aria-label="实体关系"]'],
     ["MC1", mc1.snapshot, "trace", "messages", "decision", ".mc1-page"],
     // F2：来源链是单页默认区域，不再有独立 .trace-view；用来源链卡片作为落点
     ["MC2", mc2.snapshot, "trace", "file", "source", '[data-testid="mc2-trace-card"]'],

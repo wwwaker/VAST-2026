@@ -148,6 +148,24 @@ test("MC2 unified page keeps playback while the cursor still drives its figures"
   assert.equal(s.playing, false);
   assert.equal(s.traceObject.rootEventId, "MC2:event:373902");
 });
+// F3：游标属于运行作用域。同一运行进入配对只换视图，换运行才重置游标；
+// 系统总览/实体关系等工具卡不得顺手清掉当前运行。
+test("CUSTOM cursor is run-scoped and tool cards keep the current run", () => {
+  let s = reduce(m.initialWorkspace("CUSTOM"), { type: "openRun", runId: "a" });
+  s = reduce(s, { type: "replay", cursorUs: 42 });
+  const paired = reduce(s, { type: "openRun", runId: "a", compare: true });
+  assert.equal(paired.replay.cursorUs, 42);
+  assert.equal(paired.traceObject.runId, "a");
+  const switched = reduce(paired, { type: "openRun", runId: "b" });
+  assert.equal(switched.replay.cursorUs, null);
+  const tools = reduce(s, { type: "task", task: "overview", mode: "time" });
+  assert.equal(tools.traceObject.runId, "a");
+  const graph = reduce(s, { type: "task", task: "overview", mode: "relations" });
+  assert.equal(graph.traceObject.runId, "a");
+  const collection = reduce(s, { type: "task", task: "overview", mode: "runs" });
+  assert.equal(collection.traceObject.runId, null);
+  assert.equal(collection.replay.cursorUs, 42);
+});
 test("functional cursor updates compose atomically without entering return history", () => {
   let s = reduce(m.initialWorkspace("MC1"), { type: "cursor", value: 0 });
   s = reduce(s, { type: "cursor", value: (previous) => previous + 1 });

@@ -3,7 +3,14 @@ import { useWorkspace } from "../state/workspace";
 import { useTheme } from "../theme/theme";
 import { HOUR_US, SECOND_US, fetchDatasets, fetchRun, formatUtc } from "../data/api";
 
-export function TimeBrush({ compact = false }: { compact?: boolean }) {
+export function TimeBrush({
+  compact = false,
+  missingRunIds,
+}: {
+  compact?: boolean;
+  /** 恢复快照判定缺失的运行：保留 ID 但不请求已知缺失对象。 */
+  missingRunIds?: string[];
+}) {
   const {
     dataset,
     filters,
@@ -39,13 +46,18 @@ export function TimeBrush({ compact = false }: { compact?: boolean }) {
     };
 
     if (runId) {
-      fetchRun(runId, {}, controller.signal)
-        .then((detail) => {
-          if (!cancelled) apply(detail.run.start_us, detail.run.end_us);
-        })
-        .catch(() => {
-          if (!cancelled) setRange(null);
-        });
+      if (missingRunIds?.includes(runId)) {
+        // 快照里已知缺失的运行：不发请求，也不把范围退回数据集全量
+        setRange(null);
+      } else {
+        fetchRun(runId, {}, controller.signal)
+          .then((detail) => {
+            if (!cancelled) apply(detail.run.start_us, detail.run.end_us);
+          })
+          .catch(() => {
+            if (!cancelled) setRange(null);
+          });
+      }
     } else {
       fetchDatasets(controller.signal)
         .then((datasets) => {
@@ -62,7 +74,7 @@ export function TimeBrush({ compact = false }: { compact?: boolean }) {
       cancelled = true;
       controller.abort();
     };
-  }, [dataset, runId, setCursor]);
+  }, [dataset, runId, setCursor, missingRunIds]);
 
 
   useEffect(() => {

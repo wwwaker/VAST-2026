@@ -60,23 +60,40 @@ function roleOf(entityId: string | null): string {
   return entityId.slice(entityId.lastIndexOf(":") + 1);
 }
 
+/**
+ * 单运行的唯一流程区：角色泳道 + 事件图形 + 模型调用区间 + 明确 parent 连线。
+ * 点事件或审计证据都交给父页的 openEvent，正文、selection 与笔记关联只此一份。
+ */
 export function RunTimeline({
   runId,
+  missing = false,
   onBack,
   onCompare,
+  onClearEventFilters,
+  hasEventFilters,
+  onOpenEvent,
 }: {
   runId: string;
+  missing?: boolean;
   onBack: () => void;
   onCompare: (runId: string) => void;
+  onClearEventFilters: () => void;
+  hasEventFilters: boolean;
+  onOpenEvent: (eventId: string, timeUs: number | null, trigger?: Element | null) => void;
 }) {
-  const { cursor, masking, selectedEventId, selectEvent, filters } = useWorkspace();
+  const { cursor, masking, selectedEventId, filters } = useWorkspace();
   const { colors } = useTheme();
   const [detail, setDetail] = useState<RunDetailPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeRule, setActiveRule] = useState<string | null>(null);
 
   useEffect(() => {
+    if (missing) {
+      setDetail(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     const controller = new AbortController();
     setLoading(true);
     setError(null);
@@ -92,7 +109,7 @@ export function RunTimeline({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [runId, cursor, masking, filters]);
+  }, [runId, cursor, masking, filters, missing]);
 
   const layout = useMemo(() => {
     if (!detail) return null;
@@ -120,58 +137,96 @@ export function RunTimeline({
     return { events, startUs, endUs, span, xOf, positions };
   }, [detail]);
 
-  if (error) {
+  if (missing) {
     return (
-      <div className="empty-state">
-        <h2>运行读取失败</h2>
-        <p>{error}</p>
-        <button type="button" className="btn" onClick={onBack}>返回运行列表</button>
-      </div>
+      <section className="custom-card" aria-label="单次运行" data-testid="custom-run">
+        <div className="callout callout-warn">
+          <strong>该运行在快照中被标记为缺失</strong>
+          <p className="muted small mono">{runId}</p>
+          <p className="muted small">
+            原引用已保留并可导出，不会用其他运行替代，也不请求已知缺失的对象。
+          </p>
+          <button type="button" className="btn" onClick={onBack}>
+            返回运行集合
+          </button>
+        </div>
+      </section>
     );
   }
 
-  if (!detail || !layout) {
-    return <div className="empty-state"><p className="muted">{loading ? "正在载入运行…" : "该运行当前没有可见事件"}</p></div>;
+  if (error) {
+    return (
+      <section className="custom-card" aria-label="单次运行" data-testid="custom-run">
+        <div className="empty-state">
+          <h2>运行读取失败</h2>
+          <p>{error}</p>
+          <button type="button" className="btn" onClick={onBack}>
+            返回运行集合
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  if (!detail) {
+    return (
+      <section className="custom-card" aria-label="单次运行" data-testid="custom-run">
+        <p className="muted small">
+          {loading
+            ? "正在载入运行…"
+            : "该运行在当前附加事件筛选/回放遮蔽下没有可见事件；清除事件条件可看完整运行。"}
+        </p>
+      </section>
+    );
   }
 
   const { run, audit } = detail;
   const height = TOP + ROLES.length * LANE_H + 24;
-  const ticks = [0, 1, 2, 3, 4, 5].map((index) => layout.startUs + (layout.span * index) / 5);
-
-  const selectEvidence = (eventId: string) => {
-    const event = layout.events.find((item) => item.event_id === eventId);
-    if (event) selectEvent(event.event_id, event.time_us);
-  };
+  const ticks = layout ? [0, 1, 2, 3, 4, 5].map((index) => layout.startUs + (layout.span * index) / 5) : [];
+  const matched = detail.meta.matched_events;
 
   return (
-    <div className="run-detail">
-      <div className="run-detail-head">
-        <div>
-          <h2>
-            <span className="mono">{run.run_id}</span>
-          </h2>
-          <p className="muted small">
-            {run.model ?? "模型未知"} · {(run.fixture ?? "fixture 未知").split("/").pop()} · 场景{" "}
-            {run.scenario ?? "未标注"} · observed {String(run.observed)} · {run.event_count} 条事件 ·{" "}
-            {formatDuration(run.duration_us)}
-            {masking && cursor != null && ` · 回放截止 ${formatUtc(cursor)}`}
-          </p>
-        </div>
-        <div className="run-detail-tools">
-          <button type="button" className="btn btn-quiet" onClick={onBack}>返回运行列表</button>
+    <section className="custom-card custom-run" aria-label="单次运行" data-testid="custom-run">
+      <header className="custom-card-head">
+        <h2>
+          角色流程 · <span className="mono">{run.run_id}</span>
+        </h2>
+        <p className="muted small">
+          {run.model ?? "模型未知"} · {(run.fixture ?? "fixture 未知").split("/").pop()} · 场景{" "}
+          {run.scenario ?? "未标注"} · observed {String(run.observed)}
+        </p>
+        <div className="custom-card-actions">
+          <button type="button" className="btn btn-quiet" onClick={onBack}>
+            返回运行集合
+          </button>
           <button
             type="button"
             className="btn"
             onClick={() => onCompare(run.run_id)}
             disabled={!detail.pair}
-            title={detail.pair ? "与同模型同任务的正常对照比较" : "该运行没有已核验的正常对照"}
+            title={detail.pair ? "与同模型同任务的正常对照比较（两次完整运行）" : "该运行没有已核验的正常对照"}
           >
             与正常对照比较
           </button>
         </div>
+      </header>
+
+      <div className="custom-scope" data-testid="custom-run-scope">
+        <span className="tag">
+          当前可见 {matched} / 完整 {run.event_count} 条
+        </span>
+        {detail.truncated && <span className="tag tag-warn">事件已截断显示</span>}
+        {masking && cursor != null && <span className="tag">回放截止 {formatUtc(cursor)}</span>}
+        {masking && cursor == null && <span className="tag">回放遮蔽开启但未定位</span>}
+        {hasEventFilters && (
+          <button type="button" className="btn btn-quiet" onClick={onClearEventFilters}>
+            查看完整运行（清事件条件）
+          </button>
+        )}
       </div>
 
-      <div className="run-lanes">
+      {layout ? (
+      <div className="custom-lanes">
         <svg viewBox={`0 0 ${W} ${height}`} role="img" aria-label="单次运行流程泳道" preserveAspectRatio="xMidYMid meet">
           {ROLES.map((role, index) => (
             <g key={role}>
@@ -197,7 +252,6 @@ export function RunTimeline({
             </g>
           ))}
 
-          {/* 模型调用区间：只画有起止配对的调用 */}
           {detail.calls
             .filter((call) => !call.unpaired && call.start_us != null)
             .map((call, index) => {
@@ -216,7 +270,7 @@ export function RunTimeline({
                   fill={colors.accent}
                   opacity={0.08}
                 >
-                  <title>{`模型调用 ${formatDuration((call.end_us - (call.start_us as number)))}`}</title>
+                  <title>{`模型调用 ${formatDuration(call.end_us - (call.start_us as number))}`}</title>
                 </rect>
               );
             })}
@@ -249,11 +303,15 @@ export function RunTimeline({
               <g
                 key={`${event.event_id}-${index}`}
                 className="run-event"
-                onClick={() => selectEvent(event.event_id, event.time_us)}
+                data-event-id={event.event_id}
+                onClick={(click) => onOpenEvent(event.event_id, event.time_us, click.currentTarget)}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(keyboard) => {
-                  if (keyboard.key === "Enter" || keyboard.key === " ") selectEvent(event.event_id, event.time_us);
+                  if (keyboard.key === "Enter" || keyboard.key === " ") {
+                    keyboard.preventDefault();
+                    onOpenEvent(event.event_id, event.time_us, keyboard.currentTarget);
+                  }
                 }}
               >
                 <title>{`${formatUtc(event.time_us)}\n${event.event_type}\n${event.actor_label ?? event.actor_id ?? "执行者未知"}\n${event.preview}`}</title>
@@ -314,6 +372,11 @@ export function RunTimeline({
           ))}
         </svg>
       </div>
+      ) : (
+        <p className="muted small" data-testid="custom-run-empty">
+          当前附加事件条件/回放遮蔽下没有可见事件：不显示空成功，也不把“没有可见事件”当作“没有执行”。
+        </p>
+      )}
 
       <div className="row">
         <span className="legend-item">● 消息</span>
@@ -321,71 +384,73 @@ export function RunTimeline({
         <span className="legend-item">◆ 审核/版本</span>
         <span className="legend-item">▲ 发布</span>
         <span className="legend-item legend-off">浅色条 = 模型调用区间</span>
-        <span className="legend-item legend-off">连线 = 明确 parent 记录</span>
+        <span className="legend-item legend-off">连线 = 明确 parent 记录（不是因果推断）</span>
       </div>
 
-      <div className="audit">
-        <div className="audit-head">
+      <div className="custom-audit">
+        <div className="custom-audit-head">
           <h3>审计（由事件字段重算）</h3>
-          <p className="muted small">
-            尝试 {audit.summary.attempt_count} · 审核有效 {audit.summary.review_valid} / 无效{" "}
-            {audit.summary.review_invalid} / 未知 {audit.summary.review_unknown} · 发布当前版本{" "}
-            {audit.summary.published_current} / 旧版 {audit.summary.published_stale} / 拒绝{" "}
-            {audit.summary.denied} · 重复交接 {audit.summary.repeated_handoff}
-          </p>
+          <span className="tag" title="审计只使用当前可见事件；回放/筛选会改变可见证据。">
+            基于当前可见事件
+          </span>
         </div>
+        <p className="muted small" data-testid="custom-audit-summary">
+          尝试 {audit.summary.attempt_count} · 审核有效 {audit.summary.review_valid} / 无效{" "}
+          {audit.summary.review_invalid} / 未知 {audit.summary.review_unknown} · 发布当前版本{" "}
+          {audit.summary.published_current} / 旧版 {audit.summary.published_stale} / 拒绝{" "}
+          {audit.summary.denied} · 重复交接 {audit.summary.repeated_handoff}
+        </p>
 
-        <div className="audit-rules">
-          {audit.rules.map((rule: RunAuditRule, index) => (
-            <div
-              key={`${rule.rule_id}-${rule.scope ?? "run"}-${index}`}
-              className={`audit-rule${activeRule === `${rule.rule_id}-${index}` ? " audit-rule-active" : ""}`}
-              onClick={() => setActiveRule(`${rule.rule_id}-${index}`)}
-            >
-              <span className="mono">{rule.rule_id}</span>
-              <span className={statusClass(rule.status)}>{statusLabel(rule.status)}</span>
-              <span className="audit-reason">{rule.reason}</span>
-              <span className="audit-evidence">
-                {rule.evidence_event_ids.slice(0, 3).map((eventId, index) => {
-                  const visible = layout.positions.has(eventId);
-                  return (
-                    <button
-                      key={`${eventId}-${index}`}
-                      type="button"
-                      className="btn btn-quiet audit-evidence-btn"
-                      disabled={!visible}
-                      title={visible ? "定位到该证据事件" : "该证据位于当前回放/筛选之外"}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        selectEvidence(eventId);
-                      }}
-                    >
-                      {eventId.slice(0, 8)}
-                    </button>
-                  );
-                })}
-                {rule.evidence_event_ids.length > 3 && (
-                  <span className="muted small">+{rule.evidence_event_ids.length - 3}</span>
-                )}
-              </span>
-            </div>
-          ))}
-        </div>
+        <details className="custom-audit-rules">
+          <summary>规则原因与证据（{audit.rules.length}）</summary>
+          <div className="audit-rules">
+            {audit.rules.map((rule: RunAuditRule, index) => (
+              <div key={`${rule.rule_id}-${rule.scope ?? "run"}-${index}`} className="audit-rule">
+                <span className="mono">{rule.rule_id}</span>
+                <span className={statusClass(rule.status)}>{statusLabel(rule.status)}</span>
+                <span className="audit-reason">{rule.reason}</span>
+                <span className="audit-evidence">
+                  {rule.evidence_event_ids.slice(0, 3).map((eventId, evidenceIndex) => {
+                    const position = layout?.positions.get(eventId);
+                    return (
+                      <button
+                        key={`${eventId}-${evidenceIndex}`}
+                        type="button"
+                        className="btn btn-quiet audit-evidence-btn"
+                        data-event-id={eventId}
+                        disabled={!position}
+                        title={position ? "在阅读区打开该证据事件" : "该证据位于当前回放/筛选之外"}
+                        onClick={(click) => {
+                          click.stopPropagation();
+                          if (position) onOpenEvent(eventId, position.event.time_us, click.currentTarget);
+                        }}
+                      >
+                        {eventId.slice(0, 8)}
+                      </button>
+                    );
+                  })}
+                  {rule.evidence_event_ids.length > 3 && (
+                    <span className="muted small">+{rule.evidence_event_ids.length - 3}</span>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+          {audit.handoff.pairs.length > 0 && (
+            <p className="muted small">
+              交接对：
+              {audit.handoff.pairs
+                .map((pair) => `${pair.source_role}→${pair.target_role}×${pair.count}`)
+                .join("；")}
+              {audit.handoff.loops.length > 0 && ` · 回返路径 ${audit.handoff.loops.length} 条`}
+            </p>
+          )}
+        </details>
 
-        {audit.handoff.pairs.length > 0 && (
-          <p className="muted small">
-            交接对：
-            {audit.handoff.pairs
-              .map((pair) => `${pair.source_role}→${pair.target_role}×${pair.count}`)
-              .join("；")}
-            {audit.handoff.loops.length > 0 && ` · 回返路径 ${audit.handoff.loops.length} 条`}
-          </p>
-        )}
         <p className="muted small">
-          审计只使用当前可见事件；结果缺失时为 unknown，不推断成功或失败。规则状态是待核验证据，
-          不是对流程意图的判断。
+          结果缺失时为 unknown，不推断成功或失败；规则状态是待核验证据，不是对流程意图的判断。
         </p>
       </div>
-    </div>
+    </section>
   );
 }

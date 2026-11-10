@@ -26,6 +26,7 @@ export function EvidenceDrawer() {
     selectedEventId,
     selectedEventAt,
     state,
+    restoreMissing,
     notes,
     notesLoading,
     addNote,
@@ -44,6 +45,13 @@ export function EvidenceDrawer() {
   useEffect(() => {
     if (!selectedEventId) {
       setEvent(null);
+      return;
+    }
+    // 恢复快照判定缺失的事件：保留引用，但不请求已知不存在的对象
+    if (restoreMissing.includes(selectedEventId)) {
+      setEvent(null);
+      setError("该事件在快照中被标记为缺失");
+      setLoading(false);
       return;
     }
     let cancelled = false;
@@ -71,10 +79,10 @@ export function EvidenceDrawer() {
   if (!evidenceOpen) return null;
 
   const details = event?.details ?? null;
-  // MC1 的正文与原始字段已统一在页面阅读面板里，证据侧栏只保留关联、证据篮和笔记，
+  // MC1/CUSTOM 的正文与原始字段已统一在页面阅读面板里，证据侧栏只保留关联、证据篮和笔记，
   // 不再提供第二套消息阅读入口。
   const tabs =
-    dataset === "MC1"
+    dataset === "MC1" || dataset === "CUSTOM"
       ? [
           { key: "related", label: "关联" },
           { key: "basket", label: "证据篮" },
@@ -139,7 +147,9 @@ export function EvidenceDrawer() {
             <p className="muted">
               {dataset === "MC1"
                 ? "在热力图、事件轨或回复网络中打开对象后，这里会显示它的参与实体与关系边。"
-                : "在下方事件流中点击任意一行，或点击时间线上的红色三角锚点。"}
+                : dataset === "CUSTOM"
+                  ? "从阶段样本、角色泳道、配对轨迹或事件查询打开事件后，这里显示它的关联与笔记入口。"
+                  : "在下方事件流中点击任意一行，或点击时间线上的红色三角锚点。"}
             </p>
             <p className="muted small">
               需要记录结论时可以切到「笔记」页，笔记存在服务端，刷新不会丢。

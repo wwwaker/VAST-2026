@@ -79,20 +79,22 @@ const system = await page.evaluate(() => ({
 check("MC2 系统背景聚合图可用", system.nodes >= 8, JSON.stringify(system));
 await shot("regression-mc2-system");
 
-// --- CUSTOM 运行入口 ---
+// --- CUSTOM 运行入口（F3 参考单页：运行×阶段概览 → 角色流程） ---
 await page.goto(URL, { waitUntil: "networkidle0" });
 await page.select(".dataset-field select", "CUSTOM");
-await page.waitForSelector(".run-row-button", { timeout: 20000 });
+await page.waitForSelector('[data-testid="custom-overview"]', { timeout: 20000 });
+await page.waitForFunction(() => document.querySelectorAll(".custom-overview-body").length > 0, { timeout: 20000 });
 await wait(600);
-const runCount = await page.evaluate(() => document.querySelectorAll(".run-row-button").length);
-await page.evaluate(() => document.querySelector(".run-row-button")?.click());
-await page.waitForSelector(".run-detail-head", { timeout: 20000 });
+const runCount = await page.evaluate(() => document.querySelectorAll(".custom-overview-body").length);
+await page.evaluate(() => document.querySelector(".custom-run-identity")?.click());
+await page.waitForSelector('[data-testid="custom-run"]', { timeout: 20000 });
 await wait(900);
 const custom = await page.evaluate(() => ({
-  head: document.querySelector(".run-detail-head")?.textContent?.slice(0, 60) ?? "",
-  summary: document.querySelector(".status-summary")?.textContent ?? "",
+  head: document.querySelector('[data-testid="custom-run"] .custom-card-head')?.textContent?.slice(0, 80) ?? "",
+  scope: document.querySelector('[data-testid="custom-run-scope"]')?.textContent?.replace(/\s+/g, " ").trim() ?? "",
 }));
 check("CUSTOM 运行可选中并显示详情", runCount >= 30 && custom.head.length > 0, JSON.stringify({ runCount, ...custom }));
+check("CUSTOM 单页不出现旧四任务导航", (await page.evaluate(() => document.querySelectorAll(".task-tab, .view-tab, .event-dock").length)) === 0);
 await shot("regression-custom-run");
 
 const uniqueErrors = [...new Set(errors)];
