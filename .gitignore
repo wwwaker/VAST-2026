@@ -29,3 +29,7 @@ VAST_Challenge_2026-main/
 .DS_Store
 Thumbs.db
 *.log
+
+# ---- 文档本地保留，不入库（避免随分支/推送流转）----
+docs/
+/frontend/REFERENCE_SOURCES.md

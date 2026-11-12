@@ -16,6 +16,7 @@ import {
   fmtSigned, fmtRoundLabel, timeToBucket,
 } from './utils.js';
 import { Collapsible } from './components/Collapsible.jsx';
+import { ViewControls } from './components/ViewControls.jsx';
 import { CrisisTimeline } from './components/CrisisTimeline.jsx';
 import { StockSentimentLineChart } from './components/StockSentimentLineChart.jsx';
 import { SequentialFlow } from './components/SequentialFlow.jsx';
@@ -659,12 +660,12 @@ const HELP_EXTERNAL_CHANNEL = '公开动态没有接收者，因此不会形成�
         </nav>
       </header>
 
-      <section className="global-controls">
-        <span className="gc-label">显示视图：</span>
-        <label className="check"><input type="checkbox" checked={showHeatmap} onChange={e => setShowHeatmap(e.target.checked)} /> 热力图</label>
-        <label className="check"><input type="checkbox" checked={showSeqFlow} onChange={e => setShowSeqFlow(e.target.checked)} disabled={sideBySide} /> 事件流</label>
-        <label className="check"><input type="checkbox" checked={showLineChart} onChange={e => setShowLineChart(e.target.checked)} disabled={sideBySide} /> 折线图</label>
-        <label className="check"><input type="checkbox" checked={showNetwork} onChange={e => setShowNetwork(e.target.checked)} /> 网络图</label>
+      <ViewControls views={[
+        { id: 'heatmap', label: '热力图', checked: showHeatmap, change: setShowHeatmap },
+        { id: 'sequence', label: '事件流', checked: showSeqFlow, change: setShowSeqFlow, disabled: sideBySide },
+        { id: 'line', label: '折线图', checked: showLineChart, change: setShowLineChart, disabled: sideBySide },
+        { id: 'network', label: '网络图', checked: showNetwork, change: setShowNetwork },
+      ]}>
         <button type="button" className={`fp-toggle gc-compare-toggle ${sideBySide ? 'on' : ''}`}
           onClick={() => setSideBySide(v => !v)}
           title="将热力图与网络图并排显示以便对比（开启时会隐藏筛选面板与折线图）。">
@@ -681,7 +682,7 @@ const HELP_EXTERNAL_CHANNEL = '公开动态没有接收者，因此不会形成�
           全库含合并关键词：<b>{options.combined_merger_count}</b> / {options.total_count}
           {' · '}内容：{options.merger_count} {' · '}内心想法：{options.internal_merger_count}
         </div>
-      </section>
+      </ViewControls>
 
       {/* ============================================
           Crisis timeline slider (drives all three views)

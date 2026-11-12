@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..db import get_conn, require_dataset
 from ..domain import event_types
+from ..domain.mc2_reading import summary as mc2_summary
 from ..query import filters
 from ..query.filters import EventSelection, FilterError, RawFilter
 
@@ -82,7 +83,7 @@ def summarize(row, dataset: str, annotations: list[dict]) -> dict:
         "version": row["version"],
         "document_id": row["document_id"],
         "channel_id": row["channel_id"],
-        "preview": _preview(row["details_json"]),
+        "preview": mc2_summary(row["event_type"], row["details_json"]) if dataset == "MC2" else _preview(row["details_json"]),
         "has_deliberation": bool(row["has_deliberation"]),
         "source_missing_id": bool(row["source_missing_id"]),
         "annotations": annotations,

@@ -1,3 +1,4 @@
+import { MessageMetadata, ReadingActions } from './MessageMetadata.jsx';
 
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
@@ -86,9 +87,7 @@ export function MessageList({ status, messages, selectedMessageId, onSelectMessa
       title="点击查看该消息的上下文 / 相关消息"
     >
       {renderExtra && renderExtra(m)}
-      <div className="msg-meta">
-        {m.comm_id != null && <span className="comm-id">#{m.comm_id}</span>}
-        <b>{m.timestamp}</b>
+      <MessageMetadata number={m.comm_id} timestamp={m.timestamp}>
         <span>{agentLabelOf(m.agent_id, m.agent_label)}</span>
         <span>{channelLabelOf(m.channel)}</span>
         <span>{visibilityLabelOf(m.visibility)}</span>
@@ -106,7 +105,7 @@ export function MessageList({ status, messages, selectedMessageId, onSelectMessa
               </span>
             );
           })}
-      </div>
+      </MessageMetadata>
       <div className="sub-meta">
         角色：{roleLabelOf(m.agent_role) || '-'} / 收件人：{formatRecipients(m.recipients)} / 回复对象：{(() => {
           if (!m.responding_to) return '-';
@@ -422,8 +421,7 @@ export function ConversationFlowModal({ open, context, status, selectedMessageId
               </div>
             )}
           </div>
-          {history.length > 0 && <button className="flow-back" onClick={back}>返回上一条</button>}
-          <button className="flow-close" aria-label="关闭对话" onClick={onClose}>✕</button>
+          <ReadingActions onBack={history.length > 0 ? back : undefined} onClose={onClose}/>
         </div>
 
         {!loading && !errored && why && <div className="flow-why"><b>为什么重要：</b> {why}</div>}

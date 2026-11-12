@@ -4,7 +4,7 @@ import { Play, Pause } from 'lucide-react';
 import { fmtRoundLabel } from '../utils.js';
 import { EVENT_MARKERS } from '../constants.js';
 
-export function CrisisTimeline({ timeline, idx, setIdx, startIdx = 0, setStartIdx, playing, onTogglePlay, granularity, setGranularity }) {
+export function CrisisTimeline({ timeline, idx, setIdx, startIdx = 0, setStartIdx, playing, onTogglePlay, granularity, setGranularity, eventMarkers = EVENT_MARKERS, tickColor, renderMeta, tickLabel, tickAriaLabel, onTick, scaleOptions, playTitle }) {
   const total = timeline ? timeline.length : 0;
 
   // ---- Klavye kısayolları ----
@@ -51,7 +51,7 @@ export function CrisisTimeline({ timeline, idx, setIdx, startIdx = 0, setStartId
 
   // Olay işaretlerini (leak / embargo) round index'ine çevir:
   // önce saat bazında tam eşleşme ara, yoksa marker'dan önceki son round'a düşür.
-  const markers = EVENT_MARKERS.map(mk => {
+  const markers = eventMarkers.map(mk => {
     let mIdx = null;
     for (let i = 0; i < n; i++) {
       const h = timeline[i].hour || '';
@@ -67,7 +67,7 @@ export function CrisisTimeline({ timeline, idx, setIdx, startIdx = 0, setStartId
   return (
     <section className="timeline-bar">
       <div className="tl-row">
-        <button className={`tl-play ${playing ? 'playing' : ''}`} onClick={onTogglePlay} title={playing ? '暂停' : '播放危机（从起始手柄开始逐步扩展窗口）'}>
+        <button className={`tl-play ${playing ? 'playing' : ''}`} onClick={onTogglePlay} title={playing ? '暂停' : playTitle || '播放危机（从起始手柄开始逐步扩展窗口）'}>
           {playing ? <Pause size={15} /> : <Play size={15} />}
           {playing ? '暂停' : '播放'}
         </button>
@@ -93,9 +93,10 @@ export function CrisisTimeline({ timeline, idx, setIdx, startIdx = 0, setStartId
               return (
                 <button key={i}
                   className={`tl-tick ${i === idx ? 'current' : ''} ${i === startIdx ? 'start' : ''} ${inRange ? 'in-range' : ''}`}
-                  style={{ height: `${h}px`, background: inRange ? bg : '#1b2a3f' }}
-                  title={`第 ${i + 1}/${n} 轮 · ${fmtRoundLabel(r.hour)} · ${r.total_msgs} 条消息，${r.merger_msgs} 条含合并关键词`}
-                  onClick={() => onEnd(i)} />
+                  style={{ height: `${h}px`, background: tickColor ? tickColor(r, inRange) : inRange ? bg : '#1b2a3f' }}
+                  title={tickLabel ? tickLabel(r, i) : `第 ${i + 1}/${n} 轮 · ${fmtRoundLabel(r.hour)} · ${r.total_msgs} 条消息，${r.merger_msgs} 条含合并关键词`}
+                  aria-label={tickAriaLabel ? tickAriaLabel(r, i) : undefined}
+                  onClick={() => onTick ? onTick(i) : onEnd(i)} />
               );
             })}
           </div>
@@ -115,14 +116,13 @@ export function CrisisTimeline({ timeline, idx, setIdx, startIdx = 0, setStartId
           <label className="tl-scale" title="热力图 / 折线图横轴的时间粒度">
             粒度
             <select value={granularity} onChange={e => setGranularity(e.target.value)}>
-              <option value="daily">按日</option>
-              <option value="hourly">按小时</option>
+              {(scaleOptions || [{ value: 'daily', label: '按日' }, { value: 'hourly', label: '按小时' }]).map(option => <option key={option.value} value={option.value} disabled={option.disabled}>{option.label}</option>)}
             </select>
           </label>
         )}
       </div>
 
-      <div className="tl-meta">
+      <div className="tl-meta">{renderMeta ? renderMeta({ startIdx, idx, total: n, start: startCur, end: cur }) : <>
         <span className="tl-round">轮次 {startIdx + 1}–{idx + 1} / {n}</span>
         <span className="tl-date">{fmtRoundLabel(startCur.hour)} → {fmtRoundLabel(cur.hour)}</span>
         <span className="tl-merger">{cur.merger_msgs || 0} 条含合并关键词 · {cur.total_msgs || 0} 条消息（结束轮次）</span>
@@ -131,7 +131,7 @@ export function CrisisTimeline({ timeline, idx, setIdx, startIdx = 0, setStartId
             ▍{mk.short} {mk.time.slice(11, 16)}
           </span>
         ))}
-      </div>
+      </>}</div>
     </section>
   );
 }
