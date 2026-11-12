@@ -960,6 +960,7 @@ export interface FileTrackPayload {
   meta: Meta;
   file: FileStatus;
   relation_counts: Record<string, number>;
+  event_type_counts?: Record<string, number>;
   items: (EventItem & { file_relations: string[] })[];
   next_cursor: string | null;
   naming_note: string;
@@ -967,6 +968,13 @@ export interface FileTrackPayload {
 
 export function fetchTraceRoots(signal?: AbortSignal): Promise<{ dataset_id: string; items: TraceRootItem[]; note: string }> {
   return getJson("/api/traces/roots", { dataset: "MC2" }, signal);
+}
+
+/** Complete MC2 actor choices (agents and people), rather than overview's top 50. */
+export async function fetchMc2Actors(signal?: AbortSignal): Promise<{ entity_id: string; label: string | null }[]> {
+  const results = await Promise.all(["agent", "person"].map(type =>
+    getJson<{ items: { entity_id: string; label: string | null }[] }>("/api/entities", { dataset: "MC2", type, limit: 500 }, signal)));
+  return results.flatMap(result => result.items).sort((a, b) => (a.label ?? a.entity_id).localeCompare(b.label ?? b.entity_id));
 }
 
 export function fetchTrace(

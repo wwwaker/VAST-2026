@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+import sqlite3
 
 try:
     from . import helpers
@@ -65,6 +66,25 @@ class Mc2ContentTest(unittest.TestCase):
             exact = mc2_files.search_files(conn, "MC2", "SwiftWren.txt", 10)
         self.assertTrue(exact[0]["exact"])
 
+    def test_summary_counts_distinct_events_beyond_content_inspection_limit(self) -> None:
+        """A bounded body inspection must not become a truncated or duplicate total."""
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        self.addCleanup(conn.close)
+        conn.executescript(helpers.schema.TABLES)
+        conn.execute("INSERT INTO entities (dataset_id,entity_id,entity_type,source_value) VALUES ('MC2','file','file_path','test.txt')")
+        for index in range(502):
+            event_id = f"test:{index}"
+            helpers.insert_event(conn, dataset="MC2", event_id=event_id, time_us=index + 1, event_type="read_file", details='{"file_path":"test.txt"}')
+            for relation in ("file_path", "queued_file_path"):
+                conn.execute("INSERT INTO relations (dataset_id,event_id,dst_id,relation,derivation) VALUES ('MC2',?,'file',?,'recorded')", (event_id, relation))
+        info = mc2_files.content_status(conn, "MC2", "file")
+        self.assertEqual(info["event_count"], 502)
+        self.assertEqual(info["event_type_counts"], {"read_file": 502})
+        self.assertEqual((info["first_us"], info["last_us"]), (1, 502))
+        self.assertTrue(info["events_truncated"])
+        self.assertEqual(info["summary_scope"], "global")
+
 
 class Mc2TraceTest(unittest.TestCase):
     """M2-02：候选关联不得当成已证实传播；回放不得读到未来证据。"""
@@ -105,6 +125,12 @@ class Mc2TraceTest(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 409)
         self.assertIn("root_after_cursor", ctx.exception.detail)
 
+    def test_root_after_window_is_not_misreported_as_replay_conflict(self) -> None:
+        with self.assertRaises(HTTPException) as ctx:
+            traces("MC2", TARGET_POST, RawFilter(end_us=2410168875000000), 100)
+        self.assertIn("root_outside_window", ctx.exception.detail)
+        self.assertNotIn("root_after_cursor", ctx.exception.detail)
+
     def test_candidate_relay_count_is_reported_not_asserted(self) -> None:
         payload = traces("MC2", TARGET_POST, RawFilter(), 100)
         candidate_files = [n for n in payload["nodes"] if n.get("role") == "candidate_file"]
@@ -137,6 +163,8 @@ class Mc2FileTrackTest(unittest.TestCase):
         payload = file_track("MC2", TARGET_FILE, RawFilter(start_us=start + 1), 100, None, "asc")
         self.assertEqual(payload["meta"]["matched_events"], 1)
         self.assertEqual([item["event_id"] for item in payload["items"]], ["MC2:event:373913"])
+        self.assertEqual(payload["event_type_counts"], {"delete_file": 1})
+        self.assertEqual(payload["file"]["event_count"], 3)  # global summary remains explicit
 
     def test_non_mc2_is_rejected(self) -> None:
         with self.assertRaises(HTTPException) as ctx:

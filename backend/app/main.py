@@ -26,6 +26,7 @@ from .routers import (
     findings,
     graph,
     mc1,
+    mc1_reference,
     notes,
     patterns,
     runs,
@@ -64,6 +65,7 @@ app.include_router(cases.router)
 app.include_router(findings.router)
 app.include_router(transitions.router)
 app.include_router(mc1.router)
+app.include_router(mc1_reference.router)
 
 # 笔记存在独立的库文件里，启动时建表即可，与数据导入互不影响
 ensure_notes_schema()

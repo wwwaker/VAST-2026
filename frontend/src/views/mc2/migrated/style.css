@@ -1,0 +1,124 @@
+/* MC2 uses the same page grid and reading rhythm as the migrated MC1. */
+.mc2-app { font-size: 14px; line-height: 1.5; }
+.mc2-app button { border: 1px solid #cbd7e5; border-radius: 8px; background: #fff; color: #34516e; padding: 7px 11px; cursor: pointer; text-align: center; }
+.mc2-app button:hover:not(:disabled) { border-color: #4d8bc9; background: #f0f6fd; }
+.mc2-app button:disabled { opacity: .45; cursor: default; }
+.mc2-app button.mc2-primary { background: #2469b5; color: #fff; border-color: #2469b5; }
+.mc2-app button.mc2-primary:hover { background: #1b599a; }
+.mc2-app .mc2-note { color: #617187; font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
+.mc2-layout { grid-template-columns: 258px minmax(0, 1fr); }
+.mc2-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.mc2-card { background: #fff; border: 1px solid #dce3ec; border-radius: 14px; padding: 16px; min-width: 0; box-shadow: 0 3px 12px #254c7505; }
+.mc2-card-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; }
+.mc2-card-head h2 { font-size: 17px; flex: none; }
+.mc2-card h3, .mc2-file-search h3, .mc2-reading-block h3 { margin: 0 0 10px; font-size: 14px; color: #294560; }
+.mc2-inline-label { display: flex; flex-direction: row; align-items: center; gap: 8px; }
+.mc2-root-label { display: flex; flex-direction: row; align-items: center; min-width: 0; max-width: 100%; }
+.mc2-root-label select { min-width: 0; width: 345px; max-width: 100%; }
+.mc2-scope { flex: 1 1 350px; font-size: 12px; color: #49627c; overflow-wrap: anywhere; }
+.mc2-filter-form { display: flex; flex-direction: column; gap: 13px; }
+.mc2-filter-form select, .mc2-filter-form input { min-width: 0; width: 100%; }
+.mc2-filter-form label { font-weight: 500; }
+.mc2-file-search { border-top: 1px solid #dce3ec; padding-top: 14px; }
+.mc2-file-search form { display: flex; flex-direction: column; gap: 8px; }
+.mc2-file-search input { min-width: 0; width: 100%; }
+.mc2-file-results { max-height: 230px; overflow-y: auto; overscroll-behavior: contain; }
+.mc2-file-results button { width: 100%; margin-top: 6px; overflow-wrap: anywhere; text-align: left; font-size: 12px; }
+.mc2-status { min-height: 22px; color: #235b9c; font-size: 12px; overflow-wrap: anywhere; }
+.mc2-status:empty { min-height: 6px; }
+.mc2-warning { background: #fff6e9; color: #8c5613; border: 1px solid #eed4ab; border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.7; }
+.mc2-empty { padding: 24px 12px; color: #617187; text-align: center; }
+.mc2-source-card { min-height: 370px; }
+.mc2-source-card > .mc2-note { min-height: 22px; }
+.mc2-source-body { height: 400px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.mc2-trace-lanes { display: grid; grid-template-columns: minmax(0, 1fr) 35px minmax(0, 1.12fr) 35px minmax(0, 1.2fr); gap: 8px; margin: 14px 0; }
+.mc2-trace-lane { min-width: 0; }
+.mc2-trace-lane h3 small { color: #617187; font-weight: 400; }
+.mc2-app button.mc2-node { width: 100%; display: flex; flex-direction: column; gap: 8px; text-align: left; padding: 13px; background: #f4f8fd; border-color: #bbd0e9; overflow-wrap: anywhere; min-height: 158px; }
+.mc2-app button.mc2-node.file { background: #f1f9f6; border-color: #a9d4c5; }
+.mc2-node small, .mc2-node time, .mc2-operation time { font-size: 11px; color: #617187; }
+.mc2-node > span:last-child { color: #28679f; font-size: 12px; }
+.mc2-connector { display: flex; flex-direction: column; align-items: center; justify-content: center; color: #4c7fae; font-size: 25px; }
+.mc2-connector small { font-size: 10px; text-align: center; }
+.mc2-operations { height: 180px; overflow-y: auto; padding-right: 4px; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.mc2-app button.mc2-operation { display: flex; flex-direction: column; gap: 3px; text-align: left; width: 100%; margin-bottom: 6px; padding: 8px 10px; background: #f8fafc; font-size: 12px; overflow-wrap: anywhere; }
+.mc2-candidates { border: 1px dashed #ddb87e; background: #fffbf4; padding: 10px 12px; border-radius: 9px; font-size: 12px; color: #805a2b; }
+.mc2-candidates p { margin: 3px 0 8px; }
+.mc2-candidates button { font-size: 12px; margin: 3px 5px 3px 0; max-width: 100%; overflow-wrap: anywhere; text-align: left; }
+.mc2-candidates button span { color: #617187; }
+.mc2-edge-details { font-size: 12px; margin-top: 10px; }
+.mc2-edge-details > div { padding: 8px 0; border-bottom: 1px solid #e3eaf2; }
+.mc2-edge-details button { font-size: 11px; padding: 3px 7px; margin: 4px 5px 0 0; }
+.mc2-activity-card { min-height: 415px; }
+.mc2-activity-body { height: 440px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.mc2-chart-scroll { overflow-x: auto; margin-top: 10px; overscroll-behavior-x: contain; padding-bottom: 4px; }
+.mc2-activity { display: grid; grid-template-columns: 104px minmax(0, 1fr); row-gap: 4px; }
+.mc2-line-label { display: flex; flex-direction: column; justify-content: space-between; font-size: 11px; color: #617187; height: 80px; padding-right: 8px; line-height: 1.2; }
+.mc2-line-label br { display: none; }
+.mc2-volume { display: block; width: 100%; height: 80px; }
+.mc2-axis-label { font-size: 11px; color: #617187; }
+.mc2-axis { display: grid; height: 24px; align-items: end; font-size: 10px; color: #617187; }
+.mc2-axis > span { white-space: nowrap; overflow: visible; }
+.mc2-heat-row { display: contents; }
+.mc2-category-label { display: flex; align-items: center; justify-content: space-between; padding-right: 10px; font-size: 12px; }
+.mc2-category-label small { color: #617187; font-size: 10px; }
+.mc2-heat-cells { display: grid; gap: 2px; height: 24px; }
+.mc2-app button.mc2-cell { width: 100%; min-width: 0; padding: 0; border: 0; border-radius: 3px; }
+.mc2-app button.mc2-cell:hover:not(:disabled) { outline: 2px solid #34516e; outline-offset: -2px; }
+.mc2-app button.mc2-cell.selected { outline: 3px solid #dd8b22; outline-offset: -2px; }
+.mc2-legend { display: flex; align-items: center; gap: 4px; color: #617187; font-size: 11px; margin-top: 10px; }
+.mc2-legend i { width: 16px; height: 10px; border-radius: 2px; flex: none; }
+.mc2-record-list { height: 420px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; border-top: 1px solid #e2e9f1; }
+.mc2-list-toolbar, .mc2-pagination { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; color: #617187; margin: 10px 0; }
+.mc2-pagination { margin-bottom: 0; }
+.mc2-list-toolbar select { padding: 4px 7px; }
+.mc2-app button.mc2-record { display: flex; flex-direction: column; gap: 7px; width: 100%; padding: 12px 13px; margin: 7px 0; background: #f8fafc; border-color: #e0e7ef; border-radius: 9px; text-align: left; }
+.mc2-record-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; font-size: 12px; }
+.mc2-record-meta b { color: #285f9b; }
+.mc2-record-meta time { color: #617187; font-size: 11px; }
+.mc2-preview { font-size: 13px; color: #334b66; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mc2-record-id { color: #617187; font-size: 11px; }
+.mc2-overlay { position: fixed; inset: 0; z-index: 1000; padding: 28px; display: flex; align-items: center; justify-content: center; background: #16314c65; }
+.mc2-reader { width: min(1000px, 100%); height: min(88vh, 940px); max-height: 100%; display: flex; flex-direction: column; background: #fff; color: #203047; border: 1px solid #d3deeb; border-radius: 15px; box-shadow: 0 22px 80px #112e4c40; overflow: hidden; }
+.mc2-reader-head { display: flex; flex: none; justify-content: space-between; align-items: start; gap: 14px; padding: 15px 20px; border-bottom: 1px solid #dce3ec; background: #f5f8fc; }
+.mc2-reader-head h2 { font-size: 18px; }
+.mc2-reader-head p { margin-top: 5px; }
+.mc2-actions { display: flex; gap: 8px; flex: none; }
+.mc2-reader-body { min-height: 0; flex: 1; padding: 12px 22px 22px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; overflow-wrap: anywhere; }
+.mc2-reader-summary { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; font-size: 13px; padding: 8px 0 16px; border-bottom: 1px solid #e0e7ef; }
+.mc2-reader-scope { border-bottom: 1px solid #e0e7ef; padding-bottom: 10px; }
+.mc2-reading-block { padding: 17px 0; border-bottom: 1px solid #e0e7ef; }
+.mc2-reading-block summary { font-size: 13px; color: #34516e; font-weight: 600; }
+.mc2-fields { margin: 12px 0 0; }
+.mc2-fields > div { display: grid; grid-template-columns: 145px minmax(0, 1fr); border-top: 1px solid #edf1f6; padding: 9px 0; gap: 16px; }
+.mc2-fields dt { color: #617187; font-size: 12px; }
+.mc2-fields dd { margin: 0; white-space: pre-wrap; font-size: 13px; line-height: 1.8; }
+.mc2-fields dd small { display: block; color: #617187; }
+.mc2-reader pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #f5f8fc; border-radius: 8px; padding: 14px; font-size: 12px; line-height: 1.75; }
+.mc2-long-text { white-space: pre-wrap; line-height: 1.9; font-size: 14px; }
+.mc2-app button.mc2-link-row { display: block; text-align: left; margin: 8px 0; max-width: 100%; overflow-wrap: anywhere; }
+.mc2-relation { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; padding: 8px 0; }
+.mc2-relation-note { font-size: 11px; color: #617187; margin: -3px 0 9px 14px; }
+.mc2-type-counts { display: flex; flex-wrap: wrap; gap: 7px; margin: 8px 0; }
+.mc2-type-counts span { background: #edf4fb; border: 1px solid #d5e2ef; border-radius: 6px; padding: 4px 8px; color: #3f5f7e; font-size: 12px; }
+@media (max-width: 1100px) {
+  .mc2-layout { grid-template-columns: 230px minmax(0, 1fr); gap: 12px; }
+  .mc2-trace-lanes { grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1fr); }
+  .mc2-trace-lane:last-child { grid-column: 1 / -1; }
+  .mc2-connector:nth-last-child(2) { display: none; }
+  .mc2-operations { height: 120px; }
+  .mc2-source-body { height: 510px; }
+}
+@media (max-width: 700px) {
+  .mc2-layout { grid-template-columns: minmax(0, 1fr); }
+  .mc2-layout .filter-panel { position: static; max-height: 360px; }
+  .mc2-card { padding: 12px; }
+  .mc2-root-label { flex-direction: column; align-items: start; width: 100%; }
+  .mc2-root-label select { width: 100%; }
+  .mc2-overlay { padding: 8px; }
+  .mc2-reader { height: 95vh; }
+  .mc2-reader-head { flex-wrap: wrap; padding: 12px; }
+  .mc2-reader-body { padding: 8px 12px 20px; }
+  .mc2-fields > div { grid-template-columns: 1fr; gap: 4px; }
+  .mc2-list-toolbar { flex-wrap: wrap; }
+}

@@ -29,7 +29,7 @@ function isInteractiveControl(target: EventTarget | null): boolean {
   return false;
 }
 
-export function useHotkeys(onToggleHelp: () => void) {
+export function useHotkeys(onToggleHelp: () => void, enabled = true) {
   const {
     dataset,
     setCursor,
@@ -43,6 +43,7 @@ export function useHotkeys(onToggleHelp: () => void) {
   } = useWorkspace();
 
   useEffect(() => {
+    if (!enabled) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTyping(event.target)) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
@@ -116,6 +117,7 @@ export function useHotkeys(onToggleHelp: () => void) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [
+    enabled,
     onToggleHelp,
     dataset,
     setCursor,

@@ -74,6 +74,12 @@ def file_track(
                 salt=f"file:{file_id}",
             )
             matched = filters.count_events(conn, selection)
+            filtered_type_counts = {
+                row['event_type']: int(row['cnt']) for row in conn.execute(
+                    f"SELECT e.event_type, COUNT(*) AS cnt FROM events e WHERE {selection.where_sql} GROUP BY e.event_type",
+                    selection.params,
+                )
+            }
             rows, next_cursor = filters.page_events(conn, selection, limit, cursor, direction)
 
             relation_counts = {
@@ -118,6 +124,7 @@ def file_track(
         ),
         "file": info,
         "relation_counts": relation_counts,
+        "event_type_counts": filtered_type_counts,
         "items": items,
         "next_cursor": next_cursor,
         "naming_note": "同名不同路径的文件不会合并；文件名相同不代表同一份内容。",

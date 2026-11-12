@@ -97,6 +97,8 @@ def traces(
         root_node = next((n for n in payload["nodes"] if n["id"] == root_event_id), None)
         root_time = root_node["time_us"] if root_node else None
         if root_time is not None and selection.end_us is not None and root_time >= selection.end_us:
+            if not (raw.masking and raw.cursor_us is not None and root_time > raw.cursor_us):
+                raise HTTPException(409, "root_outside_window: 根事件晚于当前观察窗口，请扩展时间范围")
             raise HTTPException(
                 409,
                 "root_after_cursor: 根事件晚于当前回放截止时间，不能作为当前已知信息展开",

@@ -1,0 +1,92 @@
+/* Theme and small integration safeguards; layout remains the reference layout. */
+:host { display: block; color-scheme: light; font-size: 14px; line-height: 1.5; }
+button, input, select { font: inherit; }
+button, a, input, select, summary { outline-offset: 3px; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid #2563eb; }
+.workspace-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.workspace-nav button, .workspace-nav a, .nav-current { border: 1px solid #d1ddeb; background: #fff; color: #34516e; padding: 7px 12px; border-radius: 8px; text-decoration: none; cursor: pointer; font-size: 13px; }
+.workspace-nav .nav-current { color: #1d58b0; background: #eaf2ff; border-color: #b7cff2; font-weight: 700; }
+.workspace-nav .reload { display: flex; flex-direction: row; }
+.compact-header { flex-wrap: wrap; }
+.detail-body, .flow-list, .context-section { overscroll-behavior: contain; scrollbar-gutter: stable; overflow-wrap: anywhere; }
+.detail-card { min-height: 68px; }
+.detail-card:has(.detail-body) { min-height: 260px; }
+.detail-body { height: 420px; }
+.filter-panel { max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain; }
+.flow-modal { background: #fff; color: #203047; }
+.flow-modal-head, .flow-sub, .flow-why, .cb-ts, .cb-ch, .sub-meta, .chat-bubble, .cb-body { color: #40556e; }
+.flow-modal-head { background: #f5f8fc; }
+.chat-bubble { background: #f8fafc; border-color: #d8e2ed; }
+.chat-bubble.selected { background: #edf5ff; border-color: #6695d3; }
+.flow-why { background: #f1f6fc; }
+.cb-agent { color: #305b87 !important; }
+.flow-close { color: #34516e; background: #fff; border-color: #c7d3e2; }
+.flow-sub { font-size: 12px; }
+.flow-modal-head h3 { color: #203047; }
+.net-time-hud, .net-legend, .net-tt { background: #fffffff5; border-color: #d1ddeb; color: #334b66; }
+.net-tt .tt-v, .net-tt .tt-name { color: #334b66; }
+.net-edge-lbl text { fill: #334b66; }
+.bucket-head.has-marker { color: #29496c; }
+.lc-readout b { color: #203047; }
+.gc-compare-toggle.on, .sync-btn.on { background: #2469b5; color: #fff; border-color: #2469b5; }
+.lc-swatch { flex: none; }
+.provenance-note { font-size: 12px; color: #617187; margin: 5px 0; }
+.loading { color: #235b9c; }
+@media (max-width: 900px) {
+  .app { padding: 12px 12px 36px; }
+  .section { grid-template-columns: 210px minmax(0, 1fr); gap: 12px; }
+  .compare-row { flex-direction: column; }
+  .compare-row > .section { width: 100%; }
+  .net-time-hud { position: static; max-width: 100%; flex-wrap: wrap; }
+}
+@media (max-width: 620px) {
+  .section { grid-template-columns: minmax(0, 1fr); }
+  .filter-panel { position: static; max-height: 320px; }
+  .global-controls { gap: 9px; }
+  .gc-counts { margin-left: 0; }
+  .timeline-bar { position: static; }
+}
+
+.request-status { min-height: 24px; font-size: 12px; color: #235b9c; }
+.corner, .agent-label, .bucket-head { background: #edf2f8; color: #34516e; }
+.round, .message, .ctx-item, .flow-item { background: #f8fafc; }
+.chips span, .msg-meta span, .comm-id { background: #edf3fb; color: #365779; border-color: #cfdaea; }
+.msg-meta .merger, .chips .merger { background: #fff5e5; color: #945507; border-color: #edcb93; }
+.msg-meta .internal-merger { background: #e8f6f2; color: #176b58; border-color: #a8d5c9; }
+.msg-meta .keyword-score { background: #edf4ff; color: #245eaa; }
+.msg-meta .event-related { background: #f5f8fc; }
+.ds-text b, .msg-meta b, .round-hour, .ctx-header, .ctx-agent, .flow-why b, .cb-reason.is-sel { color: #285f9b; }
+.kw-chip { background: #edf4ff; color: #285f9b; border-color: #bed1eb; }
+.kw-chip:hover { background: #deebfc; }
+.kw-chip.far { background: #fff4e6; color: #915310; border-color: #eacba2; }
+.why-matters, .ctx-badge { background: #edf4ff; color: #34516e; border-color: #c7d8ee; }
+.cell, .cell.cell-num { text-shadow: none; }
+.cell[data-empty='true'] { color: #637a92; }
+.cell-selected { outline-color: #dc8b25 !important; }
+.cb-body { color: #253b53; white-space: pre-wrap; line-height: 1.65; }
+.pct-up { color: #168367; } .pct-down { color: #b74438; }
+.flow-overlay { background: #162c4770; }
+.flow-modal { width: min(860px,100%); }
+.flow-modal-head { flex-shrink: 0; }
+.flow-list { min-height: 0; }
+.flow-sub code { font-family: inherit; }
+.flow-back { margin-left: auto; margin-right: 12px; color: #245eaa; background: #edf4ff; border: 1px solid #c7d8ee; padding: 5px 10px; border-radius: 7px; cursor: pointer; }
+.provenance-note code { font-size: 11px; }
+
+.heatmap-card, .detail-card, .linechart-card, .network-card { box-shadow: 0 3px 14px #1c3d6410; }
+.detail-body { overflow-y: auto; border-top: 1px solid #dce3ec; padding-top: 8px; margin-top: 12px; }
+.seqflow-hint { color: #526e8b; }
+.net-svg { background: #f8fafc; border-color: #d5e0ed; }
+.net-grid circle { fill: #d8e2ed; }
+.n-label, .n-rank-txt { fill: #34516e; }
+.tl-scale select { background: #f8fafc; color: #34516e; }
+.tl-play { color: #235b9c; }
+.tl-track { background: #d6e1ef; }
+.tl-range-fill, .tl-range-start::-webkit-slider-thumb, .tl-range-end::-webkit-slider-thumb { background: #2469b5; }
+.tl-range-start::-moz-range-thumb, .tl-range-end::-moz-range-thumb { background: #2469b5; }
+.agent-label:hover { background: #e4edf9; }
+.agent-label.row-selected { background: #dbeafe; color: #1d5292; }
+.flow-list code { background: #eaf1fb; color: #34516e; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

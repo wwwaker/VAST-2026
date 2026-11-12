@@ -108,11 +108,20 @@ def content_status(conn, dataset: str, file_id: str) -> dict:
         raise KeyError(file_id)
 
     events, truncated = _file_events(conn, dataset, file_id)
-    type_counts: dict[str, int] = {}
+    # The inspection sample is bounded; aggregate counts must cover distinct
+    # source events, including those beyond that sample and multiple relations.
+    totals = conn.execute(
+        "SELECT e.event_type, COUNT(*) AS cnt, MIN(e.time_sort_us) AS first_us, "
+        "MAX(e.time_sort_us) AS last_us FROM events e JOIN "
+        "(SELECT DISTINCT event_id FROM relations WHERE dataset_id=? AND dst_id=? "
+        "AND relation IN ('file_path','queued_file_path','post_content_source')) r "
+        "ON e.event_id=r.event_id WHERE e.dataset_id=? "
+        "GROUP BY e.event_type", (dataset, file_id, dataset)
+    ).fetchall()
+    type_counts = {r['event_type']: int(r['cnt']) for r in totals}
     size_hint: int | None = None
     content_hits: list[dict] = []
     for item in events:
-        type_counts[item["event_type"]] = type_counts.get(item["event_type"], 0) + 1
         details = item["details"]
         if isinstance(details.get("size_hint"), int):
             size_hint = details["size_hint"]
@@ -124,8 +133,8 @@ def content_status(conn, dataset: str, file_id: str) -> dict:
                 )
 
     event_ids = [item["event_id"] for item in events]
-    first_us = events[0]["time_us"] if events else None
-    last_us = events[-1]["time_us"] if events else None
+    first_us = min((r['first_us'] for r in totals), default=None)
+    last_us = max((r['last_us'] for r in totals), default=None)
 
     if content_hits:
         status = "available"
@@ -153,7 +162,9 @@ def content_status(conn, dataset: str, file_id: str) -> dict:
         "content_status": status,
         "reason": reason,
         "size_hint": size_hint,
-        "event_count": len(events),
+        "event_count": sum(type_counts.values()),
+        "summary_scope": "global",
+        "content_inspection_limit": 500,
         "event_type_counts": type_counts,
         "first_us": first_us,
         "last_us": last_us,

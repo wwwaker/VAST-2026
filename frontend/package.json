@@ -8,6 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "check:ui": "node scripts/ui_check.mjs",
+    "check:mc1-migration": "node scripts/check_mc1_migration.mjs",
+    "check:mc2-migration": "node scripts/check_mc2_migration.mjs",
     "check:state": "node scripts/check_workspace.mjs",
     "check:s0": "node scripts/check_s0_ui.mjs",
     "check:reference": "node scripts/check_reference_ui.mjs",
@@ -15,9 +17,11 @@
     "check:f4": "node scripts/check_f4_journeys.mjs"
   },
   "dependencies": {
+    "d3": "^7.9.0",
     "d3-array": "^3.2.4",
     "d3-force": "^3.0.1",
     "d3-scale": "^4.0.2",
+    "lucide-react": "^0.460.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -28,6 +32,7 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
+    "jsdom": "^26.1.0",
     "puppeteer-core": "^23.11.1",
     "typescript": "^5.6.3",
     "vite": "^5.4.10"

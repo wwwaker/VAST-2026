@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { ThemeProvider } from "./theme/theme";
 import { WorkspaceProvider, useWorkspace, type DatasetId } from "./state/workspace";
 import { TopBar } from "./components/Shell";
@@ -12,6 +12,8 @@ import { Mc2ReferencePage } from "./views/mc2/Mc2ReferencePage";
 import { CustomReferencePage } from "./views/custom/CustomReferencePage";
 
 const LAYOUT_VERSION = 1;
+const Mc1MigratedPage = lazy(() => import("./views/mc1/Mc1MigratedPage").then(module => ({ default: module.Mc1MigratedPage })));
+const Mc2MigratedPage = lazy(() => import("./views/mc2/Mc2MigratedPage").then(module => ({ default: module.Mc2MigratedPage })));
 type LayoutPrefs = { version: number; evidenceOpen: boolean; evidenceSize: number };
 const defaultLayout: LayoutPrefs = { version: LAYOUT_VERSION, evidenceOpen: false, evidenceSize: 392 };
 function readLayout(key: string): LayoutPrefs {
@@ -45,6 +47,7 @@ function Workspace() {
   const previousEvidenceOpen = useRef(false);
   const {
     dataset,
+    setDataset,
     state,
     evidenceOpen,
     setEvidenceOpen,
@@ -57,6 +60,12 @@ function Workspace() {
   const layoutKey = `mas-workspace.${dataset}.layout`;
 
   useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    if (query.has("mc1")) setDataset("MC1");
+    else if (query.has("mc2")) setDataset("MC2");
+  }, [setDataset]);
+
+  useEffect(() => {
     const prefs = readLayout(layoutKey);
     setEvidenceOpen(prefs.evidenceOpen && window.innerWidth >= 900);
     setEvidenceSize(prefs.evidenceSize);
@@ -67,7 +76,16 @@ function Workspace() {
     previousEvidenceOpen.current = evidenceOpen;
   }, [evidenceOpen]);
 
-  useHotkeys(() => setShowHelp((v) => !v));
+  const usingReferenceMc1 = dataset === "MC1" && !showBench && new URLSearchParams(window.location.search).get("mc1") !== "legacy";
+  const usingReferenceMc2 = dataset === "MC2" && !showBench && new URLSearchParams(window.location.search).get("mc2") !== "legacy";
+  useHotkeys(() => setShowHelp((v) => !v), !usingReferenceMc1 && !usingReferenceMc2);
+  const selectDataset = (id: DatasetId) => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("mc1"); url.searchParams.delete("mc2");
+    if (id !== "CUSTOM") url.searchParams.set(id.toLowerCase(), "reference");
+    window.history.replaceState(null, "", url);
+    setDataset(id);
+  };
 
   const persist = (patch: Partial<LayoutPrefs>) => {
     try {
@@ -94,6 +112,13 @@ function Workspace() {
     window.addEventListener("pointercancel", end, { once: true });
   };
 
+  if (usingReferenceMc1) {
+    return <Suspense fallback={<p role="status" style={{ padding: 24 }}>正在打开 MC1…</p>}><Mc1MigratedPage onDatasetChange={selectDataset} /></Suspense>;
+  }
+  if (usingReferenceMc2) {
+    return <Suspense fallback={<p role="status" style={{ padding: 24 }}>正在打开 MC2…</p>}><Mc2MigratedPage onDatasetChange={selectDataset} /></Suspense>;
+  }
+
   return (
     <div className="app">
       <TopBar
@@ -108,6 +133,8 @@ function Workspace() {
           persist({ evidenceOpen: next });
         }}
       />
+      {dataset === "MC1" && <div style={{ padding: "6px 20px" }}><a href="?mc1=reference">返回新版 MC1</a><span> · 旧版扩展工具保留于此</span></div>}
+      {dataset === "MC2" && <div style={{ padding: "6px 20px" }}><a href="?mc2=reference">返回新版 MC2</a><span> · 旧版扩展工具保留于此</span></div>}
       <div className="workbench" style={{ "--evidence-size": `${evidenceSize}px` } as CSSProperties}>
         <div className={`body${evidenceOpen ? " body-evidence-open" : ""}`}>
           <main className="canvas-area">
