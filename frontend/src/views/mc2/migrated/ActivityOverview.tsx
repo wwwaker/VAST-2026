@@ -20,7 +20,7 @@ export function ActivityOverview({ data, selected, choose, day, chooseDay, colla
   const peak = Math.max(1, ...totals);
   const rowPeak = Math.max(1, ...Object.values(rowTotals));
   return <>
-    <div className="mc2-chart-scroll" tabIndex={0} aria-label="24 类型活动矩阵" ref={el => { if (el) el.scrollLeft = scrollCache.get(data.meta.selection_hash) ?? 0; }} onScroll={e => scrollCache.set(data.meta.selection_hash, e.currentTarget.scrollLeft)}>
+    <div className="mc2-chart-scroll" tabIndex={0} aria-label="24 类型活动矩阵" ref={el => { const saved = scrollCache.get(data.meta.selection_hash); if (el && saved !== undefined) el.scrollLeft = saved; }} onScroll={e => scrollCache.set(data.meta.selection_hash, e.currentTarget.scrollLeft)}>
       <div className="w-activity" style={{ width: width + 260 }}>
         <div className="w-volume-label">记录总量<br/><b>{number(peak)}</b></div>
         <svg width={width} height="65" role="group" aria-label="时间总量柱">

@@ -19,22 +19,32 @@ globalThis.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.win
 globalThis.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
 globalThis.getComputedStyle = dom.window.getComputedStyle.bind(dom.window);
 dom.window.scrollTo = () => {};
-globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+const resizeObservers = new Set();
+globalThis.ResizeObserver = class {
+  constructor(callback) { this.callback = callback; }
+  observe() { resizeObservers.add(this); }
+  unobserve() {}
+  disconnect() { resizeObservers.delete(this); }
+};
 dom.window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
 dom.window.HTMLElement.prototype.scrollIntoView = function () {};
-// Deterministic prior layout measurement below the initial 520px placeholder.
-dom.window.HTMLElement.prototype.getBoundingClientRect = function () { return { x:0,y:0,left:0,top:0,right:800,bottom:480,width:800,height:this.classList.contains('w-pending-region') ? 480 : 0, toJSON() { return {}; } }; };
+// Simulated content measurements exercise height retention, not browser layout.
+let contentHeight = 480;
+dom.window.HTMLElement.prototype.getBoundingClientRect = function () { return { x:0,y:0,left:0,top:0,right:800,bottom:480,width:800,height:this.classList.contains('w-pending-region') ? 480 : this.classList.contains('w-pending-content') ? contentHeight : 0, toJSON() { return {}; } }; };
 dom.window.SVGElement.prototype.setPointerCapture = function () {};
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const realFetch = globalThis.fetch;
 const requests = [];
 let holdEvents = false;
 let holdWorkspace = false;
+let failWorkspace = false;
+let holdReader = false;
 const delayed = [];
 globalThis.fetch = async (url, options) => {
   requests.push(String(url));
+  if (failWorkspace && new URL(url, base).pathname.startsWith('/api/mc2/')) throw new Error('Simulated refresh failure');
   const response = await realFetch(new URL(url, base), options);
-  if ((holdEvents && new URL(url).pathname === '/api/events') || (holdWorkspace && new URL(url).pathname.startsWith('/api/mc2/'))) await new Promise(resolve => delayed.push(resolve));
+  if ((holdEvents && new URL(url).pathname === '/api/events') || (holdWorkspace && new URL(url).pathname.startsWith('/api/mc2/')) || (holdReader && new URL(url).pathname === '/api/file-track')) await new Promise(resolve => delayed.push(resolve));
   return response;
 };
 const bundle = await build({
@@ -96,7 +106,25 @@ try {
   check('Empty local process has only compact entry', !shadow.querySelector('.w-timeline-scroll'));
   await click(buttons('收起概览')[0]);
   check('Collapsed overview retains volume and removes type rows', shadow.querySelector('[aria-label="时间总量柱"]') && !shadow.querySelector('.w-type-label'));
+  check('Explicit overview collapse releases its expanded height reservation', parseFloat(shadow.querySelector('.mc2-activity-card .w-pending-region').style.minHeight) < 660);
   await click(buttons('展开24类型')[0]);
+  const activityBeforePlay = shadow.querySelector('.w-activity');
+  holdWorkspace = true;
+  const requestsBeforePlay = requests.length;
+  await click(shadow.querySelector('.tl-play'));
+  await wait(() => shadow.querySelector('.mc2-activity-card [data-refresh-state="refreshing"]'));
+  check('Playback retains the previous matrix with a light update status', shadow.querySelector('.w-activity') === activityBeforePlay && !shadow.querySelector('.mc2-activity-card .w-loading-placeholder') && shadow.querySelector('.mc2-activity-card .mc2-status').textContent.includes('暂显示上次结果'));
+  await wait(() => requests.slice(requestsBeforePlay).filter(url => new URL(url).pathname === '/api/mc2/activity').length >= 2);
+  check('Further playback steps keep the same visible matrix until results arrive', shadow.querySelector('.w-activity') === activityBeforePlay && shadow.querySelector('.mc2-activity-card .is-retaining .w-pending-content').inert);
+  await click(buttons('收起概览')[0]);
+  check('Overview can collapse immediately even while playback data is pending', !shadow.querySelector('.w-type-label') && parseFloat(shadow.querySelector('.mc2-activity-card .w-pending-region').style.minHeight) < 660);
+  await click(buttons('展开24类型')[0]);
+  await click(shadow.querySelector('.tl-play'));
+  holdWorkspace = false;
+  await wait(() => delayed.length > 0);
+  await act(async () => { delayed.splice(0).forEach(resolve => resolve()); await new Promise(resolve => setTimeout(resolve, 100)); });
+  await wait(() => !shadow.querySelector('.mc2-activity-card [aria-busy="true"]'));
+  await click(buttons('恢复全范围')[0]); await wait(ready);
   const globalDates = shadow.querySelector('.tl-date').textContent;
   const globalHandles = [...shadow.querySelectorAll('.tl-range')].map(e => e.value);
   await click(shadow.querySelector('[aria-label^="筛选当天 2046-05-17"]'));
@@ -150,7 +178,13 @@ try {
   check('Reader header uses shared back/close actions', shadow.querySelector('.mc2-reader .flow-close') && !shadow.querySelector('.mc2-reader .mc2-close'));
   check('Reader uses MC1 message cards and collapses raw fields', shadow.querySelector('.flow-modal .chat-bubble') && shadow.querySelector('.mc2-reader details:not([open]) .mc2-fields') && shadow.querySelector('.mc2-reader').textContent.includes('原始记录与来源定位'));
   check('Actor filter is a name link, not a standalone action button', shadow.querySelector('.cb-agent.w-text-link') && !buttons('以此执行者筛选主页面').length);
+  holdReader = true;
+  const messageBeforeFile = shadow.querySelector('.mc2-reader .chat-bubble');
   await click(shadow.querySelector('.mc2-reader .mc2-link-row'));
+  await wait(() => delayed.length > 0 && shadow.querySelector('.mc2-reader [data-refresh-state="refreshing"]'));
+  check('Reader retains its previous message while a different payload type loads', shadow.querySelector('.mc2-reader .chat-bubble') === messageBeforeFile && !shadow.querySelector('.mc2-reader .w-loading-placeholder') && shadow.querySelector('.mc2-reader .w-pending-content').inert && shadow.querySelector('.mc2-reader .mc2-status').textContent.includes('暂显示上次结果'));
+  holdReader = false;
+  await act(async () => { delayed.splice(0).forEach(resolve => resolve()); });
   await wait(() => shadow.querySelector('.mc2-reader').textContent.includes('当前筛选内的文件轨迹'));
   check('Reader switches from event to file without mixing payload types', !!shadow.querySelector('.mc2-reader .mc2-type-counts'));
   await click(buttons('返回上次阅读')[0]);
@@ -204,15 +238,36 @@ try {
   check('Returning to a recent scope uses cached workspace responses', requests.length === beforeCache);
   await click(buttons('恢复全范围')[0]); await wait(ready);
   holdWorkspace = true;
+  const matrixBeforeFilter = shadow.querySelector('.w-activity');
+  const recordsBeforeFilter = shadow.querySelector('.mc2-record-list');
+  const facetBeforeFilter = shadow.querySelector('.w-facets');
+  contentHeight = 730;
+  await act(async () => { [...resizeObservers].forEach(observer => observer.callback()); });
   await change('[aria-label="记录关键词"]', 'pending-query-one');
   await wait(() => delayed.length > 0 && shadow.querySelector('.w-relation-section .is-pending'));
   const pendingRegion = shadow.querySelector('.w-relation-section .is-pending');
-  check('Loading preserves relation body and blocks old interactive results', pendingRegion.querySelector('.w-relation-body') && pendingRegion.querySelector('.w-pending-content').inert && pendingRegion.getAttribute('aria-busy') === 'true' && pendingRegion.style.minHeight === '480px');
+  check('Relation refresh masks old results with a prominent loading label while preserving height', !pendingRegion.classList.contains('is-retaining') && pendingRegion.querySelector(':scope > .w-loading-mask .w-loading-spinner') && pendingRegion.querySelector(':scope > .w-loading-mask').textContent.includes('正在加载关系调查') && !shadow.querySelector('.w-relation-section > .mc2-status').textContent.includes('上次结果') && pendingRegion.querySelector('.w-relation-body') && pendingRegion.querySelector('.w-pending-content').inert && pendingRegion.getAttribute('aria-busy') === 'true' && parseFloat(pendingRegion.style.minHeight) >= 520);
+  check('Filtering preserves the mounted matrix, evidence list and object distribution', shadow.querySelector('.w-activity') === matrixBeforeFilter && shadow.querySelector('.mc2-record-list') === recordsBeforeFilter && shadow.querySelector('.w-facets') === facetBeforeFilter && shadow.querySelector('.w-evidence-section .is-retaining'));
+  await wait(() => parseFloat(pendingRegion.style.minHeight) >= 730);
+  contentHeight = 120;
   holdWorkspace = false;
   await change('[aria-label="记录关键词"]', 'no-such-record-latest');
   await wait(() => shadow.querySelector('[data-testid="evidence-count"]').textContent.includes('0 条') && !shadow.querySelector('.w-relation-section [aria-busy="true"]'));
   await act(async () => { delayed.splice(0).forEach(resolve => resolve()); await new Promise(resolve => setTimeout(resolve, 100)); });
   check('Delayed older responses cannot replace latest keyword results', shadow.querySelector('[aria-label="记录关键词"]').value === 'no-such-record-latest' && shadow.querySelector('[data-testid="evidence-count"]').textContent.includes('0 条'));
+  check('Empty results preserve card floors after refresh completes', parseFloat(shadow.querySelector('.mc2-activity-card .w-pending-region').style.minHeight) >= 660 && parseFloat(shadow.querySelector('.w-relation-section .w-pending-region').style.minHeight) >= 520 && parseFloat(shadow.querySelector('.w-evidence-section .w-pending-region').style.minHeight) >= 350);
+  check('Smaller results retain previously measured heights and mounted lists', parseFloat(shadow.querySelector('.w-relation-section .w-pending-region').style.minHeight) >= 730 && shadow.querySelector('.mc2-record-list') === recordsBeforeFilter && shadow.querySelector('.w-facets') === facetBeforeFilter);
+  contentHeight = 480;
+  await click(buttons('恢复全范围')[0]); await wait(ready);
+  const beforeFailure = shadow.querySelector('.w-activity');
+  failWorkspace = true;
+  await change('[aria-label="记录关键词"]', 'failed-refresh-unique');
+  await wait(() => shadow.querySelector('.mc2-activity-card [data-refresh-state="error"]'));
+  check('Failed updates preserve results, height and offer an explicit retry', shadow.querySelector('.w-activity') === beforeFailure && !shadow.querySelector('.mc2-activity-card .w-loading-placeholder') && shadow.querySelector('.mc2-activity-card [role="alert"]').textContent.includes('更新失败') && shadow.querySelector('.mc2-activity-card [role="alert"] button') && shadow.querySelector('.mc2-activity-card .w-pending-content').inert);
+  failWorkspace = false;
+  await click(shadow.querySelector('.mc2-activity-card [role="alert"] button'));
+  await wait(() => shadow.querySelector('.mc2-activity-card [data-refresh-state="ready"]'));
+  check('Retry replaces the retained view with the successful empty result', !shadow.querySelector('.mc2-activity-card [role="alert"]') && shadow.querySelector('.mc2-activity-card .mc2-note').textContent.includes('0 条记录'));
   await click(buttons('恢复全范围')[0]); await wait(ready);
   await click(buttons('MC1')[0]);
   await wait(() => document.querySelector('[data-testid="mc1-reference"]')?.shadowRoot?.querySelectorAll('.cell').length > 0);

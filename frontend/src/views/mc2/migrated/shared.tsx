@@ -18,7 +18,7 @@ export const actor = (id: string | null | undefined) => {
 export const typeLabel = (value: string, types: TypeInfo[]) => types.find(type => type.type === value)?.display_label ?? value;
 export type ReaderTarget = { kind: "event" | "file"; id: string };
 
-export { useRequest, PendingRegion, RequestStatus } from "../../shared/request";
+export { useRequest, PendingRegion, RequestStatus } from "./RefreshRegion";
 
 export function EventMetadata({ event, types, filterActor }: { event: Pick<EventItem, "event_id" | "time_us" | "event_type" | "actor_id" | "category">; types: TypeInfo[]; filterActor?: (id: string) => void }) {
   const color = categoryColors[(event.category - 1) % categoryColors.length], Icon = categoryIcon(event.category);

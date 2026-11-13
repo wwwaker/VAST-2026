@@ -24,7 +24,7 @@
 .w-total-bar i { display: block; position: absolute; background: #dde9f4; height: 14px; top: 3px; }
 .w-total-bar b { position: relative; display: block; text-align: right; font-weight: 500; color: #4c6780; line-height: 20px; }
 .group-start > * { border-top: 3px solid #fff !important; height: 24px; }
-.w-selection-notice { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px; background: #edf4fc; color: #345d85; border-radius: 8px; font-size: 12px; margin-top: 10px; }
+.w-selection-notice { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 52px; padding: 10px; background: #edf4fc; color: #345d85; border-radius: 8px; font-size: 12px; margin-top: 10px; }
 .w-selection-notice > span { flex: 1 1 280px; }
 .w-relation-section,.w-process-section { scroll-margin-top: 85px; }
 .w-tabs { display: flex; gap: 5px; flex-wrap: wrap; }
@@ -115,8 +115,16 @@
 .w-app .mc2-activity-card { min-height: 0; }
 .w-pending-region { position: relative; min-width: 0; }
 .w-pending-region.is-pending > .w-pending-content { visibility: hidden; pointer-events: none; }
-.w-loading-placeholder { position: absolute; inset: 0; display: grid; place-items: center; min-height: 35px; border-radius: 8px; background: repeating-linear-gradient(100deg,#f5f7fa,#f5f7fa 28px,#f0f3f6 28px,#f0f3f6 56px); color: #708192; font-size: 12px; }
-.w-app .mc2-status,.w-app .mc2-status:empty { min-height: 18px; }
+.w-pending-region.is-retaining > .w-pending-content { visibility: visible; }
+.w-loading-placeholder { position: absolute; inset: 0; display: grid; place-items: center; min-height: 35px; color: #708192; font-size: 12px; pointer-events: none; }
+.w-loading-mask { z-index: 5; background: #fff; border: 1px solid #e1e7ee; border-radius: 8px; color: #40566f; font-size: 15px; font-weight: 600; }
+.w-app .mc2-status.is-masked-loading { color: #77519b; font-weight: 600; }
+.w-loading-message { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.w-loading-spinner { width: 22px; height: 22px; border: 3px solid #e4dfef; border-top-color: #8161a3; border-radius: 50%; animation: w-loading-spin .9s linear infinite; }
+@keyframes w-loading-spin { to { transform: rotate(360deg); } }
+@media(prefers-reduced-motion:reduce) { .w-loading-spinner { animation: none; } }
+.w-pending-content { display: flow-root; }
+.w-app .mc2-status,.w-app .mc2-status:empty { min-height: 22px; }
 .w-app .w-relation-main > .mc2-empty { min-height: 390px; display: grid; place-items: center; }
 .w-app .w-facet-track i { background: #b49a70; }
 .w-app .w-kicker { color: #92705b; }

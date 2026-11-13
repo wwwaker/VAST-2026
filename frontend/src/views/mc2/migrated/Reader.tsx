@@ -29,7 +29,7 @@ export function Reader({ initial, filters, types, close, filterActor }: { initia
     <div className="flow-modal mc2-reader w-reader" role="dialog" aria-modal="true" aria-labelledby="mc2-reader-title" ref={modal} onKeyDown={event => {
       if (event.key === "Escape") { event.stopPropagation(); close(); }
       if (event.key === "Tab") {
-        const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], summary, [tabindex="0"]')].filter(el => !el.closest("details:not([open])") || el.tagName === "SUMMARY");
+        const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], summary, [tabindex="0"]')].filter(el => !el.closest("[inert]") && (!el.closest("details:not([open])") || el.tagName === "SUMMARY"));
         const first = controls[0], last = controls[controls.length - 1];
         const active = event.currentTarget.getRootNode() instanceof ShadowRoot ? (event.currentTarget.getRootNode() as ShadowRoot).activeElement : document.activeElement;
         if (event.shiftKey && active === first) { event.preventDefault(); last?.focus(); }
