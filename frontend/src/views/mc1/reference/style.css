@@ -150,7 +150,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: #378ADD; cursor: poi
 .round, .message { background: #101722; border: 1px solid #dce3ec; border-radius: 12px; padding: 12px; margin-bottom: 9px; }
 .round-hour { color: #93c5fd; font-size: 12px; margin-bottom: 4px; }
 .msg-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.chips span, .msg-meta span { background: #1f2a3a; color: #334b66; border: 1px solid #c7d3e2; border-radius: 999px; padding: 3px 8px; font-size: 12px; }
+/* Only top-level metadata items are pills; icon/name wrappers stay unframed. */
+.chips span, .msg-meta > span { background: #1f2a3a; color: #334b66; border: 1px solid #c7d3e2; border-radius: 999px; padding: 3px 8px; font-size: 12px; }
 .msg-meta b { color: #93c5fd; margin-right: 4px; }
 .sub-meta { color: #617187; font-size: 12px; margin: 8px 0; }
 .msg-meta .merger, .chips .merger { background: #3b2f12; border-color: #8a6418; color: #a65e07; }

@@ -1,3 +1,4 @@
+import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { fetchEvent, fetchFileTrack, type EventDetail, type FileTrackPayload, type TypeInfo } from "../../../data/api";
 import type { Filters } from "../../../data/filterContext";
@@ -68,8 +69,8 @@ function EventContent({ event, types, open, filterActor }: { event: EventDetail;
         {typeof details.meeting === "object" && details.meeting !== null && <MeetingContent value={details.meeting as Record<string, unknown>}/>}
       </div><div className="provenance-note">原始记录：{displayId(event.event_id)} · 点击执行者姓名可筛选主页面</div>
     </article>
-    {event.relations.length > 0 && <section className="mc2-reading-block"><h3>这条记录涉及谁、涉及什么</h3>{event.relations.map((r, i) => <div className="w-evidence-role" key={i}><span>{actor(r.src_id)}</span><span className="w-role-arrow">— {relationName[r.relation] ?? r.relation} →</span><button className="w-text-link" onClick={() => r.dst_id.startsWith("MC2:file_path:") ? open({ kind: "file", id: r.dst_id }) : r.target_kind === "event" ? open({ kind: "event", id: r.dst_id }) : undefined} disabled={!r.dst_id.startsWith("MC2:file_path:") && r.target_kind !== "event"}>{r.dst_id.startsWith("MC2:file_path:") ? r.dst_id.slice("MC2:file_path:".length) : actor(r.dst_id)}</button></div>)}</section>}
-    {files.length > 0 && <section className="mc2-reading-block"><h3>关联文件与轨迹</h3>{files.map(id => <button className="mc2-link-row" key={id} onClick={() => open({ kind: "file", id })}>{id.slice("MC2:file_path:".length)} →</button>)}</section>}
+    {event.relations.length > 0 && <section className="mc2-reading-block"><h3>这条记录涉及谁、涉及什么</h3>{event.relations.map((r, i) => <div className="w-evidence-role" key={i}><span>{actor(r.src_id)}</span><span className="w-role-arrow">— {relationName[r.relation] ?? r.relation}<ArrowRight size={14} aria-hidden="true"/></span><button className="w-text-link" onClick={() => r.dst_id.startsWith("MC2:file_path:") ? open({ kind: "file", id: r.dst_id }) : r.target_kind === "event" ? open({ kind: "event", id: r.dst_id }) : undefined} disabled={!r.dst_id.startsWith("MC2:file_path:") && r.target_kind !== "event"}>{r.dst_id.startsWith("MC2:file_path:") ? r.dst_id.slice("MC2:file_path:".length) : actor(r.dst_id)}</button></div>)}</section>}
+    {files.length > 0 && <section className="mc2-reading-block"><h3>关联文件与轨迹</h3>{files.map(id => <button className="mc2-link-row" key={id} onClick={() => open({ kind: "file", id })}>{id.slice("MC2:file_path:".length)}<ArrowRight size={14} aria-hidden="true"/></button>)}</section>}
     <NearbyActivity event={event} open={open} types={types}/>
     {event.deliberation && <details className="mc2-reading-block"><summary>内部审议</summary>{Object.entries(event.deliberation).map(([key, value]) => <p key={key}><b>{key}：</b>{typeof value === "string" ? value : JSON.stringify(value)}</p>)}</details>}
     <details className="mc2-reading-block"><summary>完整字段与角色依据</summary><dl className="mc2-fields">{Object.entries(details).map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{displayId(typeof value === "string" ? value : JSON.stringify(value, null, 2))}</dd></div>)}</dl>{event.relations.map((r, i) => <p className="mc2-note" key={i}>{relationName[r.relation] ?? r.relation}：{r.derivation}</p>)}</details>
@@ -93,12 +94,12 @@ function FileContent({ track, types, open, previous, page }: { track: FileTrackP
       {file.events_truncated && <p className="mc2-note">正文检查仅覆盖最早的 500 条关联记录；不能据此判断全部历史是否含正文。</p>}
       <p className="mc2-note">全历史：{number(file.event_count)} 条记录 · {time(file.first_us)} 至 {time(file.last_us)}{file.size_hint != null && ` · size_hint 原始值 ${file.size_hint}`}</p>
       <p className="mc2-note">文件阅读沿用打开时的时间、类型、执行者和关键词；展示此范围的文件轨迹，不叠加关系图中选中边的端点限制。</p>
-      {file.content_sources.map(source => <button className="mc2-link-row" key={`${source.event_id}:${source.field}`} onClick={() => open({ kind: "event", id: source.event_id })}>查看文本依据：{source.field} · {number(source.length)} 字符 →</button>)}
+      {file.content_sources.map(source => <button className="mc2-link-row" key={`${source.event_id}:${source.field}`} onClick={() => open({ kind: "event", id: source.event_id })}>查看文本依据：{source.field} · {number(source.length)} 字符<ArrowRight size={14} aria-hidden="true"/></button>)}
     </section>
     <section className="mc2-reading-block"><h3>当前筛选内的文件轨迹 · {number(track.meta.matched_events)} 条</h3><div className="mc2-type-counts">{Object.entries(track.event_type_counts ?? {}).map(([type, count]) => <span key={type}>{typeLabel(type, types)} <b>{number(count)}</b></span>)}</div><p className="mc2-note">按时间正序排列。此处继承主页面筛选；全历史总数不随筛选变化。</p>
       {track.items.map(item => <div key={item.event_id}><EventRow event={item} types={types} open={target => open(target)}/><p className="mc2-relation-note">日志关系：{item.file_relations.join("、")}</p></div>)}
       {!track.items.length && <p className="mc2-empty">当前筛选内没有此文件的记录，可关闭阅读窗口并清空筛选。</p>}
-      <div className="mc2-pagination"><button disabled={!previous} onClick={() => page()}>上一页</button><span>每页最多 40 条</span><button disabled={!track.next_cursor} onClick={() => page(track.next_cursor!)}>下一页</button></div>
+      <div className="mc2-pagination"><button disabled={!previous} onClick={() => page()}><ChevronLeft size={14} aria-hidden="true"/>上一页</button><span>每页最多 40 条</span><button disabled={!track.next_cursor} onClick={() => page(track.next_cursor!)}>下一页<ChevronRight size={14} aria-hidden="true"/></button></div>
     </section>
   </>;
 }

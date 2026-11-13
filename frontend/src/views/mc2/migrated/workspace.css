@@ -170,3 +170,29 @@
 .w-entity-legend > span { display: inline-flex; align-items: center; gap: 4px; }
 .w-app .mc2-record-list { padding-top: 9px; }
 @media(min-width:1400px) { .w-main-parallel { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; } .w-main-parallel .w-current-scope { grid-column: 1/-1; } .w-main-parallel .w-relation-body { grid-template-columns: minmax(0,1fr); } .w-main-parallel .w-inspector { border-left: 0; border-top: 1px solid #e2e9f1; padding: 12px 0 0; max-height: 340px; } }
+
+/* Shared category and entity colors carry across overview, objects and reading. */
+.w-app .mc2-card-head h2{display:flex;align-items:center;gap:8px}
+.mc2-activity-card h2>svg{color:#338d83}.w-relation-section h2>svg{color:#7d6bb3}.w-process-section h2>svg{color:#bf6965}.w-evidence-section h2>svg{color:#b17a29}
+.w-app .global-controls button:has(>svg),.w-app .w-tabs button,.w-app .w-selection-notice button,.w-app .mc2-pagination button,.w-app .w-process-tools button,.w-app .w-graph-tools button{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.w-mode-tabs button>svg{color:var(--w-accent)}
+.w-app .w-mode-tabs button[aria-pressed=true]{border-color:var(--w-accent);box-shadow:inset 0 -2px var(--w-accent);background:#f8fafc;color:#40566e}
+.w-app button.w-type-label{display:flex;align-items:center;gap:5px}.w-type-label>svg{flex:none}.w-type-label>span{overflow:hidden;text-overflow:ellipsis}
+.w-category-legend,.w-process-legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:11px;margin-top:12px;color:#617187}
+.w-category-legend>span,.w-process-legend>span{display:inline-flex;align-items:center;gap:5px}
+.w-app .mc2-legend{flex-wrap:wrap;line-height:1.7}
+.w-app .w-cells button.mc2-cell.selected,.w-app .w-cells button.mc2-cell.selected:hover{outline:2px solid #e49a33;outline-offset:-2px;border-radius:2px}
+/* Native SVG focus rectangles are replaced by marks on the actual geometry. */
+.w-app svg [role=button]:focus{outline:none}
+.w-app .w-volume-bar:focus-visible .w-bar-mark{stroke:#d58c27;stroke-width:2}
+.w-app .w-volume-bar .w-bar-hit{stroke:none}
+.w-app .w-process-mark:focus-visible .w-process-symbol,.w-app .w-process-mark.selected .w-process-symbol{stroke:#d58c27;stroke-width:3}
+.w-app .w-process-hit{stroke:none}.w-app .w-process-halo{pointer-events:none}
+.w-edge-inspector svg [role=button]:focus-visible rect{stroke:#d58c27;stroke-width:2}
+.w-app .w-event-type-chip{display:inline-flex;align-items:center;gap:4px}
+.w-app .w-event-type-chip svg,.w-app .w-entity-label svg{flex:none}
+.w-app .mc2-record-id,.w-app .w-process-link,.w-app .w-shortcut,.w-app .w-role-arrow,.w-app .w-text-link:has(>svg){display:inline-flex;align-items:center;gap:6px}
+.w-app .w-shortcut{justify-content:space-between}
+.w-facet-name .w-entity-label{max-width:100%;display:inline-flex;align-items:center;gap:5px}
+.w-facet-name .w-entity-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.w-app .mc2-link-row>svg,.w-app .mc2-node span>svg,.w-app .mc2-candidates span>svg{vertical-align:middle;margin-left:5px}

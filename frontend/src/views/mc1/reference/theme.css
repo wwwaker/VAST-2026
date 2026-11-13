@@ -50,7 +50,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .request-status { min-height: 24px; font-size: 12px; color: #235b9c; }
 .corner, .agent-label, .bucket-head { background: #edf2f8; color: #34516e; }
 .round, .message, .ctx-item, .flow-item { background: #f8fafc; }
-.chips span, .msg-meta span, .comm-id { background: #edf3fb; color: #365779; border-color: #cfdaea; }
+.chips span, .msg-meta > span, .comm-id { background: #edf3fb; color: #365779; border-color: #cfdaea; }
 .msg-meta .merger, .chips .merger { background: #fff5e5; color: #945507; border-color: #edcb93; }
 .msg-meta .internal-merger { background: #e8f6f2; color: #176b58; border-color: #a8d5c9; }
 .msg-meta .keyword-score { background: #edf4ff; color: #245eaa; }

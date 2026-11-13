@@ -9,6 +9,8 @@ const kinds = {
   team: { label: "团队", color: "#9c6b91", Icon: Users },
   missing: { label: "缺失角色", color: "#748092", Icon: HelpCircle },
 };
+export const entityVisual = (kind: string) => kinds[kind as keyof typeof kinds] ?? kinds.missing;
+export const entityKind = (id: string) => id.startsWith("MC2:") ? id.split(":")[1] : "missing";
 export function entityName(id: string, label?: string) {
   const name = (label || id).replace(/^(?:(?:MC2|agent|Agent|person|system|world|team|file_path|room|group):|(?:Agent|agent)\/)+/g, "");
   const systems: Record<string, string> = { email: "邮件", mail: "邮件", file_system: "文件系统", filesystem: "文件系统", flex: "FleX", saidit: "SaidIt", calendar: "日历" };
@@ -16,7 +18,7 @@ export function entityName(id: string, label?: string) {
   return systems[name.toLowerCase()] ?? name.replaceAll("_", " ");
 }
 export function EntityLabel({ id, label, kind = "missing" }: { id: string; label?: string; kind?: string }) {
-  const item = kinds[kind as keyof typeof kinds] ?? kinds.missing;
+  const item = entityVisual(kind);
   return <span className="w-entity-label" title={`${item.label} · ${entityName(id, label)}\n${id.replace(/^MC2:/, "")}`}><item.Icon size={14} color={item.color} aria-label={item.label}/><span className="w-entity-name">{entityName(id, label)}</span></span>;
 }
 export function EntityLegend() {

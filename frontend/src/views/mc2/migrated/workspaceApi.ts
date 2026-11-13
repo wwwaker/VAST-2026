@@ -2,7 +2,7 @@ import { toApiFilters, type Filters } from "../../../data/filterContext";
 import type { EventItem, TypeInfo } from "../../../data/api";
 
 export type Scope = { filters: Filters; fileId?: string; noFile?: boolean; relation?: string; source?: string; target?: string; action?: string };
-export type Selection = { start: number; end: number; type?: string; label: string };
+export type Selection = { start: number; end: number; type?: string; label: string; cellBucket?: number };
 export type Meta = { matched_events: number; selection_hash: string; data_version: string };
 export type Evidence = { meta: Meta; items: EventItem[]; next_cursor: string | null; timeline?: { start: number; end: number; count: number }[] };
 export type ActivityData = { meta: Meta; buckets: number[]; step: number; types: TypeInfo[]; cells: { bucket: number; type: string; count: number }[]; categories: { id: number; label: string }[]; coverage: { start: number; end: number } };
