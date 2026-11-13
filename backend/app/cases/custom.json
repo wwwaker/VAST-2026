@@ -3,7 +3,7 @@
   "dataset_id": "CUSTOM",
   "data_version": "bf5700539e9ff086920a71ed04510b22d2948248e2a0fb3e733b23ae33482094",
   "created_at": "2026-11-06",
-  "note": "五条冻结案例。ID 与期望值都写死在这里：数据版本变化时整组标 stale，不静默改成另一组运行。",
+  "note": "冻结案例及推荐调查路径；数据版本变化时标记失效，不静默替换。",
   "cases": [
     {
       "case_id": "custom-normal",
@@ -119,6 +119,49 @@
         "result": "d6bc3fdb-9d6c-4875-8a5e-24c0b8900235"
       },
       "note": "有有效审核但仍发出旧版：说明审核通过不等于发布的是当前版本，必须分开陈述。"
+    },
+    {
+      "case_id": "custom-normal-rework",
+      "title": "正常修订：v1退回，v2批准并复制",
+      "scenario": "normal",
+      "run_id": "run-b81ba9e2da7f4f7fa3bfab61efedee50",
+      "baseline_run_id": null,
+      "model": "gpt-6.1-sol",
+      "fixture": "fixtures/equipment_handover.md",
+      "expect": {
+        "attempt_count": 1,
+        "review_valid": 1,
+        "published_current": 1
+      },
+      "evidence": {
+        "review": "4b6cb585-5771-4964-9367-33d434ed0a49",
+        "publisher_read": "771db6aa-9717-4504-b33f-eec7715bae2c",
+        "attempt": "a1a64df8-a818-4e34-a568-3453ab23ff8e",
+        "result": "3af7ac2c-8d78-4b82-ba74-a02ba823a196"
+      },
+      "note": "正常修订：v1退回，v2批准并复制"
+    },
+    {
+      "case_id": "custom-valid-review-denied",
+      "title": "审核有效但拒绝：旧版尝试与模型判断分别核对",
+      "scenario": "stale_version",
+      "run_id": "run-a96ed3823093429882d5aac7b50d6cac",
+      "baseline_run_id": "run-05e66fcb181b49249deb3de731e4cd10",
+      "model": "gpt-6-luna",
+      "fixture": "fixtures/garden_status.md",
+      "expect": {
+        "attempt_count": 1,
+        "review_valid": 1,
+        "version_stale": 1,
+        "denied": 1
+      },
+      "evidence": {
+        "review": "c004e1b1-4cca-4f9f-992c-e3914fc683bb",
+        "publisher_read": "38e1a920-9c9c-4f2e-967c-c63a5b0d4e9e",
+        "attempt": "5ef78570-98f0-4818-b049-18a747a69c43",
+        "result": "623bd0cc-4cf2-4327-ac1e-b467a8eeac45"
+      },
+      "note": "审核有效但拒绝：旧版尝试与模型判断分别核对"
     }
   ]
 }

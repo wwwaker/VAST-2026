@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "check:ui": "node scripts/ui_check.mjs",
     "check:mc1-migration": "node scripts/check_mc1_migration.mjs",
+    "check:custom-migration": "node scripts/check_custom_migration.mjs",
     "check:mc2-migration": "node scripts/check_mc2_migration.mjs",
     "check:state": "node scripts/check_workspace.mjs",
     "check:s0": "node scripts/check_s0_ui.mjs",

@@ -107,18 +107,6 @@
 
 /* Follow MC1 control/reader templates; scrollable panes hand off at boundaries. */
 .w-app .filter-panel,.w-app .fp-body,.w-app .w-inspector,.w-app .w-matrix-scroll,.w-app .mc2-record-list,.w-app .mc2-file-results,.w-app .mc2-chart-scroll,.w-app .w-timeline-scroll,.w-app .w-actor-options,.w-app .w-process-story,.w-app .w-edge-events { overscroll-behavior: auto; }
-.w-app .filter-panel { padding: 0; gap: 0; display: flex; flex-direction: column; }
-.w-app .fp-title { flex-shrink: 0; padding: 14px 16px; margin: 0; }
-.w-app .fp-body { padding: 12px 16px; min-height: 0; overflow-y: auto; }
-.w-app .fp-body > * { flex-shrink: 0; }
-.w-app .filter-panel input:not([type=checkbox]):not([type=radio]),.w-app .filter-panel select { width: 100%; min-width: 0; }
-.w-app .filter-panel .check { flex-direction: row; align-items: center; gap: 7px; font-size: 12px; font-weight: 400; }
-.w-app .filter-panel .group-head { font-weight: 600; }
-.w-app .filter-panel .type-grid { grid-template-columns: minmax(0,1fr); gap: 7px; }
-.w-app .filter-panel button.collapsible-head { background: transparent; border: 0; border-radius: 0; padding: 10px 0; text-align: left; }
-.w-app .filter-panel .collapsible { border-bottom: 1px solid #e3e9ee; }
-.w-app .filter-panel .collapsible-body { padding: 2px 0 12px; }
-.w-app .filter-panel .collapsible-title { color: #354b62; }
 .w-actor-options { max-height: 260px; overflow: auto; margin-top: 10px; display: grid; gap: 8px; }
 .w-type-options { max-height: 260px; overflow-y: auto; overscroll-behavior: auto; scrollbar-gutter: stable; padding: 2px 4px 2px 0; display: flex; flex-direction: column; gap: 11px; }
 .w-type-options > * { flex-shrink: 0; }
@@ -156,7 +144,6 @@
 .w-shared-timeline .timeline-bar { position: static; }
 .w-shared-timeline .tl-date { color: #617187; }
 .w-layout.filters-hidden { grid-template-columns: minmax(0,1fr); }
-.w-app .global-controls .gc-clear-filters { background: #fff0e9; color: #ad522d; border-color: #f0af96; }
 .w-app .w-shared-timeline .tl-tick { min-height: 0; }
 .w-app .message.mc2-record { margin: 0 0 9px; padding: 12px; border-radius: 12px; background: #f8fafc; border: 1px solid #dce3ec; cursor: pointer; }
 .w-app .message.mc2-record:hover { background: #edf5ff; border-color: #a9c3df; }

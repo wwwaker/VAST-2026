@@ -90,3 +90,5 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+.flow-back, .flow-close { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }

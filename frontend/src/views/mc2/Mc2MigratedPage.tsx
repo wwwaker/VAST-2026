@@ -1,3 +1,4 @@
+import windowRangeCss from "../shared/window-range.css?inline";
 import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { fetchCapabilities, fetchDatasets, fetchMc2Actors, fetchTraceRoots, type EventItem, type TypeInfo } from "../../data/api";
@@ -6,6 +7,8 @@ import type { DatasetId } from "../../state/workspace";
 import referenceCss from "../mc1/reference/style.css?inline";
 import themeCss from "../mc1/reference/theme.css?inline";
 import css from "./migrated/style.css?inline";
+import sharedCss from "../shared/workspace.css?inline";
+import { WorkspaceHeader } from "../shared/WorkspaceHeader";
 import workspaceCss from "./migrated/workspace.css?inline";
 import { ViewControls } from "../mc1/reference/components/ViewControls";
 import { Reader } from "./migrated/Reader";
@@ -26,7 +29,7 @@ export function Mc2MigratedPage({ onDatasetChange }: { onDatasetChange: (id: Dat
     document.documentElement.style.scrollbarGutter = "stable";
     return () => { document.documentElement.style.scrollbarGutter = previous; };
   }, []);
-  return <div ref={host} data-testid="mc2-reference" style={{ minHeight: "100vh", background: "#f5f7fa" }}>{shadow && createPortal(<><style>{referenceCss}{themeCss}{css}{workspaceCss}</style><Mc2Workspace onDatasetChange={onDatasetChange} /></>, shadow)}</div>;
+  return <div ref={host} data-testid="mc2-reference" style={{ minHeight: "100vh", background: "#f5f7fa" }}>{shadow && createPortal(<><style>{referenceCss}{themeCss}{windowRangeCss}{sharedCss}{css}{workspaceCss}</style><Mc2Workspace onDatasetChange={onDatasetChange} /></>, shadow)}</div>;
 }
 
 type Mode = "types" | "system" | "relay" | "operations" | "compare";
@@ -91,8 +94,8 @@ function Mc2Workspace({ onDatasetChange }: { onDatasetChange: (id: DatasetId) =>
   const counts = useRequest(JSON.stringify(["count", parentCountParams]), signal => query<Evidence>("evidence", parentCountParams, signal));
   const fileLabel = state.fileId?.replace("MC2:file_path:", "");
   const scopeLabel = state.edge ? `${relationName[state.edge.relation]} · ${actor(state.edge.source)} → ${actor(state.edge.target)}` : state.fileId ? `文件：${fileLabel}` : state.noFile ? "无明确文件关联" : state.selected ? `${state.selected.label} · 当前时间轴范围` : "当前全局筛选";
-  return <div className="app mc2-app w-app" data-testid="mc2-page">
-    <header className="compact-header"><div><h1>MC2 · 系统活动调查</h1><p>从活动与明确关系进入局部过程，逐条核对原始证据。</p></div><nav className="workspace-nav"><button onClick={() => onDatasetChange("MC1")}>MC1</button><span className="nav-current">MC2</span><button onClick={() => onDatasetChange("CUSTOM")}>CUSTOM</button><a href="?mc2=legacy">旧版 MC2 / 扩展工具</a></nav></header>
+  return <div className="app mc2-app w-app workspace-shell" data-testid="mc2-page">
+    <WorkspaceHeader title="MC2 · 系统活动调查" description="从活动与明确关系进入局部过程，逐条核对原始证据。" dataset="MC2" change={onDatasetChange}><a href="?mc2=legacy">旧版 MC2 / 扩展工具</a></WorkspaceHeader>
     <ViewControls views={([
       ["activity", "活动分布"], ["relations", "关系调查"], ["process", "局部过程"], ["evidence", "证据记录"],
     ] as const).map(([id, label]) => ({ id, label, checked: visible[id], change: (value: boolean) => setVisible(previous => ({ ...previous, [id]: value })) }))}>

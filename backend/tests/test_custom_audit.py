@@ -17,6 +17,7 @@ def event(event_id: str, event_type: str, time_us: int, **kwargs) -> dict:
         "actor_id": kwargs.pop("actor_id", f"{RUN}:writer"),
         "target_id": kwargs.pop("target_id", None),
         "document_id": kwargs.pop("document_id", f"{RUN}:document"),
+        "task_id": kwargs.pop("task_id", f"{RUN}:task"),
         "version": kwargs.pop("version", None),
         "parent_event_id": kwargs.pop("parent_event_id", None),
         "details": details,
@@ -25,8 +26,11 @@ def event(event_id: str, event_type: str, time_us: int, **kwargs) -> dict:
 
 def base_events(attempt_details: dict, review_details: dict | None, result: dict | None) -> list[dict]:
     events = [
+        event("version1", "version_updated", 10, version=1, details={"previous_version": None, "sha256": HASH}),
         event("attempt", "publish_attempt", 200, version=1, details=attempt_details),
     ]
+    if attempt_details.get("expected_version") == 2:
+        events.append(event("version2", "version_updated", 20, version=2, details={"previous_version": 1, "sha256": "b" * 64}))
     if review_details is not None:
         events.append(
             event(

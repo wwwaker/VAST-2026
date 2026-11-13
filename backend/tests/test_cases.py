@@ -21,7 +21,7 @@ CASE_PATH = os.path.join(
 
 
 class CaseFileTest(unittest.TestCase):
-    """S2 剩余项：五条冻结案例的 ID、配对与期望值都能被重算复核。"""
+    """S2 剩余项：七条冻结案例的 ID、配对与期望值都能被重算复核。"""
 
     def setUp(self) -> None:
         helpers.require_db(self)
@@ -32,18 +32,20 @@ class CaseFileTest(unittest.TestCase):
                 "SELECT data_version FROM datasets WHERE dataset_id='CUSTOM'"
             ).fetchone()["data_version"]
 
-    def test_five_cases_are_frozen(self) -> None:
+    def test_seven_cases_are_frozen(self) -> None:
         payload = list_cases("CUSTOM")
-        self.assertEqual(payload["total"], 5)
+        self.assertEqual(payload["total"], 7)
         self.assertEqual([item["case_id"] for item in payload["items"]], [
             "custom-normal",
             "custom-bypass-review",
             "custom-repeated-handoff",
             "custom-stale-denied",
             "custom-stale-published",
+            "custom-normal-rework",
+            "custom-valid-review-denied",
         ])
         # 每条都用当前主库重算过，期望值与实际一致
-        self.assertEqual(payload["status_counts"]["ok"], 5)
+        self.assertEqual(payload["status_counts"]["ok"], 7)
         self.assertFalse(payload["stale"])
 
     def test_every_case_resolves_run_and_baseline(self) -> None:
@@ -82,7 +84,7 @@ class CaseFileTest(unittest.TestCase):
         with get_conn() as conn:
             payload = case_domain.list_cases(conn, "sha256-of-some-other-build", CASE_PATH)
         self.assertTrue(payload["stale"])
-        self.assertEqual(payload["status_counts"]["stale"], 5)
+        self.assertEqual(payload["status_counts"]["stale"], 7)
         for item in payload["items"]:
             self.assertEqual(item["computed_status"], "ok")
 

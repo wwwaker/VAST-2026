@@ -4,6 +4,7 @@ import type { Filters } from "../../../data/filterContext";
 import { actor, categoryColors, displayId, EventMetadata, EventRow, number, PendingRegion, RequestStatus, time, typeLabel, useRequest, type ReaderTarget } from "./shared";
 
 import { ReadingActions } from "../../mc1/reference/components/MessageMetadata";
+import { useReaderScrollLock } from "../../shared/ReaderDialog";
 import { query, relationName, type ProcessData } from "./workspaceApi";
 
 type Entry = ReaderTarget & { scroll: number; cursors: (string | null)[] };
@@ -16,12 +17,7 @@ export function Reader({ initial, filters, types, close, filterActor }: { initia
   const resource = useRequest<EventDetail | FileTrackPayload>(JSON.stringify([current.kind, current.id, filters, cursor]), signal => current.kind === "event"
     ? fetchEvent("MC2", current.id, signal)
     : fetchFileTrack({ fileId: current.id, filters, limit: 40, cursor }, signal));
-  useEffect(() => {
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    modal.current?.querySelector<HTMLButtonElement>("button")?.focus();
-    return () => { document.body.style.overflow = previous; };
-  }, []);
+  useReaderScrollLock(modal);
   useEffect(() => { if (body.current && !resource.loading) body.current.scrollTop = current.scroll; }, [current, resource.loading]);
   useEffect(() => { modal.current?.querySelector<HTMLButtonElement>("button")?.focus(); }, [current.kind, current.id, cursor]);
   const open = (target: ReaderTarget) => {

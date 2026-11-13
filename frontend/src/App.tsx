@@ -14,6 +14,7 @@ import { CustomReferencePage } from "./views/custom/CustomReferencePage";
 const LAYOUT_VERSION = 1;
 const Mc1MigratedPage = lazy(() => import("./views/mc1/Mc1MigratedPage").then(module => ({ default: module.Mc1MigratedPage })));
 const Mc2MigratedPage = lazy(() => import("./views/mc2/Mc2MigratedPage").then(module => ({ default: module.Mc2MigratedPage })));
+const CustomMigratedPage = lazy(() => import("./views/custom/CustomMigratedPage").then(module => ({ default: module.CustomMigratedPage })));
 type LayoutPrefs = { version: number; evidenceOpen: boolean; evidenceSize: number };
 const defaultLayout: LayoutPrefs = { version: LAYOUT_VERSION, evidenceOpen: false, evidenceSize: 392 };
 function readLayout(key: string): LayoutPrefs {
@@ -63,6 +64,7 @@ function Workspace() {
     const query = new URLSearchParams(window.location.search);
     if (query.has("mc1")) setDataset("MC1");
     else if (query.has("mc2")) setDataset("MC2");
+    else if (query.has("custom")) setDataset("CUSTOM");
   }, [setDataset]);
 
   useEffect(() => {
@@ -78,11 +80,12 @@ function Workspace() {
 
   const usingReferenceMc1 = dataset === "MC1" && !showBench && new URLSearchParams(window.location.search).get("mc1") !== "legacy";
   const usingReferenceMc2 = dataset === "MC2" && !showBench && new URLSearchParams(window.location.search).get("mc2") !== "legacy";
-  useHotkeys(() => setShowHelp((v) => !v), !usingReferenceMc1 && !usingReferenceMc2);
+  const usingReferenceCustom = dataset === "CUSTOM" && !showBench && new URLSearchParams(window.location.search).get("custom") !== "legacy";
+  useHotkeys(() => setShowHelp((v) => !v), !usingReferenceMc1 && !usingReferenceMc2 && !usingReferenceCustom);
   const selectDataset = (id: DatasetId) => {
     const url = new URL(window.location.href);
-    url.searchParams.delete("mc1"); url.searchParams.delete("mc2");
-    if (id !== "CUSTOM") url.searchParams.set(id.toLowerCase(), "reference");
+    for (const key of ["mc1", "mc2", "custom", "run", "baseline", "tab"]) url.searchParams.delete(key);
+    url.searchParams.set(id.toLowerCase(), "reference");
     window.history.replaceState(null, "", url);
     setDataset(id);
   };
@@ -117,6 +120,9 @@ function Workspace() {
   }
   if (usingReferenceMc2) {
     return <Suspense fallback={<p role="status" style={{ padding: 24 }}>正在打开 MC2…</p>}><Mc2MigratedPage onDatasetChange={selectDataset} /></Suspense>;
+  }
+  if (usingReferenceCustom) {
+    return <Suspense fallback={<p role="status" style={{ padding: 24 }}>正在打开 CUSTOM…</p>}><CustomMigratedPage onDatasetChange={selectDataset} /></Suspense>;
   }
 
   return (

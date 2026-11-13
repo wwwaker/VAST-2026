@@ -3,6 +3,7 @@ import React, { useEffect } from 'react';
 import { Play, Pause } from 'lucide-react';
 import { fmtRoundLabel } from '../utils.js';
 import { EVENT_MARKERS } from '../constants.js';
+import { WindowRange } from '../../../shared/WindowRange';
 
 export function CrisisTimeline({ timeline, idx, setIdx, startIdx = 0, setStartIdx, playing, onTogglePlay, granularity, setGranularity, eventMarkers = EVENT_MARKERS, tickColor, renderMeta, tickLabel, tickAriaLabel, onTick, scaleOptions, playTitle }) {
   const total = timeline ? timeline.length : 0;
@@ -46,7 +47,6 @@ export function CrisisTimeline({ timeline, idx, setIdx, startIdx = 0, setStartId
   const n = timeline.length;
   const denom = Math.max(1, n - 1);
 
-  const onStart = (v) => { setStartIdx && setStartIdx(Math.min(Number(v), idx)); };
   const onEnd = (v) => { setIdx(Math.max(Number(v), startIdx)); };
 
   // Olay işaretlerini (leak / embargo) round index'ine çevir:
@@ -60,9 +60,6 @@ export function CrisisTimeline({ timeline, idx, setIdx, startIdx = 0, setStartId
     }
     return { ...mk, idx: mIdx };
   });
-
-  const fillLeft = (startIdx / denom) * 100;
-  const fillWidth = ((idx - startIdx) / denom) * 100;
 
   return (
     <section className="timeline-bar">
@@ -100,16 +97,10 @@ export function CrisisTimeline({ timeline, idx, setIdx, startIdx = 0, setStartId
               );
             })}
           </div>
-          <div className="tl-range-multi">
-            <div className="tl-track" />
-            <div className="tl-track-fill" style={{ left: `${fillLeft}%`, width: `${fillWidth}%` }} />
-            <input className="tl-range tl-range-start" type="range" min={0} max={n - 1} step={1}
-              value={startIdx} onChange={e => onStart(e.target.value)}
-              aria-label="窗口起点" />
-            <input className="tl-range tl-range-end" type="range" min={0} max={n - 1} step={1}
-              value={idx} onChange={e => onEnd(e.target.value)}
-              aria-label="窗口终点" />
-          </div>
+          <WindowRange maximum={n - 1} value={[startIdx, idx]} change={([a, b]) => {
+            if (a !== startIdx && setStartIdx) setStartIdx(a);
+            if (b !== idx) setIdx(b);
+          }} />
         </div>
 
         {setGranularity && (

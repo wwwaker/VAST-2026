@@ -1,8 +1,5 @@
 /* MC2 uses the same page grid and reading rhythm as the migrated MC1. */
 .mc2-app { font-size: 14px; line-height: 1.5; }
-.mc2-app button:not(:where(.fp-toggle,.tl-play,.tl-tick,.flow-back,.flow-close)) { border: 1px solid #cbd7e5; border-radius: 8px; background: #fff; color: #34516e; padding: 7px 11px; cursor: pointer; text-align: center; }
-.mc2-app button:not(:where(.fp-toggle,.tl-play,.tl-tick,.flow-back,.flow-close)):hover:not(:disabled) { border-color: #4d8bc9; background: #f0f6fd; }
-.mc2-app button:disabled { opacity: .45; cursor: default; }
 .mc2-app button.mc2-primary { background: #2469b5; color: #fff; border-color: #2469b5; }
 .mc2-app button.mc2-primary:hover { background: #1b599a; }
 .mc2-app .mc2-note { color: #617187; font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }

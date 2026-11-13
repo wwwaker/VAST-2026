@@ -1,3 +1,4 @@
+import windowRangeCss from "../shared/window-range.css?inline";
 import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { DatasetId } from "../../state/workspace";
@@ -17,6 +18,6 @@ export function Mc1MigratedPage({ onDatasetChange }: { onDatasetChange: (id: Dat
     return () => { document.documentElement.style.scrollbarGutter = previous; };
   }, []);
   return <div ref={host} data-testid="mc1-reference" style={{ minHeight: "100vh", background: "#f5f7fa" }}>
-    {root && createPortal(<><style>{referenceCss}{themeCss}</style><ReferenceMc1 onDatasetChange={onDatasetChange} /></>, root)}
+    {root && createPortal(<><style>{referenceCss}{themeCss}{windowRangeCss}</style><ReferenceMc1 onDatasetChange={onDatasetChange} /></>, root)}
   </div>;
 }

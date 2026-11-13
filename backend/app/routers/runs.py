@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..db import get_conn, require_dataset
 from ..domain import custom_audit
+from ..domain.custom_projection import coverage, project
 from ..query import filters
 from ..query.filters import FilterError, RawFilter
 from .events import load_annotations, summarize
@@ -130,7 +131,8 @@ def list_runs(
         if observed is not None and bool(row["observed"]) != observed:
             continue
         events = grouped.get(row["run_id"], [])
-        audit = custom_audit.audit_run(events)
+        event_coverage = coverage(events, row["event_count"])
+        audit = custom_audit.audit_run(events, event_coverage["complete"])
         normal_id = pairs.get(row["run_id"])
         items.append(
             {
@@ -139,6 +141,11 @@ def list_runs(
                 "has_pair": bool(normal_id),
                 "audit": audit["summary"],
                 "audit_rules": [rule for rule in audit["rules"] if rule["status"] not in {"valid", "current"}],
+                "attempts": audit["attempts"],
+                "coverage": event_coverage,
+                "call_count": sum(e["event_type"] == "agent_call_started" for e in events),
+                "version_count": sum(e["event_type"] == "version_updated" for e in events),
+                "version_path": [{"version": e.get("version"), "previous_version": (e["details"] or {}).get("previous_version")} for e in events if e["event_type"] == "version_updated"],
             }
         )
         if include_stages:
@@ -200,7 +207,9 @@ def run_detail(
         ).fetchall()
         annotations = load_annotations(conn, dataset, [event["event_id"] for event in events])
 
-    audit = custom_audit.audit_run(events)
+    event_coverage = coverage(events, row["event_count"])
+    audit = custom_audit.audit_run(events, event_coverage["complete"])
+    projection = project(events, row["event_count"], dataset_row["data_version"], audit)
 
     calls = []
     started = {event["event_id"]: event for event in events if event["event_type"] == "agent_call_started"}
@@ -253,6 +262,7 @@ def run_detail(
         "links": [dict(link) for link in links],
         "calls": calls,
         "audit": audit,
+        "projection": projection,
         "truncated": matched > len(events),
     }
 
@@ -269,18 +279,8 @@ def _metrics(events: list[dict], audit: dict) -> dict:
         "handoffs": sum(1 for event in events if event["event_type"] == "task_handoff"),
         "review_present": any(event["event_type"] == "review_decision" for event in events),
         "attempts": audit["summary"]["attempt_count"],
-        "read_version": next(
-            (
-                (event["details"] or {}).get("selected_version")
-                for event in events
-                if event["event_type"] == "workflow_route"
-            ),
-            None,
-        ),
-        "published_version": next(
-            (event.get("version") for event in events if event["event_type"] == "publish_result"),
-            None,
-        ),
+        "read_version": [a["version_check"]["read_version"] for a in audit["attempts"]],
+        "published_version": [a["publish"]["actual_version"] for a in audit["attempts"]],
         "repeated_handoff": audit["summary"]["repeated_handoff"],
     }
 
@@ -315,8 +315,8 @@ def run_comparison(
 
     left = grouped.get(run_id, [])
     right = grouped.get(normal_id, [])
-    left_audit = custom_audit.audit_run(left)
-    right_audit = custom_audit.audit_run(right)
+    left_audit = custom_audit.audit_run(left, coverage(left, run_row["event_count"])["complete"])
+    right_audit = custom_audit.audit_run(right, coverage(right, baseline_row["event_count"])["complete"])
 
     same_model = run_row["model"] == baseline_row["model"]
     same_fixture = run_row["fixture"] == baseline_row["fixture"]
@@ -374,7 +374,7 @@ def run_comparison(
             "run_id": run_id,
             "baseline_run_id": normal_id,
             "auto": baseline_run_id is None,
-            "valid": bool(same_model and same_fixture and baseline_normal),
+            "valid": bool(same_model and same_fixture and baseline_normal and run_id != normal_id),
             "same_model": same_model,
             "same_fixture": same_fixture,
             "baseline_normal": baseline_normal,
