@@ -74,8 +74,6 @@
 .w-edge-events > div { padding: 6px 0; border-bottom: 1px solid #edf1f6; display: flex; flex-wrap: wrap; gap: 5px; }
 .w-edge-events time { font-size: 10px; width: 100%; color: #617187; }
 .w-edge-events button { font-size: 10px; padding: 4px 6px; }
-.w-matrix-pages { display: flex; flex-wrap: wrap; gap: 5px; font-size: 11px; padding: 5px 0; color: #617187; }
-.w-matrix-pages > span { width: 100%; }
 .w-evidence-role { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding: 10px 0; font-size: 12px; border-bottom: 1px solid #e5ebf2; }
 .w-evidence-role small { width: 100%; color: #778b9e; }
 .w-evidence-role .w-role-arrow { color: #4e7ca4; }
@@ -149,7 +147,10 @@
 /* MC1 and MC2 now render the same control, timeline and message metadata components. */
 .w-app [hidden] { display: none !important; }
 .w-current-scope { margin: -4px 0 0; }
+/* Stick the outer timeline region so its loading wrappers do not constrain it. */
+.w-timeline-dock { position: sticky; top: 8px; z-index: 40; }
 .w-shared-timeline .timeline-bar { position: static; }
+@media(max-width:620px) { .w-timeline-dock { position: static; } }
 .w-shared-timeline .tl-date { color: #617187; }
 .w-layout.filters-hidden { grid-template-columns: minmax(0,1fr); }
 .w-app .w-shared-timeline .tl-tick { min-height: 0; }
@@ -183,6 +184,46 @@
 .w-app .mc2-card-head h2{display:flex;align-items:center;gap:8px}
 .mc2-activity-card h2>svg{color:#338d83}.w-relation-section h2>svg{color:#7d6bb3}.w-process-section h2>svg{color:#bf6965}.w-evidence-section h2>svg{color:#b17a29}
 .w-app .global-controls button:has(>svg),.w-app .w-tabs button,.w-app .w-selection-notice button,.w-app .mc2-pagination button,.w-app .w-process-tools button,.w-app .w-graph-tools button{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+
+.w-relation-controls { display:flex; gap:16px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+.w-relation-controls .w-relation-picker { margin:0; gap:10px; font-size:12px; }
+.w-relation-controls .w-mode-tabs { padding:0; border:0; }
+.w-relation-picker select { max-width:100%; }
+.w-relation-categories { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; padding:8px 0 16px; }
+.w-app .w-relation-categories > button { display:flex; flex-direction:column; align-items:stretch; text-align:left; gap:6px; border:1px solid #e2e8ef; border-left:3px solid var(--relation-color); padding:10px 12px; background:#fff; border-radius:8px; color:#60738a; font-size:11px; }
+.w-app .w-relation-categories > button:hover { background:#f7fafc; border-color:var(--relation-color); }
+.w-relation-category-title { display:flex; justify-content:space-between; gap:8px; font-size:13px; font-weight:600; color:#304c68; }
+.w-relation-category-title b { font-size:12px; font-weight:500; white-space:nowrap; }
+.w-canvas-frame { position:relative; }
+.w-canvas-tools { position:absolute; right:10px; top:10px; z-index:2; padding:4px; border:1px solid #e2e8ef; border-radius:7px; background:#fffffff0; box-shadow:0 2px 8px #23436108; }
+.w-canvas-tools details { position:relative; }
+.w-canvas-tools summary { padding:3px 5px; cursor:pointer; }
+.w-canvas-tools details[open] > button { position:absolute; top:28px; right:0; min-width:90px; }
+.w-graph-scope { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:33px; font-size:11px; color:#62768b; }
+.w-graph-scope > button { padding:3px 7px; font-size:11px; }
+.w-relation-color-legend { display:flex; gap:8px 15px; flex-wrap:wrap; padding:10px 0 5px; color:#65768a; font-size:11px; }
+.w-relation-color-legend span { display:inline-flex; align-items:center; gap:5px; }
+.w-relation-color-legend i { width:18px; height:3px; border-radius:2px; }
+.w-edge-tooltip { position:absolute; bottom:10px; left:10px; right:10px; pointer-events:none; background:#ffffffed; border:1px solid #dee6ed; border-radius:6px; padding:8px 12px; color:#34516e; font-size:12px; }
+.w-node-inspector { border-bottom:1px solid #e1e8ef; padding-bottom:12px; }
+.w-node-inspector .w-text-link { display:block; margin-top:8px; text-align:left; }
+.w-app .w-relation-matrix { table-layout:fixed; border-spacing:1px; width:max-content; }
+.w-app .w-relation-matrix th:first-child { box-sizing:border-box; width:170px; min-width:170px; max-width:170px; }
+.w-app .w-relation-matrix thead th:not(:first-child) { box-sizing:border-box; width:var(--matrix-cell); min-width:var(--matrix-cell); max-width:var(--matrix-cell); height:112px; padding:5px 2px; }
+.w-app .w-relation-matrix thead th .w-entity-name { max-height:86px; }
+.w-app .w-relation-matrix tbody th { height:var(--matrix-cell); padding:0 8px; }
+.w-app .w-relation-matrix td { width:var(--matrix-cell); height:var(--matrix-cell); background:#f0f3f7; }
+.w-app .w-relation-matrix td button { display:block; box-sizing:border-box; width:var(--matrix-cell); height:var(--matrix-cell); font-size:10px; }
+.w-app .w-relation-matrix th.is-located { background:#fff0cc; box-shadow:inset 0 0 0 1px #d5a253; }
+.w-matrix-tools { justify-content:space-between; gap:6px; }
+.w-matrix-tools input[type=range] { width:70px; padding:0; min-height:0; }
+.w-matrix-locate { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:4px 0 9px; font-size:11px; color:#617187; }
+.w-matrix-locate input { width:220px; max-width:100%; padding:5px 8px; font-size:11px; }
+.w-matrix-locate button { display:inline-flex; align-items:center; gap:5px; font-size:11px; padding:5px 7px; }
+.w-relation-visual > .mc2-status:empty { display:none; }
+.w-relation-visual .w-loading-mask { border:0; border-radius:6px; font-size:13px; font-weight:500; }
+.w-relation-visual .w-loading-spinner { width:16px; height:16px; border-width:2px; }
+@media(max-width:700px) { .w-relation-categories { grid-template-columns:minmax(0,1fr); } .w-relation-category-title { flex-wrap:wrap; } }
 .w-mode-tabs button>svg{color:var(--w-accent)}
 .w-app .w-mode-tabs button[aria-pressed=true]{border-color:var(--w-accent);box-shadow:inset 0 -2px var(--w-accent);background:#f8fafc;color:#40566e}
 .w-app button.w-type-label{display:flex;align-items:center;gap:5px}.w-type-label>svg{flex:none}.w-type-label>span{overflow:hidden;text-overflow:ellipsis}

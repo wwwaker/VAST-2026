@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 import json
 import os
 import sqlite3
@@ -204,6 +205,18 @@ def main() -> None:
                 f"无法替换主库（可能仍有后端进程占用）：{exc}\n"
                 f"请停止服务后重新执行；临时库已保留：{tmp}"
             ) from exc
+
+        # Persistent projections are optional accelerators; they never change
+        # the imported evidence or make an otherwise valid database unusable.
+        with closing(sqlite3.connect(f"file:{target}?mode=ro", uri=True)) as reader:
+            has_mc2 = reader.execute("SELECT 1 FROM datasets WHERE dataset_id='MC2'").fetchone() is not None
+        if has_mc2:
+            from ..domain.mc2_projection import build as build_mc2_projection
+            try:
+                projection = build_mc2_projection(target)
+                print(f"MC2 关系预计算：{projection['buckets']} 个日期/动作桶 · {projection['seconds']:.2f}s")
+            except (sqlite3.Error, OSError, RuntimeError) as exc:
+                print(f"MC2 预计算未完成，将使用精确查询：{exc}")
 
         total = time.perf_counter() - started
         size_mb = os.path.getsize(target) / 1024 / 1024

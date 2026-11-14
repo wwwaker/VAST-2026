@@ -13,7 +13,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..db import get_conn, require_dataset
 from ..domain import event_types
-from ..domain import mc2_files
+from ..domain import mc2_files, mc2_cache, mc2_projection
+from ..domain.mc2_relations import type_overview
 from ..query import filters
 from ..query.filters import RawFilter, FilterError
 from .events import summarize
@@ -53,8 +54,8 @@ def selected(raw: RawFilter, file_id=None, no_file=False, relation=None,
              source=None, target=None, action=None):
     sel = base(raw)
     if file_id or no_file:
-        clause = ("EXISTS (SELECT 1 FROM relations rf WHERE rf.dataset_id=e.dataset_id "
-                  "AND rf.event_id=e.event_id AND rf.relation IN "
+        clause = ("e.event_id IN (SELECT rf.event_id FROM relations rf WHERE rf.dataset_id='MC2' "
+                  "AND rf.event_id IS NOT NULL AND rf.relation IN "
                   "('file_path','queued_file_path','post_content_source')")
         if file_id:
             sel = sel.extend(clause + " AND rf.dst_id=:w_file)", {"w_file": file_id}, f"file:{file_id}")
@@ -123,28 +124,38 @@ def facets(raw: RawFilter = Depends(filters.filter_params), kind: str = Query("f
            q: str = "", offset: int = Query(0, ge=0)):
     sel = base(raw)
     with get_conn() as conn:
-        if kind == "actor":
-            sql = ("SELECT e.actor_id id,en.label,en.entity_type,COUNT(DISTINCT e.event_id) count "
-                   "FROM events e LEFT JOIN entities en ON en.dataset_id=e.dataset_id AND en.entity_id=e.actor_id "
-                   f"WHERE {sel.where_sql} GROUP BY e.actor_id")
-            missing = conn.execute(f"SELECT COUNT(*) FROM events e WHERE {sel.where_sql} AND e.actor_id IS NULL", sel.params).fetchone()[0]
+        data = mc2_cache.cached(conn, ("facets", projection_key(sel), kind),
+                                lambda: _facet_data(conn, sel, raw, kind))
+    rows = [r for r in data["items"] if q.casefold() in (r["label"] or r["id"]).casefold()]
+    return {**data, "items": rows[offset:offset + 12], "total": len(rows), "offset": offset}
+
+
+def _facet_data(conn, sel, raw, kind):
+    projected = mc2_projection.facets(conn, sel, kind)
+    if projected is not None:
+        return projected
+    if kind == "actor":
+        sql = ("SELECT e.actor_id id,en.label,en.entity_type,COUNT(DISTINCT e.event_id) count "
+               "FROM events e LEFT JOIN entities en ON en.dataset_id=e.dataset_id AND en.entity_id=e.actor_id "
+               f"WHERE {sel.where_sql} GROUP BY e.actor_id")
+        missing = conn.execute(f"SELECT COUNT(*) FROM events e WHERE {sel.where_sql} AND e.actor_id IS NULL", sel.params).fetchone()[0]
+    else:
+        role_clause = "r.relation IN ('file_path','queued_file_path','post_content_source')" if kind == "file" else "en.entity_type='system'"
+        sql = ("SELECT r.dst_id id,COALESCE(en.source_value,en.label,r.dst_id) label,en.entity_type,COUNT(DISTINCT e.event_id) count "
+               "FROM events e JOIN relations r ON r.dataset_id=e.dataset_id AND r.event_id=e.event_id "
+               "LEFT JOIN entities en ON en.dataset_id=r.dataset_id AND en.entity_id=r.dst_id "
+               f"WHERE {sel.where_sql} AND r.target_kind='entity' AND {role_clause} GROUP BY r.dst_id")
+        if kind == "file":
+            missing = filters.count_events(conn, selected(raw, no_file=True))
         else:
-            role_clause = "r.relation IN ('file_path','queued_file_path','post_content_source')" if kind == "file" else "en.entity_type='system'"
-            sql = ("SELECT r.dst_id id,COALESCE(en.source_value,en.label,r.dst_id) label,en.entity_type,COUNT(DISTINCT e.event_id) count "
-                   "FROM events e JOIN relations r ON r.dataset_id=e.dataset_id AND r.event_id=e.event_id "
-                   "LEFT JOIN entities en ON en.dataset_id=r.dataset_id AND en.entity_id=r.dst_id "
-                   f"WHERE {sel.where_sql} AND r.target_kind='entity' AND {role_clause} GROUP BY r.dst_id")
-            if kind == "file":
-                missing = filters.count_events(conn, selected(raw, no_file=True))
-            else:
-                missing = filters.count_events(conn, sel) - conn.execute(
-                    "SELECT COUNT(DISTINCT e.event_id) FROM events e JOIN relations r ON r.dataset_id=e.dataset_id AND r.event_id=e.event_id "
-                    "JOIN entities en ON en.dataset_id=r.dataset_id AND en.entity_id=r.dst_id "
-                    f"WHERE {sel.where_sql} AND en.entity_type='system'", sel.params).fetchone()[0]
-        rows = [dict(r) for r in conn.execute(sql, sel.params) if r["id"] is not None]
-        rows = sorted((r for r in rows if q.casefold() in (r["label"] or r["id"]).casefold()), key=lambda r: (-r["count"], r["id"]))
-        return {"meta": meta(conn, sel), "items": rows[offset:offset + 12], "total": len(rows),
-                "offset": offset, "missing": missing, "kind": kind}
+            missing = filters.count_events(conn, sel) - conn.execute(
+                "SELECT COUNT(DISTINCT e.event_id) FROM events e JOIN relations r ON r.dataset_id=e.dataset_id AND r.event_id=e.event_id "
+                "JOIN entities en ON en.dataset_id=r.dataset_id AND en.entity_id=r.dst_id "
+                f"WHERE {sel.where_sql} AND en.entity_type='system'", sel.params).fetchone()[0]
+    rows = [dict(r) for r in conn.execute(sql, sel.params) if r["id"] is not None]
+    rows = sorted(rows, key=lambda r: (-r["count"], r["id"]))
+    return {"meta": meta(conn, sel), "items": rows, "total": len(rows),
+            "missing": missing, "kind": kind}
 
 
 @router.get("/relations")
@@ -153,66 +164,68 @@ def relations(raw: RawFilter = Depends(filters.filter_params), file_id: str | No
               relation: str | None = None):
     sel = selected(raw, file_id, no_file)
     with get_conn() as conn:
-        relation_counts = [dict(r) for r in conn.execute(
-            "SELECT r.relation,COUNT(DISTINCT e.event_id) count FROM events e "
-            "JOIN relations r ON r.dataset_id=e.dataset_id AND r.event_id=e.event_id "
-            f"WHERE {sel.where_sql} AND r.target_kind='entity' GROUP BY r.relation ORDER BY count DESC", sel.params)]
-        valid = [r["relation"] for r in relation_counts]
-        if mode == "relay":
-            allowed = [r for r in valid if r in ("queue_target_agent", "queue_target_person")]
-        elif mode == "operations":
-            allowed = [r for r in valid if r in ("file_path", "post_content_source")]
-        elif mode == "types":
-            allowed = valid
-        else:
-            allowed = [relation] if relation in valid else valid[:1]
-        params = dict(sel.params)
-        marks = []
-        for i, role in enumerate(allowed):
-            params[f"role{i}"] = role
-            marks.append(f":role{i}")
-        role_sql = "r.relation IN (" + ",".join(marks) + ")" if marks else "0"
-        if mode == "operations":
-            role_sql += " AND r.dst_id=:op_file"
-            params["op_file"] = file_id
-        needs_file = mode == "system" and not file_id and any(r in FILE_ROLES for r in allowed)
-        src_expr = "COALESCE(src.entity_type,'unknown')" if mode == "types" else "COALESCE(r.src_id,'__missing__')"
-        dst_expr = "COALESCE(dst.entity_type,'unknown')" if mode == "types" else "r.dst_id"
-        edges = [dict(r) for r in conn.execute(
-            f"SELECT {src_expr} source,{dst_expr} target,r.relation,e.event_type action,"
-            "COUNT(DISTINCT e.event_id) count,MIN(e.time_sort_us) first_us,MAX(e.time_sort_us) last_us "
-            "FROM events e JOIN relations r ON r.dataset_id=e.dataset_id AND r.event_id=e.event_id "
-            "LEFT JOIN entities src ON src.dataset_id=r.dataset_id AND src.entity_id=r.src_id "
-            "LEFT JOIN entities dst ON dst.dataset_id=r.dataset_id AND dst.entity_id=r.dst_id "
-            f"WHERE {sel.where_sql} AND r.target_kind='entity' AND {role_sql} AND {0 if needs_file else 1} "
-            f"GROUP BY {src_expr},{dst_expr},r.relation,e.event_type ORDER BY count DESC,source,target", params)]
-        mapped = conn.execute(
-            "SELECT COUNT(DISTINCT e.event_id) FROM events e JOIN relations r ON r.dataset_id=e.dataset_id AND r.event_id=e.event_id "
-            f"WHERE {sel.where_sql} AND r.target_kind='entity' AND {role_sql}", params).fetchone()[0]
-        ids = {x[k] for x in edges for k in ("source", "target")}
-        if mode == "types":
-            members = {r["entity_type"]: r["count"] for r in conn.execute(
-                "SELECT en.entity_type,COUNT(DISTINCT en.entity_id) count FROM entities en WHERE en.dataset_id='MC2' AND en.entity_id IN ("
-                "SELECT r.src_id FROM events e JOIN relations r ON r.dataset_id=e.dataset_id AND r.event_id=e.event_id "
-                f"WHERE {sel.where_sql} AND r.target_kind='entity' AND {role_sql} UNION "
-                "SELECT r.dst_id FROM events e JOIN relations r ON r.dataset_id=e.dataset_id AND r.event_id=e.event_id "
-                f"WHERE {sel.where_sql} AND r.target_kind='entity' AND {role_sql}) GROUP BY en.entity_type", params)}
-            labels = {"agent": "智能体", "person": "人员", "file_path": "文件", "system": "系统", "room": "场所", "team": "团队", "department": "部门", "company": "公司", "world": "环境", "unknown": "缺失角色"}
-            nodes = [{"id": i, "label": f"{labels.get(i, i)} · {members.get(i, 0)} 个活跃实体", "entity_type": i} for i in sorted(ids)]
-        else:
-            nodes = []
-            for entity in sorted(ids):
-                row = conn.execute("SELECT label,source_value,entity_type FROM entities WHERE dataset_id='MC2' AND entity_id=?", (entity,)).fetchone()
-                nodes.append({"id": entity, "label": (row["source_value"] if row["entity_type"] == "file_path" else row["label"]) or entity,
-                              "entity_type": row["entity_type"]} if row else {"id": entity, "label": "缺少发起者", "entity_type": "missing"})
-        payload_meta = meta(conn, sel)
-        return {"meta": payload_meta, "nodes": nodes, "edges": edges, "mapped_events": mapped,
-                "unmapped_events": payload_meta["matched_events"] - mapped,
-                "missing_source_events": conn.execute(
-                    "SELECT COUNT(DISTINCT e.event_id) FROM events e JOIN relations r ON r.dataset_id=e.dataset_id AND r.event_id=e.event_id "
-                    f"WHERE {sel.where_sql} AND {role_sql} AND r.src_id IS NULL", params).fetchone()[0],
-                "relation_counts": [{**r, "label": RELATIONS.get(r["relation"], r["relation"])} for r in relation_counts],
-                "selected_relations": allowed, "mode": mode, "needs_file": needs_file}
+        return mc2_cache.cached(conn, ("relations", projection_key(sel), file_id, mode, relation),
+                                lambda: _relations(conn, sel, file_id, mode, relation))
+
+
+def projection_key(sel):
+    # filter_hash excludes the replay cursor, while applied() includes it.
+    return sel.filter_hash, json.dumps(sel.context.applied(), sort_keys=True)
+
+
+def _relations(conn, sel, file_id, mode, relation):
+    if mode == "types":
+        projected = mc2_projection.overview(conn, sel, RELATIONS)
+        return projected if projected is not None else type_overview(conn, sel, meta(conn, sel), RELATIONS)
+    projected = mc2_projection.details(conn, sel, file_id, mode, relation, RELATIONS)
+    if projected is not None:
+        return projected
+    relation_counts = [dict(r) for r in conn.execute(
+        "SELECT r.relation,COUNT(DISTINCT e.event_id) count FROM events e "
+        "JOIN relations r ON r.dataset_id=e.dataset_id AND r.event_id=e.event_id "
+        f"WHERE {sel.where_sql} AND r.target_kind='entity' GROUP BY r.relation ORDER BY count DESC,r.relation", sel.params)]
+    valid = [r["relation"] for r in relation_counts]
+    if mode == "relay":
+        allowed = [r for r in valid if r in ("queue_target_agent", "queue_target_person")]
+    elif mode == "operations":
+        allowed = [r for r in valid if r in ("file_path", "post_content_source")]
+    else:
+        allowed = [relation] if relation in valid else valid[:1]
+    params = dict(sel.params)
+    marks = []
+    for i, role in enumerate(allowed):
+        params[f"role{i}"] = role
+        marks.append(f":role{i}")
+    role_sql = "r.relation IN (" + ",".join(marks) + ")" if marks else "0"
+    if mode == "operations":
+        role_sql += " AND r.dst_id=:op_file"
+        params["op_file"] = file_id
+    needs_file = mode == "system" and not file_id and any(r in FILE_ROLES for r in allowed)
+    src_expr = "COALESCE(r.src_id,'__missing__')"
+    dst_expr = "r.dst_id"
+    edges = [dict(r) for r in conn.execute(
+        f"SELECT {src_expr} source,{dst_expr} target,r.relation,e.event_type action,"
+        "COUNT(DISTINCT e.event_id) count,MIN(e.time_sort_us) first_us,MAX(e.time_sort_us) last_us "
+        "FROM events e JOIN relations r ON r.dataset_id=e.dataset_id AND r.event_id=e.event_id "
+        f"WHERE {sel.where_sql} AND r.target_kind='entity' AND {role_sql} AND {0 if needs_file else 1} "
+        f"GROUP BY {src_expr},{dst_expr},r.relation,e.event_type ORDER BY count DESC,source,target", params)]
+    mapped = conn.execute(
+        "SELECT COUNT(DISTINCT e.event_id) FROM events e JOIN relations r ON r.dataset_id=e.dataset_id AND r.event_id=e.event_id "
+        f"WHERE {sel.where_sql} AND r.target_kind='entity' AND {role_sql}", params).fetchone()[0]
+    ids = {x[k] for x in edges for k in ("source", "target")}
+    nodes = []
+    for entity in sorted(ids):
+        row = conn.execute("SELECT label,source_value,entity_type FROM entities WHERE dataset_id='MC2' AND entity_id=?", (entity,)).fetchone()
+        nodes.append({"id": entity, "label": (row["source_value"] if row["entity_type"] == "file_path" else row["label"]) or entity,
+                      "entity_type": row["entity_type"]} if row else {"id": entity, "label": "缺少发起者", "entity_type": "missing"})
+    payload_meta = meta(conn, sel)
+    return {"meta": payload_meta, "nodes": nodes, "edges": edges, "mapped_events": mapped,
+            "unmapped_events": payload_meta["matched_events"] - mapped,
+            "missing_source_events": conn.execute(
+                "SELECT COUNT(DISTINCT e.event_id) FROM events e JOIN relations r ON r.dataset_id=e.dataset_id AND r.event_id=e.event_id "
+                f"WHERE {sel.where_sql} AND {role_sql} AND r.src_id IS NULL", params).fetchone()[0],
+            "relation_counts": [{**r, "label": RELATIONS.get(r["relation"], r["relation"])} for r in relation_counts],
+            "selected_relations": allowed, "mode": mode, "needs_file": needs_file}
 
 
 @router.get("/evidence")
