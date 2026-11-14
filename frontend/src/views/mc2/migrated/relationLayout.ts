@@ -15,6 +15,7 @@ export function edgeWidth(count: number, max: number) {
 
 /** Compute a settled layout once, rather than animating a simulation on every update. */
 export function arrange(data: RelationData, saved = new Map<string, Point>()): Map<string, Point> {
+  if (data.nodes.every(n => saved.has(n.id))) return new Map(data.nodes.map(n => [n.id, saved.get(n.id)!]));
   if (data.mode === "operations") {
     const actors = data.nodes.filter(n => n.entity_type !== "file_path");
     const files = data.nodes.filter(n => n.entity_type === "file_path");

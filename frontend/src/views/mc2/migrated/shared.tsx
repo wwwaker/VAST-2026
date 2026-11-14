@@ -3,11 +3,12 @@ import { categoryIcon } from "./mc2Visuals";
 import { EntityLabel, entityKind } from "./EntityLabel";
 import { MessageMetadata } from "../../mc1/reference/components/MessageMetadata";
 import type { EventItem, TypeInfo } from "../../../data/api";
+import type { Filters } from "../../../data/filterContext";
 
 export const number = (value: number) => value.toLocaleString("zh-CN");
 export const displayId = (value: string) => value.replaceAll("MC2:", "");
 export const categoryColors = ["#417bb4", "#b17a29", "#8862b4", "#429583", "#bf6965", "#638a98", "#9c6b91", "#748092"];
-export const time = (us: number | null | undefined) => us == null ? "未记录时间" : new Date(us / 1000).toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
+export const time = (us: number | null | undefined) => us == null ? "未记录时间" : new Date(Math.floor(us / 1e6) * 1000).toISOString().slice(0,19).replace("T", " ") + (us % 1e6 ? `.${String(Math.round(us % 1e6)).padStart(6,"0")}` : "") + " UTC";
 export const inputTime = (us: number | null) => us == null ? "" : new Date(us / 1000).toISOString().slice(0, 19);
 export const actor = (id: string | null | undefined) => {
   if (!id) return "未记录执行者";
@@ -16,7 +17,7 @@ export const actor = (id: string | null | undefined) => {
   return `${name}${id.startsWith("MC2:agent:") ? " · Agent" : id.startsWith("MC2:person:") ? " · 人员" : ""}`;
 };
 export const typeLabel = (value: string, types: TypeInfo[]) => types.find(type => type.type === value)?.display_label ?? value;
-export type ReaderTarget = { kind: "event" | "file"; id: string };
+export type ReaderTarget = { kind: "event" | "file"; id: string; reading?: { filters: Filters; label: string; independent?: boolean } };
 
 export { useRequest, PendingRegion, RequestStatus } from "./RefreshRegion";
 

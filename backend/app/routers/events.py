@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..db import get_conn, require_dataset
 from ..domain import event_types
-from ..domain.mc2_reading import summary as mc2_summary
+from ..domain.mc2_reading import summary as mc2_summary, reading_model
 from ..query import filters
 from ..query.filters import EventSelection, FilterError, RawFilter
 
@@ -267,6 +267,7 @@ def event_detail(event_id: str, dataset: str):
         "channel_id": row["channel_id"],
         "parent_event_id": row["parent_event_id"],
         "details": details_obj,
+        "reading": reading_model(row["event_type"], row["details_json"]) if dataset == "MC2" else None,
         "has_deliberation": bool(row["has_deliberation"]),
         # 双声道：左声道是外发文本，右声道是模型生成的内部审议
         "outgoing_text": outgoing_text if isinstance(outgoing_text, str) else None,

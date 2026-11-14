@@ -14,6 +14,7 @@ import uuid
 
 from .mc2_cache import database_identity
 from ..query.filters import DAY_US, build_selection, resolve_types
+from ..query.timing import TimedConnection
 
 VERSION = 2
 FILE_ROLES = {"file_path", "queued_file_path", "post_content_source"}
@@ -177,7 +178,7 @@ def connection(conn):
     valid = False
     try:
         if os.path.isfile(path):
-            projection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+            projection = sqlite3.connect(f"file:{path}?mode=ro", uri=True, factory=TimedConnection)
             projection.row_factory = sqlite3.Row
             row = projection.execute("SELECT value FROM metadata WHERE key='identity'").fetchone()
             valid = bool(row and row[0] == identity(conn))
@@ -235,7 +236,7 @@ def details(conn, selection, file_id, mode, relation, labels):
     if mode == "relay":
         allowed = [r for r in valid if r in ("queue_target_agent", "queue_target_person")]
     elif mode == "operations":
-        allowed = [r for r in valid if r in ("file_path", "post_content_source")]
+        allowed = [r for r in valid if r in FILE_ROLES]
     else:
         allowed = [relation] if relation in valid else valid[:1]
     needs_file = mode == "system" and not file_id and any(r in FILE_ROLES for r in allowed)

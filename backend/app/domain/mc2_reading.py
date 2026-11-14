@@ -13,7 +13,7 @@ def label(value):
     return str(value).removeprefix("MC2:").replace("Agent/person:", "").replace("agent:person:", "").replace("person:", "").replace("_", " ")
 
 
-def summary(event_type: str, details_json: str | None) -> str:
+def _summary(event_type: str, details_json: str | None) -> str:
     details = json.loads(details_json) if details_json else {}
     details = details if isinstance(details, dict) else {}
     parts = []
@@ -60,3 +60,33 @@ def summary(event_type: str, details_json: str | None) -> str:
             parts.append("日志记录了此次活动，但未提供可阅读的消息正文。")
     text = " · ".join(parts).replace("MC2:", "")
     return text[:360] + ("…" if len(text) > 360 else "")
+
+
+def reading_model(event_type: str, details_json: str | None) -> dict:
+    """One semantic model for list summaries and complete reader fields."""
+    details = json.loads(details_json) if details_json else {}
+    details = details if isinstance(details, dict) else {}
+    labels = {'content': '正文', 'subject': '邮件主题', 'question': '问题', 'response': '答复',
+              'advice': '建议', 'reason': '原因', 'feedback': '反馈', 'topic': '话题', 'purpose': '目的',
+              'target': '文件路径' if 'file' in event_type else '任务目标', 'target_agent': '任务目标',
+              'content_source': '发布内容来源', 'from': '发件角色', 'to': '收件角色', 'room': '地点',
+              'name': '名称', 'contacts': '建议联系人', 'meeting': '会议信息', 'details': '任务参数'}
+    fields = []
+    for key, value in details.items():
+        if key == 'granted' and isinstance(value, bool):
+            value = '允许' if value else '拒绝'
+        elif key == 'task':
+            value = ACTIONS.get(str(value), str(value))
+        elif key == 'args' and isinstance(value, dict):
+            for argument, v in value.items():
+                fields.append({'key': f'args.{argument}', 'label': '任务文件参数' if argument == 'path' else f'任务参数 {argument}', 'value': str(v)})
+            continue
+        elif isinstance(value, (dict, list)):
+            value = json.dumps(value, ensure_ascii=False)
+        if value is not None and str(value):
+            fields.append({'key': key, 'label': '准入检查' if key == 'granted' else '任务类型' if key == 'task' else labels.get(key, key), 'value': str(value)})
+    return {'summary': _summary(event_type, details_json), 'fields': fields}
+
+
+def summary(event_type: str, details_json: str | None) -> str:
+    return reading_model(event_type, details_json)['summary']

@@ -143,6 +143,7 @@ export interface Relation {
 }
 
 export interface EventDetail {
+  reading?: { summary: string; fields: {key:string;label:string;value:string}[] };
   meta: Meta;
   dataset_id: string;
   event_id: string;

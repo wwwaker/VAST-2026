@@ -127,7 +127,8 @@ def facets(raw: RawFilter = Depends(filters.filter_params), kind: str = Query("f
         data = mc2_cache.cached(conn, ("facets", projection_key(sel), kind),
                                 lambda: _facet_data(conn, sel, raw, kind))
     rows = [r for r in data["items"] if q.casefold() in (r["label"] or r["id"]).casefold()]
-    return {**data, "items": rows[offset:offset + 12], "total": len(rows), "offset": offset}
+    return {**data, "items": rows[offset:offset + 12], "total": len(rows), "offset": offset,
+            "scale_max": max((r["count"] for r in data["items"]), default=1)}
 
 
 def _facet_data(conn, sel, raw, kind):
@@ -164,8 +165,10 @@ def relations(raw: RawFilter = Depends(filters.filter_params), file_id: str | No
               relation: str | None = None):
     sel = selected(raw, file_id, no_file)
     with get_conn() as conn:
-        return mc2_cache.cached(conn, ("relations", projection_key(sel), file_id, mode, relation),
+        from ..domain.mc2_semantics import registry
+        data = mc2_cache.cached(conn, ("relations", projection_key(sel), file_id, mode, relation),
                                 lambda: _relations(conn, sel, file_id, mode, relation))
+        return {**data, "semantics": registry()}
 
 
 def projection_key(sel):
@@ -188,7 +191,7 @@ def _relations(conn, sel, file_id, mode, relation):
     if mode == "relay":
         allowed = [r for r in valid if r in ("queue_target_agent", "queue_target_person")]
     elif mode == "operations":
-        allowed = [r for r in valid if r in ("file_path", "post_content_source")]
+        allowed = [r for r in valid if r in FILE_ROLES]
     else:
         allowed = [relation] if relation in valid else valid[:1]
     params = dict(sel.params)
@@ -271,94 +274,48 @@ def process(anchor: str, raw: RawFilter = Depends(filters.filter_params), file_i
             no_file: bool = False, relation: str | None = None, source: str | None = None,
             target: str | None = None, action: str | None = None,
             seconds: int = Query(60, ge=1, le=86400), context: bool = False,
-            expand: bool = False, actors: str = ""):
-    parent = selected(raw, file_id, no_file, relation, source, target, action)
+            expand: bool = False, actors: str = "", bins: int = Query(240, ge=32, le=512), selected_event: str | None = None,
+            expected_version: str | None = None):
+    from ..domain import mc2_process
     with get_conn() as conn:
-        root = conn.execute("SELECT * FROM events WHERE dataset_id='MC2' AND event_id=?", (anchor,)).fetchone()
-        if root is None:
-            raise HTTPException(404, "锚点记录不存在")
-        valid = conn.execute(f"SELECT 1 FROM events e WHERE {parent.where_sql} AND e.event_id=:anchor", {**parent.params, "anchor": anchor}).fetchone() is not None
-        if not valid and not expand:
-            return {"valid": False, "anchor": anchor, "anchor_time": root["time_sort_us"], "items": [], "lanes": [], "links": [],
-                    "note": "锚点不符合当前选择。调整范围后重算，或明确固定原过程。"}
-        start, end = root["time_sort_us"] - seconds * 1_000_000, root["time_sort_us"] + seconds * 1_000_000 + 1
-        if not expand:
-            start = max(start, parent.start_us if parent.start_us is not None else start)
-            end = min(end, parent.end_us if parent.end_us is not None else end)
-        seed = {root["actor_id"]} if root["actor_id"] else set()
-        for row in conn.execute(
-            "SELECT r.src_id,r.dst_id,src.entity_type st,dst.entity_type dt FROM relations r "
-            "LEFT JOIN entities src ON src.dataset_id=r.dataset_id AND src.entity_id=r.src_id "
-            "LEFT JOIN entities dst ON dst.dataset_id=r.dataset_id AND dst.entity_id=r.dst_id "
-            "WHERE r.dataset_id='MC2' AND r.event_id=? AND r.target_kind='entity' AND r.derivation LIKE 'source:%'", (anchor,)):
-            if row["st"] in ("agent", "person"):
-                seed.add(row["src_id"])
-            if row["dt"] in ("agent", "person"):
-                seed.add(row["dst_id"])
-        # Extra entities are an explicit user action. Incoming task sources are
-        # discovered by their target role; no recursive expansion is performed.
-        if actors:
-            seed.update(x for x in actors.split(",") if x)
-        if len(seed) > 150:
-            raise HTTPException(400, "局部实体过多，请缩小选择")
-        main = parent.extend("e.time_sort_us>=:pstart AND e.time_sort_us<:pend", {"pstart": start, "pend": end}, f"window:{start}:{end}")
-        p = {"f_dataset": "MC2", "pstart": start, "pend": end, "p_anchor": anchor}
-        part = participation_clause(sorted(seed), p, prefix="seed")
-        if context:
-            rows = conn.execute(
-                "SELECT e.*,en.label actor_label FROM events e LEFT JOIN entities en ON en.dataset_id=e.dataset_id AND en.entity_id=e.actor_id "
-                f"WHERE e.dataset_id='MC2' AND e.time_sort_us>=:pstart AND e.time_sort_us<:pend AND ({part} OR e.event_id=:p_anchor) ORDER BY e.time_sort_us,e.event_id", p).fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT e.*,en.label actor_label FROM events e LEFT JOIN entities en ON en.dataset_id=e.dataset_id AND en.entity_id=e.actor_id "
-                f"WHERE {main.where_sql} ORDER BY e.time_sort_us,e.event_id", main.params).fetchall()
-        main_ids = {r[0] for r in conn.execute(f"SELECT e.event_id FROM events e WHERE {main.where_sql} AND ({part} OR e.event_id=:p_anchor)", {**main.params, **p})}
-        if not context:
-            rows = [r for r in rows if r["event_id"] in main_ids]
-        items, links = [], []
-        lane_ids = set(seed)
-        roles_by_event = defaultdict(list)
-        # Read role rows in batches instead of one SQL query per plotted event.
-        row_ids = [r["event_id"] for r in rows]
-        for offset in range(0, len(row_ids), 500):
-            chunk = row_ids[offset:offset + 500]
-            placeholders = ",".join("?" for _ in chunk)
-            for role in conn.execute(
-                "SELECT event_id,relation,src_id,dst_id,derivation FROM relations "
-                f"WHERE dataset_id='MC2' AND target_kind='entity' AND event_id IN ({placeholders})", chunk):
-                role = dict(role)
-                roles_by_event[role.pop("event_id")].append(role)
-        # Aggregate by pixel-scale time bins only when needed; retain the anchor.
-        aggregated = defaultdict(list)
-        for row in rows:
-            roles = roles_by_event[row["event_id"]]
-            item = {**summarize(row, "MC2", []), "context": row["event_id"] not in main_ids,
-                    "roles": roles, "files": sorted({r["dst_id"] for r in roles if r["relation"] in FILE_ROLES})}
-            lane = row["actor_id"] or "__missing__"
-            lane_ids.add(lane)
-            if len(rows) > 600 and row["event_id"] != anchor:
-                bucket = (row["time_sort_us"] - start) * 240 // max(1, end - start)
-                aggregated[(lane, bucket, item["context"])].append(item)
-            else:
-                items.append(item)
-                for role in roles:
-                    if role["relation"] in ("queue_target_agent", "queue_target_person"):
-                        lane_ids.add(role["dst_id"])
-                        links.append({"event_id": row["event_id"], "source": lane, "target": role["dst_id"], "relation": role["relation"], "time_us": row["time_sort_us"]})
-        for (lane, bucket, ctx), group in aggregated.items():
-            items.append({**group[0], "aggregate_count": len(group), "bucket_start": start + bucket * (end - start) // 240,
-                          "bucket_end": start + (bucket + 1) * (end - start) // 240 + 1, "context": ctx})
-        lanes = []
-        for entity in sorted(lane_ids):
-            en = conn.execute("SELECT label,entity_type FROM entities WHERE dataset_id='MC2' AND entity_id=?", (entity,)).fetchone()
-            lanes.append({"id": entity, "label": en["label"] if en else "缺少执行者", "entity_type": en["entity_type"] if en else "missing"})
-        return {"valid": True, "anchor": anchor, "anchor_time": root["time_sort_us"], "start": start, "end": end,
-                "items": sorted(items, key=lambda i: (i["time_us"], i["event_id"])), "lanes": lanes, "links": links,
-                "total": len(rows), "main_count": sum(r["event_id"] in main_ids for r in rows),
-                "context_count": sum(r["event_id"] not in main_ids for r in rows), "seed_actors": sorted(seed),
-                "outside_main": sum(r["time_sort_us"] < (parent.start_us if parent.start_us is not None else start)
-                                    or r["time_sort_us"] >= (parent.end_us if parent.end_us is not None else end) for r in rows),
-                "expanded": expand, "note": "参与包括执行者及日志明确来源/目标角色；包含入向任务，仅一跳，不递归。"}
+        packet = mc2_process.collect(conn, raw, anchor, file_id, no_file, relation, source,
+                                     target, action, seconds, context, expand, actors, bins, selected_event)
+        if expected_version and packet['data_version'] != expected_version:
+            raise HTTPException(409, '固定过程的数据版本已不存在，请取消固定并重新选择记录')
+        return mc2_process.public(packet)
+
+
+@router.get('/file-info')
+def file_info(file_id: str):
+    from ..domain import mc2_files
+    with get_conn() as conn:
+        try:
+            info = mc2_cache.cached(conn, ('file-info', file_id), lambda: mc2_files.content_status(conn, 'MC2', file_id))
+        except KeyError:
+            raise HTTPException(404, '此精确文件已不存在')
+        return {k: info[k] for k in ('file_id', 'path', 'content_status', 'reason', 'events_truncated')}
+
+
+@router.get("/process-members")
+def process_members(anchor: str, aggregate_id: str, data_version: str, selection_key: str,
+                    raw: RawFilter = Depends(filters.filter_params), file_id: str | None = None,
+                    no_file: bool = False, relation: str | None = None, source: str | None = None,
+                    target: str | None = None, action: str | None = None,
+                    seconds: int = Query(60, ge=1, le=86400), context: bool = False, expand: bool = False,
+                    actors: str = "", bins: int = Query(240, ge=32, le=512), selected_event: str | None = None,
+                    cursor: str | None = None, member_action: str | None = None):
+    from ..domain import mc2_process
+    with get_conn() as conn:
+        packet = mc2_process.collect(conn, raw, anchor, file_id, no_file, relation, source,
+                                    target, action, seconds, context, expand, actors, bins, selected_event)
+        return mc2_process.members(packet, aggregate_id, data_version, selection_key, cursor, member_action)
+
+
+@router.get("/count")
+def count(raw: RawFilter = Depends(filters.filter_params), file_id: str | None = None, no_file: bool = False,
+          relation: str | None = None, source: str | None = None, target: str | None = None, action: str | None = None):
+    with get_conn() as conn:
+        return {"meta": meta(conn, selected(raw, file_id, no_file, relation, source, target, action))}
 
 
 @router.get("/comparison")
@@ -383,4 +340,19 @@ def comparison(before_us: int | None = None, offset: int = Query(0, ge=0)):
                           "create_lag_us": row["time_sort_us"] - creates[-1]["time_sort_us"] if creates else None,
                           "delete_lag_us": deletes[0]["time_sort_us"] - row["time_sort_us"] if deletes else None})
         return {"items": items, "total": len(rows), "offset": offset,
+                "meta": {"data_version": require_dataset(conn, "MC2")["data_version"], "before_us": before_us},
                 "note": "全库有明确 post_content_source 的发布子集；文件操作为全历史。未见记录不等于行为未发生，不含同名前缀推断。"}
+
+
+@router.get('/file-patterns')
+def file_patterns(offset: int = Query(0, ge=0), sort: str = Query('files', pattern='^(files|actions)$')):
+    from ..domain import mc2_fingerprints
+    with get_conn() as conn:
+        return mc2_fingerprints.patterns(conn, offset, sort)
+
+
+@router.get('/file-pattern-members')
+def file_pattern_members(pattern_id: str, offset: int = Query(0, ge=0), q: str = '', data_version: str | None = None):
+    from ..domain import mc2_fingerprints
+    with get_conn() as conn:
+        return mc2_fingerprints.members(conn, pattern_id, offset, q, data_version)

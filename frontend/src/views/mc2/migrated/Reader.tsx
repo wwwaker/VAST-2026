@@ -1,12 +1,13 @@
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { fetchEvent, fetchFileTrack, type EventDetail, type FileTrackPayload, type TypeInfo } from "../../../data/api";
-import type { Filters } from "../../../data/filterContext";
+import { EMPTY_FILTERS, type Filters } from "../../../data/filterContext";
 import { actor, categoryColors, displayId, EventMetadata, EventRow, number, PendingRegion, RequestStatus, time, typeLabel, useRequest, type ReaderTarget } from "./shared";
 
+import { CompactSource } from "./CompactSource";
 import { ReadingActions } from "../../mc1/reference/components/MessageMetadata";
 import { useReaderScrollLock } from "../../shared/ReaderDialog";
-import { query, relationName, type ProcessData } from "./workspaceApi";
+import { query, relationName, type ProcessData, type ProcessMembers } from "./workspaceApi";
 
 type Entry = ReaderTarget & { scroll: number; cursors: (string | null)[] };
 export function Reader({ initial, filters, types, close, filterActor }: { initial: ReaderTarget; filters: Filters; types: TypeInfo[]; close: () => void; filterActor: (id: string) => void }) {
@@ -14,15 +15,16 @@ export function Reader({ initial, filters, types, close, filterActor }: { initia
   const current = history[history.length - 1];
   const modal = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
+  const readingFilters = current.reading?.filters ?? filters;
   const cursor = current.cursors[current.cursors.length - 1];
-  const resource = useRequest<EventDetail | FileTrackPayload>(JSON.stringify([current.kind, current.id, filters, cursor]), signal => current.kind === "event"
+  const resource = useRequest<EventDetail | FileTrackPayload>(JSON.stringify([current.kind, current.id, readingFilters, cursor]), signal => current.kind === "event"
     ? fetchEvent("MC2", current.id, signal)
-    : fetchFileTrack({ fileId: current.id, filters, limit: 40, cursor }, signal));
+    : fetchFileTrack({ fileId: current.id, filters: readingFilters, limit: 40, cursor }, signal));
   useReaderScrollLock(modal);
   useEffect(() => { if (body.current && !resource.loading) body.current.scrollTop = current.scroll; }, [current, resource.loading]);
   useEffect(() => { modal.current?.querySelector<HTMLButtonElement>("button")?.focus(); }, [current.kind, current.id, cursor]);
   const open = (target: ReaderTarget) => {
-    setHistory(items => [...items.slice(0, -1), { ...current, scroll: body.current?.scrollTop ?? 0 }, { ...target, scroll: 0, cursors: [null] }]);
+    setHistory(items => [...items.slice(0, -1), { ...current, scroll: body.current?.scrollTop ?? 0 }, { ...target, reading: target.reading ?? current.reading ?? {filters,label:"打开时的主调查范围"}, scroll: 0, cursors: [null] }]);
   };
   const page = (next?: string) => setHistory(items => [...items.slice(0, -1), { ...current, scroll: 0, cursors: next ? [...current.cursors, next] : current.cursors.slice(0, -1) }]);
   return <div className="flow-overlay w-reader-overlay" onMouseDown={event => { if (event.target === event.currentTarget) close(); }}>
@@ -37,8 +39,8 @@ export function Reader({ initial, filters, types, close, filterActor }: { initia
       }
     }}>
       <div className="flow-modal-head"><div><h3 id="mc2-reader-title">{current.kind === "event" ? "阅读记录" : "阅读文件轨迹"}</h3><p className="mc2-note">{displayId(current.id)}</p></div><ReadingActions onBack={history.length > 1 ? () => setHistory(items => items.slice(0, -1)) : undefined} onClose={close} backLabel="返回上次阅读" closeLabel="关闭阅读记录"/></div>
-      <div className="flow-list mc2-reader-body" ref={body} tabIndex={0}>
-        {current.kind === "file" && <p className="mc2-note mc2-reader-scope">文件轨迹范围：{filters.startUs == null ? "数据起点" : time(filters.startUs)} → {filters.endUs == null ? "数据终点" : time(filters.endUs)}（不含终点）{filters.categories.length ? ` · 类别 ${filters.categories.join("、")}` : ""}{filters.actorId ? ` · ${actor(filters.actorId)}` : ""}{filters.eventTypes.length ? ` · ${filters.eventTypes.join("、")}` : ""}{filters.keyword ? ` · 关键词「${filters.keyword}」` : ""}</p>}
+      <div className="flow-list mc2-reader-body" ref={body} tabIndex={0}><p className="w-notice">阅读入口：{current.reading?.label??"打开时的主调查范围"}{current.reading?.independent?" · 独立阅读，不改变主调查":""}</p>{current.kind==="file"&&<button className="w-text-link" onClick={()=>open({...current,reading:{filters:{...EMPTY_FILTERS},label:"该文件全历史（显式切换）",independent:true}})}>查看该文件全历史</button>}
+        {current.kind === "file" && <p className="mc2-note mc2-reader-scope">文件轨迹范围：{readingFilters.startUs == null ? "数据起点" : time(readingFilters.startUs)} → {readingFilters.endUs == null ? "数据终点" : time(readingFilters.endUs)}（不含终点）{readingFilters.categories.length ? ` · 类别 ${readingFilters.categories.join("、")}` : ""}{readingFilters.actorId ? ` · ${actor(readingFilters.actorId)}` : ""}{readingFilters.eventTypes.length ? ` · ${readingFilters.eventTypes.join("、")}` : ""}{readingFilters.keyword ? ` · 关键词「${readingFilters.keyword}」` : ""}</p>}
         <RequestStatus {...resource}/>
         <PendingRegion {...resource} minimum={340}>{!resource.loading && !resource.error && resource.data && (current.kind === "event" ? <EventContent event={resource.data as EventDetail} types={types} open={open} filterActor={filterActor}/> : <FileContent track={resource.data as FileTrackPayload} types={types} open={open} previous={current.cursors.length > 1} page={page}/>)}</PendingRegion>
       </div>
@@ -49,26 +51,16 @@ export function Reader({ initial, filters, types, close, filterActor }: { initia
 function EventContent({ event, types, open, filterActor }: { event: EventDetail; types: TypeInfo[]; open: (target: ReaderTarget) => void; filterActor: (id: string) => void }) {
   const files = [...new Set(event.relations.filter(r => r.dst_id.startsWith("MC2:file_path:")).map(r => r.dst_id))];
   const details = event.details ?? {};
-  const textFields = [["content", "正文"], ["subject", "邮件主题"], ["question", "问题"], ["response", "答复"], ["advice", "建议"], ["reason", "原因"], ["feedback", "反馈"], ["topic", "话题"], ["purpose", "目的"]].filter(([key]) => typeof details[key] === "string" && details[key]);
-  const taskNames: Record<string, string> = { read_file: "读取文件", create_file: "创建文件", delete_file: "删除文件", access_email: "打开邮箱", check_email: "查收邮件", queue_subordinate_task: "排入下属任务" };
-  const task = typeof details.task === "string" ? details.task : null;
-  const target = typeof details.target === "string" ? details.target : null;
   const color = categoryColors[(event.category - 1) % categoryColors.length];
   return <>
     <article className="chat-bubble selected w-reading-message" style={{ borderLeftColor: color }}>
       <EventMetadata event={event} types={types} filterActor={filterActor}/>
-      <div className="cb-body">{textFields.map(([key, label]) => <section className="w-message-text" key={key}>{key !== "content" && <b>{label}</b>}<p>{String(details[key])}</p></section>)}
-        {task && <p><b>{event.event_type === "queue_subordinate_task" ? "排入的任务" : "任务类型"}：</b>{taskNames[task] ?? task}</p>}
-        {target && <p><b>{event.event_type.includes("file") ? "文件路径" : "任务目标"}：</b>{displayId(target)}</p>}
-        {typeof details.content_source === "string" && <p><b>发布内容来源：</b>{details.content_source}</p>}
-        {event.event_type === "queue_subordinate_task" && <p className="mc2-note">这是任务排队记录；不能据此判断目标已执行成功。</p>}
-        {!textFields.length && <p className="mc2-note">{details.content_source ? "此发布记录只提供来源引用，日志未包含帖子正文。" : "此条属于活动日志，未附带消息正文；可核对下面的明确对象与原始来源。"}</p>}
-        {typeof details.granted === "boolean" && <p>准入检查：{details.granted ? "允许" : "拒绝"}</p>}
-        {typeof details.room === "string" && <p>地点：{details.room}</p>}
-        {Array.isArray(details.contacts) && <p>建议联系人：{details.contacts.map(v => actor(String(v))).join("、")}</p>}
-        {typeof details.meeting === "object" && details.meeting !== null && <MeetingContent value={details.meeting as Record<string, unknown>}/>}
+      <div className="cb-body">{event.reading?.fields.map(field=><section className="w-message-text" key={field.key}><b>{field.label}</b><p>{field.value}</p></section>)}
+        {!event.reading?.fields.length&&<p>{event.reading?.summary??"此条日志未提供消息正文，可核对原始字段。"}</p>}
+        {event.event_type==="queue_subordinate_task"&&<p className="mc2-note">这是任务排队记录，不能判断目标已执行成功。</p>}
       </div><div className="provenance-note">原始记录：{displayId(event.event_id)} · 点击执行者姓名可筛选主页面</div>
     </article>
+    <CompactSource event={event} open={open}/>
     {event.relations.length > 0 && <section className="mc2-reading-block"><h3>这条记录涉及谁、涉及什么</h3>{event.relations.map((r, i) => <div className="w-evidence-role" key={i}><span>{actor(r.src_id)}</span><span className="w-role-arrow">— {relationName[r.relation] ?? r.relation}<ArrowRight size={14} aria-hidden="true"/></span><button className="w-text-link" onClick={() => r.dst_id.startsWith("MC2:file_path:") ? open({ kind: "file", id: r.dst_id }) : r.target_kind === "event" ? open({ kind: "event", id: r.dst_id }) : undefined} disabled={!r.dst_id.startsWith("MC2:file_path:") && r.target_kind !== "event"}>{r.dst_id.startsWith("MC2:file_path:") ? r.dst_id.slice("MC2:file_path:".length) : actor(r.dst_id)}</button></div>)}</section>}
     {files.length > 0 && <section className="mc2-reading-block"><h3>关联文件与轨迹</h3>{files.map(id => <button className="mc2-link-row" key={id} onClick={() => open({ kind: "file", id })}>{id.slice("MC2:file_path:".length)}<ArrowRight size={14} aria-hidden="true"/></button>)}</section>}
     <NearbyActivity event={event} open={open} types={types}/>
@@ -77,14 +69,18 @@ function EventContent({ event, types, open, filterActor }: { event: EventDetail;
     <details className="mc2-reading-block"><summary>原始记录与来源定位</summary><p>{event.source_file ?? "来源文件未记录"} · 序号 {event.source_ordinal ?? "未知"} · {event.source_json_pointer}</p><pre>{JSON.stringify(event.raw, null, 2)}</pre></details>
   </>;
 }
-function MeetingContent({ value }: { value: Record<string, unknown> }) {
-  return <section><p>会议时间：{String(value.time ?? "未记录")}</p>{Array.isArray(value.participants) && <p>参与者：{value.participants.map(v => actor(String(v))).join("、")}</p>}</section>;
-}
 function NearbyActivity({ event, types, open }: { event: EventDetail; types: TypeInfo[]; open: (target: ReaderTarget) => void }) {
   const params = { anchor: event.event_id, seconds: 60, context: "true" };
   const resource = useRequest(`reader-context:${event.event_id}`, signal => query<ProcessData>("process", params, signal));
-  const items = resource.data?.items.filter(i => i.event_id !== event.event_id) ?? [];
-  return <section className="mc2-reading-block"><h3>附近参与活动</h3><p className="mc2-note">前后60秒内，按执行者及明确来源／目标角色查询，含入向任务；时间接近不表示因果。此处独立于主页面筛选。</p><RequestStatus {...resource}/><PendingRegion {...resource} minimum={80}>{items.slice(0, 20).map(item => <EventRow key={item.event_id} event={item} types={types} open={target => open(target)}/>)}{!items.length && <p className="mc2-note">此窗口内未找到其他参与活动。</p>}{items.length > 20 && <p className="mc2-note">共{items.length}个附近活动标记，展示前20个；可回到局部过程调整窗口。</p>}</PendingRegion></section>;
+  return <section className="mc2-reading-block"><h3>附近参与活动</h3><p className="mc2-note">前后60秒内，按执行者及明确来源／目标角色查询，含入向任务；时间接近不表示因果。此处独立于主页面筛选。</p><RequestStatus {...resource}/><PendingRegion {...resource} minimum={80}>{resource.data?.valid && <NearbyRecords key={resource.data.selection_key} data={resource.data} open={open} types={types}/>}</PendingRegion></section>;
+}
+
+function NearbyRecords({data,open,types}:{data:Extract<ProcessData,{valid:true}>;open:(t:ReaderTarget)=>void;types:TypeInfo[]}) {
+  const [cursors,setCursors]=useState<(string|null)[]>([null]);
+  const args={anchor:data.anchor,seconds:60,context:"true",aggregate_id:"all",data_version:data.data_version,selection_key:data.selection_key,cursor:cursors.at(-1)??undefined};
+  const resource=useRequest(JSON.stringify(args),s=>query<ProcessMembers>("process-members",args,s));
+  const items=resource.data?.items.filter(i=>i.event_id!==data.anchor)??[];
+  return <><p className="mc2-note">共 {Math.max(0,data.total-1)} 条附近活动 · 第 {cursors.length} 页（每页最多40条，包含锚点时在此省略）</p><RequestStatus {...resource}/><PendingRegion {...resource}>{items.map(i=><EventRow key={i.event_id} event={i} types={types} open={target=>open({...target,reading:{filters:{...EMPTY_FILTERS,startUs:data.start,endUs:data.end},label:"阅读中的附近参与活动窗口",independent:true}})}/>)}{data.total===1&&<p>此窗口内未找到其他参与活动。</p>}</PendingRegion><div className="mc2-pagination"><button disabled={cursors.length<2||resource.loading} onClick={()=>setCursors(v=>v.slice(0,-1))}>上一页附近活动</button><button disabled={!resource.data?.next_cursor||resource.loading} onClick={()=>setCursors(v=>[...v,resource.data!.next_cursor!])}>下一页附近活动</button></div></>;
 }
 
 function FileContent({ track, types, open, previous, page }: { track: FileTrackPayload; types: TypeInfo[]; open: (target: ReaderTarget) => void; previous: boolean; page: (next?: string) => void }) {
@@ -96,9 +92,9 @@ function FileContent({ track, types, open, previous, page }: { track: FileTrackP
       <p className="mc2-note">文件阅读沿用打开时的时间、类型、执行者和关键词；展示此范围的文件轨迹，不叠加关系图中选中边的端点限制。</p>
       {file.content_sources.map(source => <button className="mc2-link-row" key={`${source.event_id}:${source.field}`} onClick={() => open({ kind: "event", id: source.event_id })}>查看文本依据：{source.field} · {number(source.length)} 字符<ArrowRight size={14} aria-hidden="true"/></button>)}
     </section>
-    <section className="mc2-reading-block"><h3>当前筛选内的文件轨迹 · {number(track.meta.matched_events)} 条</h3><div className="mc2-type-counts">{Object.entries(track.event_type_counts ?? {}).map(([type, count]) => <span key={type}>{typeLabel(type, types)} <b>{number(count)}</b></span>)}</div><p className="mc2-note">按时间正序排列。此处继承主页面筛选；全历史总数不随筛选变化。</p>
+    <section className="mc2-reading-block"><h3>当前筛选内的文件轨迹 · {number(track.meta.matched_events)} 条</h3><div className="mc2-type-counts">{Object.entries(track.event_type_counts ?? {}).map(([type, count]) => <span key={type}>{typeLabel(type, types)} <b>{number(count)}</b></span>)}</div><p className="mc2-note">按时间正序排列。此处继承阅读入口保存的范围；全历史总数不随筛选变化。</p>
       {track.items.map(item => <div key={item.event_id}><EventRow event={item} types={types} open={target => open(target)}/><p className="mc2-relation-note">日志关系：{item.file_relations.join("、")}</p></div>)}
-      {!track.items.length && <p className="mc2-empty">当前筛选内没有此文件的记录，可关闭阅读窗口并清空筛选。</p>}
+      {!track.items.length && <p className="mc2-empty">当前筛选内没有此文件的记录，可点击上方“查看该文件全历史”，显式切换范围。</p>}
       <div className="mc2-pagination"><button disabled={!previous} onClick={() => page()}><ChevronLeft size={14} aria-hidden="true"/>上一页</button><span>每页最多 40 条</span><button disabled={!track.next_cursor} onClick={() => page(track.next_cursor!)}>下一页<ChevronRight size={14} aria-hidden="true"/></button></div>
     </section>
   </>;

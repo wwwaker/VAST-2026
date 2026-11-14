@@ -1,10 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 /** Retain layout during refresh; PendingRegion makes previous results unavailable. */
-export function useRequest<T>(key: string, request: (signal: AbortSignal) => Promise<T>): { data?: T; error?: string; loading: boolean; reload: () => void } {
+export function useRequest<T>(key: string, request: (signal: AbortSignal) => Promise<T>, enabled = true): { data?: T; error?: string; loading: boolean; reload: () => void } {
   const [state, setState] = useState<{ key: string; data?: T; error?: string; loading: boolean }>({ key, loading: true });
   const [retry, setRetry] = useState(0);
   useEffect(() => {
+    if (!enabled) return;
     const controller = new AbortController();
     let active = true;
     setState(previous => ({ key, data: previous.data, loading: true }));
@@ -16,8 +17,8 @@ export function useRequest<T>(key: string, request: (signal: AbortSignal) => Pro
     return () => { active = false; controller.abort(); };
     // The caller supplies the complete request identity, independent of closure identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, retry]);
-  return { data: state.data, error: state.key === key ? state.error : undefined, loading: state.key !== key || state.loading, reload: () => setRetry(value => value + 1) };
+  }, [key, retry, enabled]);
+  return { data: state.data, error: state.key === key ? state.error : undefined, loading: enabled && (state.key !== key || state.loading), reload: () => setRetry(value => value + 1) };
 }
 
 export function PendingRegion({ loading, error, children, minimum = 0 }: { loading: boolean; error?: string; children: ReactNode; minimum?: number }) {

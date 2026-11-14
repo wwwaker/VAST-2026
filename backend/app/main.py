@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+from time import perf_counter
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -49,6 +50,23 @@ app.add_middleware(
     allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
+
+
+@app.middleware('http')
+async def mc2_timing(request, call_next):
+    if not request.url.path.startswith('/api/mc2/'):
+        return await call_next(request)
+    from .query.timing import request_metrics
+    metrics = {'db_ms': 0.0}
+    token = request_metrics.set(metrics)
+    started = perf_counter()
+    try:
+        response = await call_next(request)
+        total = (perf_counter() - started) * 1000
+        response.headers['Server-Timing'] = f'app;dur={total:.3f}, db;dur={metrics["db_ms"]:.3f}, assemble;dur={max(0,total-metrics["db_ms"]):.3f}'
+        return response
+    finally:
+        request_metrics.reset(token)
 
 app.include_router(datasets.router)
 app.include_router(events.router)

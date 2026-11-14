@@ -7,11 +7,12 @@ from contextlib import contextmanager
 from typing import Iterator
 
 from .config import DB_PATH
+from .query.timing import TimedConnection
 
 
 @contextmanager
 def get_conn() -> Iterator[sqlite3.Connection]:
-    conn = sqlite3.connect(DB_PATH, timeout=5.0)
+    conn = sqlite3.connect(DB_PATH, timeout=5.0, factory=TimedConnection)
     conn.row_factory = sqlite3.Row
     try:
         yield conn

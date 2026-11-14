@@ -217,6 +217,12 @@ def main() -> None:
                 print(f"MC2 关系预计算：{projection['buckets']} 个日期/动作桶 · {projection['seconds']:.2f}s")
             except (sqlite3.Error, OSError, RuntimeError) as exc:
                 print(f"MC2 预计算未完成，将使用精确查询：{exc}")
+            from ..domain.mc2_fingerprints import build as build_mc2_fingerprints
+            try:
+                patterns = build_mc2_fingerprints(target)
+                print(f"MC2 精确文件模式：{patterns['file_total']} 个文件 · {patterns['pattern_total']} 种模式")
+            except (sqlite3.Error, OSError, RuntimeError) as exc:
+                print(f"MC2 精确文件模式未完成，可稍后单独构建：{exc}")
 
         total = time.perf_counter() - started
         size_mb = os.path.getsize(target) / 1024 / 1024

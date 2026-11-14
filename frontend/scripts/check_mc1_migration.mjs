@@ -22,8 +22,9 @@ const selectors = css => {
 };
 const originalCss = fs.readFileSync(path.join(frontend, '../VAST_Challenge_2026-main/frontend/src/style.css'), 'utf8');
 const migratedCss = fs.readFileSync(path.join(source, 'style.css'), 'utf8');
-assert.deepEqual(selectors(migratedCss), selectors(originalCss).map(s => s === 'body' ? ':host' : s));
-check('Reference stylesheet keeps every layout selector (only body becomes shadow host)', true);
+// Shared metadata has nested entity labels; only direct pill children receive pill styling.
+assert.deepEqual(selectors(migratedCss), selectors(originalCss).map(s => s === 'body' ? ':host' : s === '.chips span, .msg-meta span' ? '.chips span, .msg-meta > span' : s));
+check('Reference stylesheet preserves layout with ShadowRoot and direct metadata pills', true);
 for (const [selector, properties] of Object.entries({ '.section': ['grid-template-columns', 'gap'], '.compare-row': ['display','gap'], '.heatmap-grid': ['display','gap'], '.flow-overlay': ['position','inset'], '.flow-modal': ['max-height'], '.net-svg': ['max-height'] })) {
   const read = css => {
     const values = [];

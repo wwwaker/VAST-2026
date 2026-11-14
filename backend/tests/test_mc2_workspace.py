@@ -26,6 +26,38 @@ class Mc2WorkspaceTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         return response.json()
 
+    def test_timing_and_recorded_role_semantics(self):
+        response = self.client.get('/api/mc2/relations', params={'mode': 'system', 'relation': 'meeting_invitee'})
+        self.assertEqual(response.status_code, 200)
+        semantics = response.json()['semantics']
+        self.assertEqual(len(semantics), 11)
+        self.assertEqual(semantics['meeting_invitee']['event_types'], ['propose_meeting'])
+        self.assertEqual(semantics['a2a_destination']['fields'], ['details.a2a.to'])
+        timing = {part.split(';')[0].strip(): float(part.split('dur=')[1]) for part in response.headers['server-timing'].split(',')}
+        self.assertGreater(timing['db'], 0)
+        self.assertGreaterEqual(timing['app'], timing['db'])
+        self.assertGreaterEqual(timing['assemble'], 0)
+
+    def test_file_operations_include_task_parameters_without_implying_reads(self):
+        graph = self.get('relations', file_id=FILE, mode='operations')
+        self.assertIn('queued_file_path', graph['selected_relations'])
+        parameter_edges = [e for e in graph['edges'] if e['relation'] == 'queued_file_path']
+        self.assertTrue(parameter_edges)
+        self.assertTrue(all(e['action'] == 'queue_subordinate_task' and e['target'] == FILE for e in parameter_edges))
+        info = self.get('file-info', file_id=FILE)
+        self.assertEqual(info['content_status'], 'metadata_only')
+        self.assertEqual(info['file_id'], FILE)
+
+    def test_frozen_process_rejects_changed_version_and_missing_anchor(self):
+        valid = self.get('process', anchor='MC2:event:373902', context='true')
+        same = self.client.get('/api/mc2/process', params={'anchor': 'MC2:event:373902', 'context': 'true', 'expected_version': valid['data_version']})
+        self.assertEqual(same.status_code, 200)
+        stale = self.client.get('/api/mc2/process', params={'anchor': 'MC2:event:373902', 'expected_version': 'old'})
+        self.assertEqual(stale.status_code, 409)
+        missing = self.get('process', anchor='MC2:event:nonexistent', expand='true', context='true')
+        self.assertFalse(missing['valid'])
+        self.assertEqual(missing['invalid_reasons'][0]['code'], 'missing')
+
     def test_full_type_matrix_and_gap_buckets(self):
         x = self.get("activity")
         self.assertEqual(len(x["types"]), 24)

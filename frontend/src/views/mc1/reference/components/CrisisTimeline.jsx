@@ -5,7 +5,7 @@ import { fmtRoundLabel } from '../utils.js';
 import { EVENT_MARKERS } from '../constants.js';
 import { WindowRange } from '../../../shared/WindowRange';
 
-export function CrisisTimeline({ timeline, idx, setIdx, startIdx = 0, setStartIdx, playing, onTogglePlay, granularity, setGranularity, eventMarkers = EVENT_MARKERS, tickColor, renderMeta, tickLabel, tickAriaLabel, onTick, scaleOptions, playTitle }) {
+export function CrisisTimeline({ timeline, idx, setIdx, startIdx = 0, setStartIdx, playing, onTogglePlay, granularity, setGranularity, eventMarkers = EVENT_MARKERS, tickColor, renderMeta, tickLabel, tickAriaLabel, onTick, scaleOptions = undefined, playTitle, scaleControl = /** @type {import("react").ReactNode} */ (null) }) {
   const total = timeline ? timeline.length : 0;
 
   // ---- Klavye kısayolları ----
@@ -106,9 +106,9 @@ export function CrisisTimeline({ timeline, idx, setIdx, startIdx = 0, setStartId
         {setGranularity && (
           <label className="tl-scale" title="热力图 / 折线图横轴的时间粒度">
             粒度
-            <select value={granularity} onChange={e => setGranularity(e.target.value)}>
+            {scaleControl || <select value={granularity} onChange={e => setGranularity(e.target.value)}>
               {(scaleOptions || [{ value: 'daily', label: '按日' }, { value: 'hourly', label: '按小时' }]).map(option => <option key={option.value} value={option.value} disabled={option.disabled}>{option.label}</option>)}
-            </select>
+            </select>}
           </label>
         )}
       </div>
