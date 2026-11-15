@@ -535,8 +535,13 @@ export function RelationMatrix({
                           title={`${model.name(id)} → ${model.name(target)} · ${count} 个记录组合${(v?.edges.length ?? 0) > 1 ? "（多种动作，点击区分）" : ""}`}
                           aria-label={`${model.name(id)} → ${model.name(target)} ${count}`}
                           style={{
-                            background: count ? barShade("#638a98", ratio) : undefined,
-                            color: ratio > 0.65 ? "white" : "#294c70",
+                            background: count
+                              ? barShade("light-dark(#638a98, var(--text-readable))", ratio)
+                              : undefined,
+                            color:
+                              ratio > 0.65
+                                ? "light-dark(white, var(--surface-subtle))"
+                                : "light-dark(#294c70, var(--text-readable))",
                           }}
                           onFocus={() => setActive([row, col])}
                           onMouseEnter={() => setActive([row, col])}

@@ -168,7 +168,11 @@ export function TimeRange({
             </option>
           </WorkspaceSelect>
         }
-        tickColor={(_row: unknown, inRange: boolean) => (inRange ? "#2469b5" : "#dce4eb")}
+        tickColor={(_row: unknown, inRange: boolean) =>
+          inRange
+            ? "light-dark(#2469b5, var(--text-readable))"
+            : "light-dark(#dce4eb, var(--surface-subtle))"
+        }
         tickLabel={(row: { hour: string; total_msgs: number }) =>
           `${row.hour.slice(0, 10)} · 全库 ${number(row.total_msgs)} 条`
         }

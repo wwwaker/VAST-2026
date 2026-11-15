@@ -97,24 +97,40 @@ export const EVENT_MARKERS = [
     time: "2046-06-05T17:00:00",
     short: "泄露",
     label: "泄露：禁运信息出现在 FleX（约 17:00）",
-    color: "#e24b4a",
+    color: "light-dark(#e24b4a, var(--tone-danger-text))",
   },
   {
     id: "embargo",
     time: "2046-06-05T18:00:00",
     short: "解禁",
     label: "禁运解除（6 月 5 日 18:00）",
-    color: "#f59e0b",
+    color: "light-dark(#f59e0b, var(--selection-anchor))",
   },
 ];
 
 export const SEQ_KINDS = {
-  decision: { color: "#2dd4bf", shape: "triangle", label: "决策" },
+  decision: {
+    color: "light-dark(#2dd4bf, var(--tone-teal-text))",
+    shape: "triangle",
+    label: "决策",
+  },
 
-  external: { color: "#60a5fa", shape: "cross", label: "外部压力" },
-  internal: { color: "#e24b4a", shape: "cross", label: "内部泄露" },
-  agent_silent: { color: "#94a3b8", shape: "circle", label: "Agent 失声" },
-  result: { color: "#e879f9", shape: "circle", label: "结果" },
+  external: {
+    color: "light-dark(#60a5fa, var(--accent-bright))",
+    shape: "cross",
+    label: "外部压力",
+  },
+  internal: {
+    color: "light-dark(#e24b4a, var(--tone-danger-text))",
+    shape: "cross",
+    label: "内部泄露",
+  },
+  agent_silent: {
+    color: "light-dark(#94a3b8, var(--text-muted))",
+    shape: "circle",
+    label: "Agent 失声",
+  },
+  result: { color: "light-dark(#e879f9, var(--tone-violet-text))", shape: "circle", label: "结果" },
 };
 
 export const SEQ_EVENTS = [

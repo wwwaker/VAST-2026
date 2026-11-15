@@ -2,6 +2,10 @@
 :host {
   color-scheme: var(--color-scheme);
 }
+input::placeholder {
+  color: light-dark(#757575, var(--text-muted));
+  opacity: 1;
+}
 button,
 a,
 input,

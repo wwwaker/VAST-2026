@@ -1,13 +1,15 @@
 /** A common zero baseline for each metric; exact values remain readable. */
 export function barShade(color: string, ratio: number) {
-  const channels = color
-    .replace("#", "")
+  const channels = (color.match(/#[\da-f]{6}/i)?.[0] ?? "#6e9fcb")
+    .slice(1)
     .match(/.{2}/g)!
     .map((s) => parseInt(s, 16));
 
   const weight = 0.35 + 0.65 * Math.max(0, Math.min(1, ratio));
 
-  return `rgb(${channels.map((c) => Math.round(255 + (c - 255) * weight)).join(", ")})`;
+  const light = `rgb(${channels.map((c) => Math.round(255 + (c - 255) * weight)).join(", ")})`;
+
+  return `light-dark(${light}, color-mix(in srgb, ${color} ${weight * 100}%, var(--surface-panel)))`;
 }
 
 export function MetricBars({

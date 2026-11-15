@@ -394,7 +394,7 @@ export function RunTrajectory({
             >
               <path
                 d="M0 0 L10 5 L0 10z"
-                fill="#b17a29"
+                fill="light-dark(#b17a29, var(--status-warning-text))"
               />
             </marker>
           </defs>
@@ -456,7 +456,7 @@ export function RunTrajectory({
                   x2={scale(t)}
                   y1={34}
                   y2={visibleRoles.length * 58 + 45}
-                  stroke="#edf1f5"
+                  stroke="light-dark(#edf1f5, var(--border-default))"
                 />
                 <text
                   x={scale(t)}
@@ -549,7 +549,7 @@ export function RunTrajectory({
                       x2={xx}
                       y1={yy}
                       y2={y(h.target_role)}
-                      stroke="#b17a29"
+                      stroke="light-dark(#b17a29, var(--selection-anchor))"
                       strokeWidth={2}
                       markerEnd={`url(#handoff-${detail.run.run_id})`}
                     />

@@ -1,3 +1,5 @@
+import { resolveChartColor } from "../../../shared/lib/chartColors";
+import { subscribeTheme } from "../../../shared/lib/theme";
 import { Keyboard, Search, ZoomIn, ZoomOut } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import cytoscape from "cytoscape";
@@ -14,6 +16,122 @@ import {
   oneHop,
   type GraphView,
 } from "../layout/relations";
+
+function graphStyles(): cytoscape.StylesheetStyle[] {
+  return [
+    {
+      selector: "node",
+      style: {
+        label: "data(label)",
+        "background-color": resolveChartColor("light-dark(#e6eff8, var(--chart-node-surface))"),
+        "border-color": resolveChartColor("light-dark(#608cb8, var(--border-control-strong))"),
+        "border-width": 1.5,
+        width: 36,
+        height: 36,
+        color: resolveChartColor("light-dark(#294c70, var(--chart-node-label))"),
+        "font-size": 11,
+        "text-valign": "bottom",
+        "text-margin-y": 9,
+        "text-wrap": "wrap",
+        "text-max-width": "125px",
+      },
+    },
+    {
+      selector: 'node[kind="person"]',
+      style: {
+        shape: "ellipse",
+        "background-color": resolveChartColor("light-dark(#e4f2ee, var(--chart-person-surface))"),
+        "border-color": resolveChartColor("light-dark(#478d7b, var(--tone-teal-border))"),
+      },
+    },
+    {
+      selector: 'node[kind="agent"]',
+      style: {
+        shape: "round-rectangle",
+        "background-color": resolveChartColor("light-dark(#eee6f6, var(--chart-agent-surface))"),
+        "border-color": resolveChartColor("light-dark(#8862b4, var(--tone-violet-border))"),
+      },
+    },
+    {
+      selector: 'node[kind="file_path"]',
+      style: {
+        shape: "rectangle",
+        width: 46,
+        "background-color": resolveChartColor("light-dark(#fff1dc, var(--chart-file-surface))"),
+        "border-color": resolveChartColor("light-dark(#c98e3e, var(--status-warning-border))"),
+      },
+    },
+    {
+      selector: 'node[kind="missing"], node[kind="unknown"]',
+      style: {
+        shape: "diamond",
+        "border-style": "dashed",
+        "background-color": resolveChartColor("light-dark(#f2f3f5, var(--chart-missing-surface))"),
+      },
+    },
+    {
+      selector: "edge",
+      style: {
+        width: "data(weight)",
+        "line-color": "data(color)",
+        "line-style": (edge: cytoscape.EdgeSingular) =>
+          edge.data("lineStyle") as "solid" | "dashed",
+        "target-arrow-color": "data(color)",
+        "target-arrow-shape": "triangle",
+        "arrow-scale": 0.75,
+        "curve-style": "bezier",
+        "control-point-step-size": 38,
+        "loop-direction": "data(loopDirection)",
+        "loop-sweep": "48deg",
+        opacity: 0.65,
+        "overlay-padding": 7,
+      },
+    },
+    {
+      selector: "edge:selected, edge.hover",
+      style: {
+        opacity: 1,
+        label: "data(label)",
+        "font-size": 11,
+        "text-rotation": "autorotate",
+        "text-background-color": resolveChartColor("light-dark(#fff, var(--chart-halo))"),
+        "text-background-opacity": 1,
+        "text-background-padding": "3px",
+        color: resolveChartColor("light-dark(#294c70, var(--chart-node-label))"),
+        "underlay-color": "data(color)",
+        "underlay-opacity": 0.12,
+        "underlay-padding": 4,
+      },
+    },
+    {
+      selector: "node:selected, node.focused",
+      style: {
+        "border-color": resolveChartColor("light-dark(#d58c27, var(--selection-anchor))"),
+        "border-width": 3,
+      },
+    },
+    { selector: "node.hidden-label", style: { label: "" } },
+    { selector: "node.reveal", style: { label: "data(label)", "border-width": 3 } },
+    {
+      selector: "node.neighbor",
+      style: {
+        "border-width": 2.5,
+        "border-color": resolveChartColor("light-dark(#287d75, var(--chart-neighbor))"),
+      },
+    },
+    { selector: ".dimmed", style: { opacity: 0.14 } },
+    {
+      selector: "edge[deleted = 1]",
+      style: {
+        label: "data(label)",
+        "font-size": 10,
+        "text-rotation": "autorotate",
+        "text-background-color": resolveChartColor("light-dark(#fff, var(--chart-halo))"),
+        "text-background-opacity": 0.9,
+      },
+    },
+  ];
+}
 
 export function RelationCanvas({
   data,
@@ -106,105 +224,20 @@ export function RelationCanvas({
       maxZoom: 3,
       userZoomingEnabled: true,
       boxSelectionEnabled: false,
-      style: [
-        {
-          selector: "node",
-          style: {
-            label: "data(label)",
-            "background-color": "#e6eff8",
-            "border-color": "#608cb8",
-            "border-width": 1.5,
-            width: 36,
-            height: 36,
-            color: "#294c70",
-            "font-size": 11,
-            "text-valign": "bottom",
-            "text-margin-y": 9,
-            "text-wrap": "wrap",
-            "text-max-width": "125px",
-          },
-        },
-        {
-          selector: 'node[kind="person"]',
-          style: { shape: "ellipse", "background-color": "#e4f2ee", "border-color": "#478d7b" },
-        },
-        {
-          selector: 'node[kind="agent"]',
-          style: {
-            shape: "round-rectangle",
-            "background-color": "#eee6f6",
-            "border-color": "#8862b4",
-          },
-        },
-        {
-          selector: 'node[kind="file_path"]',
-          style: {
-            shape: "rectangle",
-            width: 46,
-            "background-color": "#fff1dc",
-            "border-color": "#c98e3e",
-          },
-        },
-        {
-          selector: 'node[kind="missing"], node[kind="unknown"]',
-          style: { shape: "diamond", "border-style": "dashed", "background-color": "#f2f3f5" },
-        },
-        {
-          selector: "edge",
-          style: {
-            width: "data(weight)",
-            "line-color": "data(color)",
-            "line-style": (edge: cytoscape.EdgeSingular) =>
-              edge.data("lineStyle") as "solid" | "dashed",
-            "target-arrow-color": "data(color)",
-            "target-arrow-shape": "triangle",
-            "arrow-scale": 0.75,
-            "curve-style": "bezier",
-            "control-point-step-size": 38,
-            "loop-direction": "data(loopDirection)",
-            "loop-sweep": "48deg",
-            opacity: 0.65,
-            "overlay-padding": 7,
-          },
-        },
-        {
-          selector: "edge:selected, edge.hover",
-          style: {
-            opacity: 1,
-            label: "data(label)",
-            "font-size": 11,
-            "text-rotation": "autorotate",
-            "text-background-color": "#fff",
-            "text-background-opacity": 1,
-            "text-background-padding": "3px",
-            color: "#294c70",
-            "underlay-color": "data(color)",
-            "underlay-opacity": 0.12,
-            "underlay-padding": 4,
-          },
-        },
-        {
-          selector: "node:selected, node.focused",
-          style: { "border-color": "#d58c27", "border-width": 3 },
-        },
-        { selector: "node.hidden-label", style: { label: "" } },
-        { selector: "node.reveal", style: { label: "data(label)", "border-width": 3 } },
-        { selector: "node.neighbor", style: { "border-width": 2.5, "border-color": "#287d75" } },
-        { selector: ".dimmed", style: { opacity: 0.14 } },
-        {
-          selector: "edge[deleted = 1]",
-          style: {
-            label: "data(label)",
-            "font-size": 10,
-            "text-rotation": "autorotate",
-            "text-background-color": "#fff",
-            "text-background-opacity": 0.9,
-          },
-        },
-      ],
+      style: graphStyles(),
     });
 
     cy.current = graph;
+
+    const unsubscribeTheme = subscribeTheme(() => {
+      graph.batch(() => {
+        graph.style(graphStyles());
+        graph.edges().forEach((edge) => {
+          edge.data("color", resolveChartColor(edgeVisual(edge.data("raw")).color));
+        });
+      });
+    });
+
     graph.on("tap", "edge", (event) => callbacks.current.onEdge(event.target.data("raw")));
     graph.on("tap", "node", (event) => callbacks.current.onNode(event.target.id()));
     graph.on("tap", (event) => {
@@ -265,6 +298,7 @@ export function RelationCanvas({
       element.removeEventListener("mousedown", refreshCoordinates, true);
       element.removeEventListener("wheel", refreshCoordinates, true);
       resize.disconnect();
+      unsubscribeTheme();
       graph.destroy();
       cy.current = undefined;
     };
@@ -313,7 +347,7 @@ export function RelationCanvas({
             source: e.source,
             target: e.target,
             label: `${e.action === "delete_file" ? "× 删除 · " : ""}${relationName[e.relation] ?? e.relation} · ${e.action} · ${e.count}`,
-            color: visual.color,
+            color: resolveChartColor(visual.color),
             deleted: e.action === "delete_file" ? 1 : 0,
             lineStyle: e.source === "__missing__" ? "dashed" : "solid",
             weight: edgeWidth(e.count, max),

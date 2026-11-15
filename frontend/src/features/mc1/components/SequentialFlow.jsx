@@ -297,7 +297,7 @@ export function SequentialFlow({
             >
               <path
                 d="M1 1 L9 5 L1 9 Z"
-                fill="#6286ad"
+                fill="light-dark(#6286ad, var(--text-readable))"
               />
             </marker>
             <marker
@@ -311,7 +311,7 @@ export function SequentialFlow({
             >
               <path
                 d="M1 1 L9 5 L1 9 Z"
-                fill="#a78bfa"
+                fill="light-dark(#a78bfa, var(--text-readable))"
               />
             </marker>
           </defs>
@@ -320,7 +320,7 @@ export function SequentialFlow({
             x={10}
             y={nodeBaseY + 4}
             fontSize="11"
-            fill="#7a8aa0"
+            fill="light-dark(#7a8aa0, var(--text-secondary))"
           >
             事件流
           </text>
@@ -332,7 +332,11 @@ export function SequentialFlow({
 
             const topY = arcRegionH - (arc.tier + 1) * tierH;
             const dash = arc.type === "enabling" ? "5 4" : undefined;
-            const color = arc.type === "enabling" ? "#a78bfa" : "#6286ad";
+
+            const color =
+              arc.type === "enabling"
+                ? "light-dark(#a78bfa, var(--text-readable))"
+                : "light-dark(#6286ad, var(--text-readable))";
 
             const x1 = arc.a.x + arc.dxOut;
             const y1 = nodeY(arc.a) - R;
@@ -375,7 +379,12 @@ export function SequentialFlow({
             const active = sel || hov;
             const rr = active ? R + 2 : R;
 
-            const glyphStroke = active ? "#ffffff" : connected ? "#45617f" : "none";
+            const glyphStroke = active
+              ? "light-dark(#ffffff, var(--surface-subtle))"
+              : connected
+                ? "light-dark(#45617f, var(--text-readable))"
+                : "none";
+
             const glyphStrokeW = active ? 1.5 : connected ? 1 : 0;
 
             return (
@@ -401,7 +410,13 @@ export function SequentialFlow({
                     cy={y}
                     r={rr}
                     fill={kind.color}
-                    stroke={active ? "#ffffff" : connected ? "#45617f" : "#f5f8fc"}
+                    stroke={
+                      active
+                        ? "light-dark(#ffffff, var(--border-default))"
+                        : connected
+                          ? "light-dark(#45617f, var(--text-readable))"
+                          : "light-dark(#f5f8fc, var(--surface-subtle))"
+                    }
                     strokeWidth={active ? 2 : connected ? 1.5 : 1}
                   />
                 )}
@@ -444,14 +459,14 @@ export function SequentialFlow({
               y1={axisTop}
               x2={LABEL_COL + plotW}
               y2={axisTop}
-              stroke="#c9d6e6"
+              stroke="light-dark(#c9d6e6, var(--border-default))"
               strokeWidth="1"
             />
             <text
               x={10}
               y={axisTop + 14}
               fontSize="11"
-              fill="#7a8aa0"
+              fill="light-dark(#7a8aa0, var(--text-secondary))"
             >
               时间
             </text>
@@ -479,7 +494,11 @@ export function SequentialFlow({
                     y1={axisTop}
                     x2={x}
                     y2={axisTop + (hasEvent ? 6 : 3)}
-                    stroke={hasEvent ? "#6286ad" : "#c9d6e6"}
+                    stroke={
+                      hasEvent
+                        ? "light-dark(#6286ad, var(--border-control-strong))"
+                        : "light-dark(#c9d6e6, var(--border-default))"
+                    }
                     strokeWidth={hasEvent ? 1.5 : 1}
                   />
                   {(show || hasEvent) && (
@@ -488,7 +507,11 @@ export function SequentialFlow({
                       y={axisTop + 18}
                       textAnchor="middle"
                       fontSize="10"
-                      fill={hasEvent ? "#45617f" : "#7a8aa0"}
+                      fill={
+                        hasEvent
+                          ? "light-dark(#45617f, var(--text-readable))"
+                          : "light-dark(#7a8aa0, var(--text-secondary))"
+                      }
                       fontWeight={hasEvent ? "700" : "400"}
                     >
                       {label}
@@ -500,7 +523,7 @@ export function SequentialFlow({
                       y={axisTop - 4}
                       textAnchor="middle"
                       fontSize="10"
-                      fill="#526e8b"
+                      fill="light-dark(#526e8b, var(--text-readable))"
                       fontWeight="700"
                     >
                       {b.slice(5, 10)}
@@ -538,8 +561,12 @@ export function SequentialFlow({
                           width={w}
                           height={20}
                           rx={5}
-                          fill="#f5f8fc"
-                          stroke={isFocus ? "#7d93ad" : "#3b4d68"}
+                          fill="light-dark(#f5f8fc, var(--surface-subtle))"
+                          stroke={
+                            isFocus
+                              ? "light-dark(#7d93ad, var(--border-default))"
+                              : "light-dark(#3b4d68, var(--border-control-strong))"
+                          }
                           strokeWidth="1"
                           opacity={isFocus ? 0.98 : 0.92}
                         />
@@ -548,7 +575,11 @@ export function SequentialFlow({
                           y={by + 14}
                           textAnchor="middle"
                           fontSize="11"
-                          fill={isFocus ? "#294d76" : "#50657d"}
+                          fill={
+                            isFocus
+                              ? "light-dark(#294d76, var(--text-readable))"
+                              : "light-dark(#50657d, var(--text-readable))"
+                          }
                           fontWeight={isFocus ? "700" : "400"}
                         >
                           {p.title}
@@ -623,8 +654,12 @@ export function SequentialFlow({
                       width={b.w}
                       height={20}
                       rx={5}
-                      fill="#f5f8fc"
-                      stroke={b.isFocus ? "#7d93ad" : "#3b4d68"}
+                      fill="light-dark(#f5f8fc, var(--surface-subtle))"
+                      stroke={
+                        b.isFocus
+                          ? "light-dark(#7d93ad, var(--border-default))"
+                          : "light-dark(#3b4d68, var(--border-control-strong))"
+                      }
                       strokeWidth="1"
                       opacity={b.isFocus ? 0.98 : 0.92}
                     />
@@ -633,7 +668,11 @@ export function SequentialFlow({
                       y={b.by + 14}
                       textAnchor="middle"
                       fontSize="11"
-                      fill={b.isFocus ? "#294d76" : "#50657d"}
+                      fill={
+                        b.isFocus
+                          ? "light-dark(#294d76, var(--text-readable))"
+                          : "light-dark(#50657d, var(--text-readable))"
+                      }
                       fontWeight={b.isFocus ? "700" : "400"}
                     >
                       {b.title}

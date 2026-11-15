@@ -63,7 +63,7 @@ export function ProcessTimeRange({
               y={24 - (count ? 3 + Math.sqrt(count / peak) * 20 : 1)}
               width={8}
               height={count ? 3 + Math.sqrt(count / peak) * 20 : 1}
-              fill="#a3bfd5"
+              fill="light-dark(#a3bfd5, var(--text-readable))"
             >
               <title>
                 {count} 条记录 · {time(start + (i / 64) * (end - start))}

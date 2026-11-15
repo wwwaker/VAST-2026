@@ -18,6 +18,12 @@ const browser = await puppeteer.launch({
 });
 
 const page = await browser.newPage();
+if (process.env.MAS_UI_THEME) {
+  await page.evaluateOnNewDocument(
+    (theme) => localStorage.setItem("mas-theme", theme),
+    process.env.MAS_UI_THEME,
+  );
+}
 if (process.env.MAS_LIGHT_THEME_SNAPSHOT) {
   await page.emulateMediaFeatures([{ name: "prefers-reduced-motion", value: "reduce" }]);
 }
@@ -267,17 +273,24 @@ async function readable(selector, label) {
     (host, selector) => {
       const root = document.querySelector(`[data-testid="${host}"]`).shadowRoot;
 
-      const rgba = (s) => {
-        const m = s.match(/[\d.]+/g);
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 1;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
 
-        return m ? [+m[0], +m[1], +m[2], m[3] === undefined ? 1 : +m[3]] : [0, 0, 0, 0];
+      const rgba = (s) => {
+        context.clearRect(0, 0, 1, 1);
+        context.fillStyle = s;
+        context.fillRect(0, 0, 1, 1);
+        const [r, g, b, a] = context.getImageData(0, 0, 1, 1).data;
+
+        return [r, g, b, a / 255];
       };
 
       const blend = (fg, bg) => [0, 1, 2].map((i) => fg[i] * fg[3] + bg[i] * (1 - fg[3]));
 
       const background = (e) => {
         const chain = [];
-        for (let n = e; n && n.nodeType === 1; n = n.parentElement) {
+        for (let n = e; n && n.nodeType === 1; n = n.parentElement ?? n.getRootNode().host) {
           chain.unshift(n);
         }
         let rgb = [255, 255, 255];

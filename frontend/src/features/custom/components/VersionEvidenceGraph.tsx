@@ -295,7 +295,7 @@ export function VersionEvidenceGraph({
             >
               <path
                 d="M0 0 L10 5 L0 10z"
-                fill="#628bb0"
+                fill="light-dark(#628bb0, var(--text-readable))"
               />
             </marker>
           </defs>

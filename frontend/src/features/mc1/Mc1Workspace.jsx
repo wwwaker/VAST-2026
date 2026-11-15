@@ -4,6 +4,7 @@ import { RefreshCcw, Play, Pause } from "lucide-react";
 import NetworkVisualization, { AGENTS, channelColor } from "./components/NetworkVisualization.jsx";
 
 import { AgentIcon } from "./components/AgentIcon.jsx";
+import { ThemeSelect } from "../../shared/ui/ThemeSelect";
 
 import {
   API,
@@ -925,6 +926,7 @@ export default function Mc1Workspace({ onDatasetChange }) {
           >
             <RefreshCcw size={16} /> 刷新数据
           </button>
+          <ThemeSelect />
         </nav>
       </header>
 
@@ -1292,24 +1294,24 @@ export default function Mc1Workspace({ onDatasetChange }) {
                         较少{" "}
                         <span
                           className="lg-swatch"
-                          style={{ background: "#e3eefb" }}
+                          style={{ background: "light-dark(#e3eefb, #23364d)" }}
                         />
                         <span
                           className="lg-swatch"
-                          style={{ background: "#93beec" }}
+                          style={{ background: "light-dark(#93beec, #4d88b7)" }}
                         />
                         <span
                           className="lg-swatch"
-                          style={{ background: "#558fd8" }}
+                          style={{ background: "light-dark(#558fd8, #73b0e4)" }}
                         />
                         <span
                           className="lg-swatch"
-                          style={{ background: "#1a5cc0" }}
+                          style={{ background: "light-dark(#1a5cc0, #9cd0ff)" }}
                         />{" "}
                         较多消息 · 对数刻度 ·{" "}
                         <span
                           className="lg-swatch"
-                          style={{ background: "#edf2f8" }}
+                          style={{ background: "light-dark(#edf2f8, var(--surface-grid))" }}
                         />{" "}
                         无数据
                       </span>
@@ -1318,17 +1320,17 @@ export default function Mc1Workspace({ onDatasetChange }) {
                       <span className="muted small">
                         <span
                           className="lg-swatch"
-                          style={{ background: "#e24b4a" }}
+                          style={{ background: "light-dark(#e24b4a, #f27773)" }}
                         />{" "}
                         −1 负面{" "}
                         <span
                           className="lg-swatch"
-                          style={{ background: "#9aa7b5" }}
+                          style={{ background: "light-dark(#9aa7b5, #374659)" }}
                         />{" "}
                         0 中性{" "}
                         <span
                           className="lg-swatch"
-                          style={{ background: "#378ADD" }}
+                          style={{ background: "light-dark(#378ADD, #67adf5)" }}
                         />{" "}
                         +1 正面
                         <span
@@ -1415,7 +1417,7 @@ export default function Mc1Workspace({ onDatasetChange }) {
                             } else {
                               const s = c?.bert_sentiment_score;
                               const cc = sentimentCellColor(count > 0 ? s : null);
-                              style = { background: cc.bg, opacity: cc.opacity };
+                              style = { background: cc.bg, opacity: cc.opacity, color: cc.fg };
                               title =
                                 count === 0
                                   ? `${agentLabelOf(agent.agent_id, agent.agent_label)} ${b}：无消息`
@@ -1489,7 +1491,7 @@ export default function Mc1Workspace({ onDatasetChange }) {
                       />{" "}
                       <span
                         className="lg-swatch"
-                        style={{ background: "#22d3ee" }}
+                        style={{ background: "light-dark(#22d3ee, var(--chart-market-price))" }}
                       />{" "}
                       股价
                     </label>
@@ -1501,7 +1503,7 @@ export default function Mc1Workspace({ onDatasetChange }) {
                       />{" "}
                       <span
                         className="lg-swatch"
-                        style={{ background: "#f59e0b" }}
+                        style={{ background: "light-dark(#f59e0b, var(--selection-anchor))" }}
                       />{" "}
                       市场情绪
                     </label>

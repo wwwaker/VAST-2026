@@ -83,7 +83,11 @@ export function ProcessSymbol({
         <path
           d={`M${x - 3} ${y + 1}l2 2l4 -4`}
           fill="none"
-          stroke={fill === "white" ? color : "white"}
+          stroke={
+            fill === "light-dark(white, var(--border-default))"
+              ? color
+              : "light-dark(white, var(--border-default))"
+          }
           strokeWidth={1.4}
         />
       )}
@@ -536,7 +540,7 @@ export function LocalProcess({
                       >
                         <path
                           d="M0 0L10 5L0 10z"
-                          fill="#bf6965"
+                          fill="light-dark(#bf6965, var(--tone-danger-text))"
                         />
                       </marker>
                     </defs>
@@ -554,14 +558,14 @@ export function LocalProcess({
                               x2={x}
                               y1={32}
                               y2={layout.height - 15}
-                              stroke="#d5e0ea"
+                              stroke="light-dark(#d5e0ea, var(--border-default))"
                             />
                             <text
                               x={x}
                               y={20}
                               textAnchor="middle"
                               fontSize={12}
-                              fill="#52677d"
+                              fill="light-dark(#52677d, var(--text-readable))"
                             >
                               {t.label}
                             </text>
@@ -575,7 +579,7 @@ export function LocalProcess({
                         x2={205 + ((data.anchor_time - bounds[0]) / (bounds[1] - bounds[0])) * 810}
                         y1={42}
                         y2={layout.height - 15}
-                        stroke="#d58c27"
+                        stroke="light-dark(#d58c27, var(--selection-anchor))"
                         strokeDasharray="4 3"
                       />
                     )}
@@ -610,7 +614,7 @@ export function LocalProcess({
                             x={30}
                             y={layout.offsets[i] + 23}
                             fontSize={12}
-                            fill="#34516e"
+                            fill="light-dark(#34516e, var(--text-readable))"
                           >
                             <title>{lane.id}</title>
                             {displayId(lane.label?.slice(0, 24) ?? actor(lane.id))}
@@ -619,7 +623,7 @@ export function LocalProcess({
                             x={30}
                             y={layout.offsets[i] + 40}
                             fontSize={12}
-                            fill="#52677d"
+                            fill="light-dark(#52677d, var(--text-readable))"
                           >
                             {lane.role_only ? "仅有目标角色" : v.label}
                           </text>
@@ -672,7 +676,7 @@ export function LocalProcess({
                             x2={m.x}
                             y1={m.y}
                             y2={layout.offsets[target] + 28}
-                            stroke="#bf6965"
+                            stroke="light-dark(#bf6965, var(--tone-danger-text))"
                             strokeWidth={2}
                             markerEnd="url(#mc2-arrow)"
                           />
@@ -680,8 +684,8 @@ export function LocalProcess({
                             cx={m.x}
                             cy={layout.offsets[target] + 28}
                             r={4}
-                            fill="white"
-                            stroke="#bf6965"
+                            fill="light-dark(white, var(--surface-subtle))"
+                            stroke="light-dark(#bf6965, var(--tone-danger-text))"
                           />
                         </g>
                       );
@@ -692,7 +696,7 @@ export function LocalProcess({
 
                       const color = i
                         ? categoryColors[(i.category - 1) % categoryColors.length]
-                        : "#657f96";
+                        : "light-dark(#657f96, var(--text-readable))";
 
                       const pick = () => {
                         if (multi) {
@@ -768,7 +772,7 @@ export function LocalProcess({
                               cy={m.y}
                               r={10}
                               fill="none"
-                              stroke="#d58c27"
+                              stroke="light-dark(#d58c27, var(--selection-anchor))"
                               strokeWidth={2}
                             />
                           )}{" "}
@@ -779,7 +783,7 @@ export function LocalProcess({
                               cy={m.y}
                               r={13}
                               fill="none"
-                              stroke="#3188b5"
+                              stroke="light-dark(#3188b5, var(--border-control-strong))"
                               strokeWidth={2}
                             />
                           )}
@@ -790,8 +794,12 @@ export function LocalProcess({
                                 cx={m.x}
                                 cy={m.y}
                                 r={18}
-                                fill={m.context ? "white" : "#e5eef7"}
-                                stroke="#6385a3"
+                                fill={
+                                  m.context
+                                    ? "light-dark(white, var(--surface-subtle))"
+                                    : "light-dark(#e5eef7, var(--surface-subtle))"
+                                }
+                                stroke="light-dark(#6385a3, var(--border-control-strong))"
                                 strokeWidth={2}
                               />
                               <circle
@@ -799,7 +807,7 @@ export function LocalProcess({
                                 cy={m.y}
                                 r={22}
                                 fill="none"
-                                stroke="#6385a3"
+                                stroke="light-dark(#6385a3, var(--border-control-strong))"
                                 strokeOpacity={0.2}
                                 strokeDasharray="2 3"
                               />
@@ -823,8 +831,12 @@ export function LocalProcess({
                               y={m.y}
                               type={i.event_type}
                               color={color}
-                              fill={m.context ? "white" : color}
-                              stroke={m.id === value.anchor ? "#d58c27" : color}
+                              fill={m.context ? "light-dark(white, var(--surface-subtle))" : color}
+                              stroke={
+                                m.id === value.anchor
+                                  ? "light-dark(#d58c27, var(--selection-anchor))"
+                                  : color
+                              }
                             />
                           )}{" "}
                           {!multi && m.label && (
@@ -832,7 +844,7 @@ export function LocalProcess({
                               x={m.x + 11}
                               y={m.y - 13}
                               fontSize={12}
-                              fill="#34516e"
+                              fill="light-dark(#34516e, var(--text-readable))"
                             >
                               {m.id === value.anchor ? "锚点 · " : ""}
                               {typeLabel(i.event_type, types)}
@@ -877,7 +889,7 @@ export function LocalProcess({
                       x={9}
                       y={9}
                       type={t}
-                      color="#638a98"
+                      color="light-dark(#638a98, var(--text-readable))"
                     />
                   </svg>
                   {t === "other" ? "其他活动" : typeLabel(t, types)}
@@ -892,8 +904,8 @@ export function LocalProcess({
                     cx={10}
                     cy={10}
                     r={8}
-                    fill="#e5eef7"
-                    stroke="#6385a3"
+                    fill="light-dark(#e5eef7, var(--surface-subtle))"
+                    stroke="light-dark(#6385a3, var(--border-control-strong))"
                   />
                   <text
                     x={10}

@@ -1,3 +1,4 @@
+import { seriesColor } from "../../../shared/lib/chartColors";
 import {
   forceCenter,
   forceCollide,
@@ -15,12 +16,12 @@ export type Point = { x: number; y: number };
 export type GraphView = { positions: Map<string, Point>; zoom?: number; pan?: Point };
 
 export const relationColors = {
-  task: "#8862b4",
-  mail: "#417bb4",
-  file: "#b17a29",
-  publish: "#bf6965",
-  system: "#338d83",
-  collaboration: "#638a98",
+  task: seriesColor("#8862b4"),
+  mail: seriesColor("#417bb4"),
+  file: seriesColor("#b17a29"),
+  publish: seriesColor("#bf6965"),
+  system: seriesColor("#338d83"),
+  collaboration: seriesColor("#638a98"),
 };
 
 export function edgeVisual(edge: Edge) {

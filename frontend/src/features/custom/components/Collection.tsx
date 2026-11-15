@@ -414,7 +414,7 @@ export function CoverageIndex({
                           >
                             <path
                               d="M4 40H156"
-                              stroke="#dce4ec"
+                              stroke="light-dark(#dce4ec, var(--border-default))"
                             />
                             {scenarios.map((s, i) => {
                               const r = group.runs.find((r) => r.scenario === s);
@@ -442,7 +442,7 @@ export function CoverageIndex({
                                       x={21 + i * 39}
                                       y={36}
                                       textAnchor="middle"
-                                      fill="#8793a0"
+                                      fill="light-dark(#8793a0, var(--text-secondary))"
                                       fontSize={12}
                                     >
                                       {r ? "?" : "–"}

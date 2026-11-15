@@ -25,6 +25,18 @@ select {
 .workspace-nav .nav-current {
   font-weight: 700;
 }
+.theme-select {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 5px;
+}
+.theme-select select {
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
 .workspace-nav .reload {
   display: flex;
   flex-direction: row;

@@ -146,7 +146,7 @@ export function CrisisTimeline({
               const cr = Math.round(255 + (0x8b - 255) * t);
               const cg = Math.round(255 + (0x00 - 255) * t);
               const cb = Math.round(255 + (0x00 - 255) * t);
-              const bg = `rgb(${cr},${cg},${cb})`;
+              const bg = `light-dark(rgb(${cr},${cg},${cb}), color-mix(in srgb, #46546a, #f0807f ${Math.round(t * 100)}%))`;
 
               return (
                 <button
@@ -154,7 +154,11 @@ export function CrisisTimeline({
                   className={`tl-tick ${i === idx ? "current" : ""} ${i === startIdx ? "start" : ""} ${inRange ? "in-range" : ""}`}
                   style={{
                     height: `${h}px`,
-                    background: tickColor ? tickColor(r, inRange) : inRange ? bg : "#1b2a3f",
+                    background: tickColor
+                      ? tickColor(r, inRange)
+                      : inRange
+                        ? bg
+                        : "light-dark(#1b2a3f, var(--surface-grid))",
                   }}
                   title={
                     tickLabel

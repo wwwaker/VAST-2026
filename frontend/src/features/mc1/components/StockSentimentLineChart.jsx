@@ -19,7 +19,11 @@ const pct = (v) => (v == null ? "未记录" : `${v > 0 ? "+" : ""}${Number(v.toF
 const sentimentLabel = (value) => sentimentLabelOf(value?.toLowerCase());
 
 const evidenceColor = (e) =>
-  e.kind === "forecast" ? "#92631b" : e.kind === "model_baseline" ? "#78509a" : "#2469b5";
+  e.kind === "forecast"
+    ? "light-dark(#92631b, var(--status-warning-text))"
+    : e.kind === "model_baseline"
+      ? "light-dark(#78509a, var(--tone-violet-text))"
+      : "light-dark(#2469b5, var(--accent))";
 
 function EvidenceMark({ e, x, y }) {
   const color = evidenceColor(e);
@@ -49,7 +53,7 @@ function EvidenceMark({ e, x, y }) {
     return (
       <path
         d={`M${x} ${cy - 6}l6 6-6 6-6-6Z`}
-        fill="white"
+        fill="light-dark(white, var(--surface-subtle))"
         stroke={color}
         strokeWidth={2}
       />
@@ -74,7 +78,7 @@ function EvidenceMark({ e, x, y }) {
       y={cy - 5}
       width={10}
       height={10}
-      fill="white"
+      fill="light-dark(white, var(--surface-subtle))"
       stroke={color}
       strokeWidth={2}
     />
@@ -386,7 +390,7 @@ export function StockSentimentLineChart({
                   y={priceTop}
                   width={plotW}
                   height={priceBottom - priceTop}
-                  fill="#f7fbfc"
+                  fill="light-dark(#f7fbfc, var(--surface-subtle))"
                 />
                 {y.ticks(4).map((v) => (
                   <line
@@ -395,19 +399,19 @@ export function StockSentimentLineChart({
                     x2={LABEL_COL + plotW}
                     y1={y(v)}
                     y2={y(v)}
-                    stroke="#dce7ec"
+                    stroke="light-dark(#dce7ec, var(--border-default))"
                   />
                 ))}
                 <path
                   d={fill}
-                  fill="#14778a"
+                  fill="light-dark(#14778a, var(--chart-market-price))"
                   fillOpacity=".09"
                 />
                 <path
                   data-testid="raw-stock-path"
                   d={path}
                   fill="none"
-                  stroke="#14778a"
+                  stroke="light-dark(#14778a, var(--chart-market-price))"
                   strokeWidth={2.5}
                   strokeLinejoin="round"
                 />
@@ -420,7 +424,7 @@ export function StockSentimentLineChart({
                   y={sentTop - 10}
                   width={plotW}
                   height={sentBottom - sentTop + 20}
-                  fill="#fffcf6"
+                  fill="light-dark(#fffcf6, var(--status-warning-surface))"
                 />
                 {levels.map((l, i) => (
                   <line
@@ -429,20 +433,20 @@ export function StockSentimentLineChart({
                     x2={LABEL_COL + plotW}
                     y1={sy(i)}
                     y2={sy(i)}
-                    stroke="#ece5d8"
+                    stroke="light-dark(#ece5d8, var(--border-default))"
                     strokeDasharray="3 4"
                   />
                 ))}
                 <path
                   d={sentimentFill}
-                  fill="#ad761c"
+                  fill="light-dark(#ad761c, var(--chart-market-sentiment))"
                   fillOpacity=".10"
                 />
                 <path
                   data-testid="market-sentiment-path"
                   d={sentimentPath}
                   fill="none"
-                  stroke="#98621a"
+                  stroke="light-dark(#98621a, var(--chart-market-sentiment))"
                   strokeWidth={2.5}
                   strokeLinejoin="round"
                 />
@@ -458,7 +462,7 @@ export function StockSentimentLineChart({
                   x2={x(e.i)}
                   y1={showStock ? priceTop : sentTop}
                   y2={showSentiment ? sentBottom : priceBottom}
-                  stroke="#b56843"
+                  stroke="light-dark(#b56843, var(--text-market-event))"
                   strokeDasharray="4 4"
                 />
                 <text
@@ -487,9 +491,9 @@ export function StockSentimentLineChart({
                     height={height - 56}
                     fill={
                       picked === s.time_bucket
-                        ? "#2469b514"
+                        ? "light-dark(#2469b514, var(--surface-selection))"
                         : hover === s.time_bucket
-                          ? "#2469b509"
+                          ? "light-dark(#2469b509, var(--surface-hover))"
                           : "transparent"
                     }
                   />
@@ -508,7 +512,7 @@ export function StockSentimentLineChart({
                           cx={x(i)}
                           cy={y(s.stock_price)}
                           r={hover === s.time_bucket ? 5 : 3.5}
-                          fill="#14778a"
+                          fill="light-dark(#14778a, var(--chart-market-price))"
                         />
                         {s.price_disputed && (
                           <circle
@@ -516,7 +520,7 @@ export function StockSentimentLineChart({
                             cy={y(s.stock_price)}
                             r={8}
                             fill="none"
-                            stroke="#92631b"
+                            stroke="light-dark(#92631b, var(--status-warning-text))"
                             strokeWidth={2}
                           />
                         )}
@@ -532,8 +536,8 @@ export function StockSentimentLineChart({
                           width={46}
                           height={20}
                           rx={4}
-                          fill="#fff6e6"
-                          stroke="#ab782c"
+                          fill="light-dark(#fff6e6, var(--status-warning-surface))"
+                          stroke="light-dark(#ab782c, var(--status-warning-border))"
                         />
                         <text
                           y={4}
@@ -559,7 +563,7 @@ export function StockSentimentLineChart({
                       cx={x(i)}
                       cy={sy(level(s))}
                       r={hover === s.time_bucket ? 5 : 3.5}
-                      fill="#98621a"
+                      fill="light-dark(#98621a, var(--chart-market-sentiment))"
                     />
                   )}
                 </g>
@@ -584,7 +588,7 @@ export function StockSentimentLineChart({
                           y={y(e.range[1])}
                           width={24}
                           height={y(e.range[0]) - y(e.range[1])}
-                          fill="#b07a22"
+                          fill="light-dark(#b07a22, var(--status-warning-text))"
                           fillOpacity=".12"
                         />
                       )}
@@ -635,7 +639,7 @@ export function StockSentimentLineChart({
           <rect
             width={LABEL_COL}
             height={height}
-            fill="white"
+            fill="light-dark(white, var(--surface-subtle))"
           />
           {showStock && (
             <>
@@ -661,7 +665,7 @@ export function StockSentimentLineChart({
                     x2={LABEL_COL}
                     y1={y(v)}
                     y2={y(v)}
-                    stroke="#9bb5c1"
+                    stroke="light-dark(#9bb5c1, var(--border-control-strong))"
                   />
                 </g>
               ))}
@@ -699,7 +703,7 @@ export function StockSentimentLineChart({
             x2={LABEL_COL - 0.5}
             y1={26}
             y2={height - 27}
-            stroke="#d5e0ea"
+            stroke="light-dark(#d5e0ea, var(--border-details))"
           />
         </svg>
       </div>

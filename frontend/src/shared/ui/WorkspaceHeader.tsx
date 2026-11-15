@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { DatasetId } from "../types/dataset";
+import { ThemeSelect } from "./ThemeSelect";
 
 export function WorkspaceHeader({
   title,
@@ -42,6 +43,7 @@ export function WorkspaceHeader({
           ),
         )}
         {children}
+        <ThemeSelect />
       </nav>
     </header>
   );

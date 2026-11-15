@@ -14,6 +14,7 @@
     "check:code": "npm run format:check && npm run lint && npm run typecheck",
     "preview": "vite preview",
     "check:readability-browser": "node scripts/check_readability_browser.mjs",
+    "check:theme-browser": "node scripts/check_theme_browser.mjs",
     "check:readability": "node scripts/check_readability.mjs",
     "check:mc2-browser": "node scripts/check_mc2_browser.mjs",
     "check:mc2-controls": "node scripts/check_mc2_controls_browser.mjs",

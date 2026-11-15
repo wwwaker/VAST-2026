@@ -1,3 +1,4 @@
+import { seriesColor, colorAlpha } from "../../shared/lib/chartColors";
 import { ArrowRight } from "lucide-react";
 import { categoryIcon } from "./visuals";
 import { EntityLabel, entityKind } from "./components/EntityLabel";
@@ -10,14 +11,14 @@ export const number = (value: number) => value.toLocaleString("zh-CN");
 export const displayId = (value: string) => value.replaceAll("MC2:", "");
 
 export const categoryColors = [
-  "#417bb4",
-  "#b17a29",
-  "#8862b4",
-  "#429583",
-  "#bf6965",
-  "#638a98",
-  "#9c6b91",
-  "#748092",
+  seriesColor("#417bb4"),
+  seriesColor("#b17a29"),
+  seriesColor("#8862b4"),
+  seriesColor("#429583"),
+  seriesColor("#bf6965"),
+  seriesColor("#638a98"),
+  seriesColor("#9c6b91"),
+  seriesColor("#748092"),
 ];
 
 export const time = (us: number | null | undefined) =>
@@ -93,7 +94,7 @@ export function EventMetadata({
       </span>
       <span
         className="w-event-type-chip"
-        style={{ color, borderColor: `${color}60`, background: `${color}0c` }}
+        style={{ color, borderColor: colorAlpha(color, "60"), background: colorAlpha(color, "0c") }}
       >
         <Icon
           size={12}

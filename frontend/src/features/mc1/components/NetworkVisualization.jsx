@@ -2,14 +2,15 @@
 
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
+import { darkCellText } from "../../../shared/lib/chartColors";
 
 import { AGENT_ICONS } from "./AgentIcon.jsx";
 import { agentLabelOf, channelLabelOf } from "../constants.js";
 
 // 节点用位置、图标和标签区分角色；颜色通道留给消息关系，避免两种含义混用。
-export const NODE_COLOR = "#8b95a5";
+export const NODE_COLOR = "light-dark(#8b95a5, var(--border-control-strong))";
 
-export const NODE_FILL = "#e2e7ee";
+export const NODE_FILL = "light-dark(#e2e7ee, var(--surface-inset))";
 
 export const AGENTS = {
   legal_agent: {
@@ -76,7 +77,8 @@ const CHANNELS = {
 
 // via_channel 没有 message_type → 统一按 broadcast 的蓝色处理。
 const colorKeyOf = (ch, mt) => (ch === "comms_huddle" ? `comms_huddle|${mt || "broadcast"}` : ch);
-export const channelColor = (ch, mt) => CHANNELS[colorKeyOf(ch, mt)]?.color || "#5A7A9A";
+export const channelColor = (ch, mt) =>
+  CHANNELS[colorKeyOf(ch, mt)]?.color || "light-dark(#5A7A9A, var(--text-muted))";
 
 const channelLabel = (ch, mt) =>
   CHANNELS[colorKeyOf(ch, mt)]?.label || channelLabelOf(ch) || "其他";
@@ -112,18 +114,31 @@ function edgeWidth(w, maxW) {
   return Math.max(1.4, 1.4 + norm * 7);
 }
 
+function darkSentimentColor(s) {
+  return d3.interpolateRgb("#374659", s >= 0 ? "#67adf5" : "#f27773")(Math.min(1, Math.abs(s)));
+}
+
+function sentimentText(s) {
+  if (s == null) {
+    return "light-dark(#0a0f16, var(--text-primary))";
+  }
+  const { r, g, b } = d3.rgb(darkSentimentColor(s));
+
+  return `light-dark(#0a0f16, ${darkCellText([r, g, b])})`;
+}
+
 function sentimentColor(s) {
   if (s === null || s === undefined) {
-    return "#3a4a5e";
+    return "light-dark(#3a4a5e, var(--surface-grid))";
   }
   if (s >= 0) {
     const t = Math.min(1, s);
 
-    return d3.interpolateRgb("#9aa7b5", "#378ADD")(t);
+    return `light-dark(${d3.interpolateRgb("#9aa7b5", "#378ADD")(t)}, ${darkSentimentColor(s)})`;
   }
   const t = Math.min(1, -s);
 
-  return d3.interpolateRgb("#9aa7b5", "#e24b4a")(t);
+  return `light-dark(${d3.interpolateRgb("#9aa7b5", "#e24b4a")(t)}, ${darkSentimentColor(s)})`;
 }
 
 export default function NetworkVisualization({
@@ -171,7 +186,7 @@ export default function NetworkVisualization({
         .attr("x", W / 2)
         .attr("y", H / 2)
         .attr("text-anchor", "middle")
-        .attr("fill", "#5a7a9a")
+        .attr("fill", "light-dark(#5a7a9a, var(--text-muted))")
         .attr("font-size", 14)
         .style("display", "none")
         .text("没有 Agent 符合当前筛选条件。");
@@ -189,7 +204,7 @@ export default function NetworkVisualization({
         .attr("cx", (d) => d.x)
         .attr("cy", (d) => d.y)
         .attr("r", 1)
-        .attr("fill", "#151F2E");
+        .attr("fill", "light-dark(#151F2E, var(--border-subtle))");
 
       const zoom = d3
         .zoom()
@@ -365,7 +380,7 @@ export default function NetworkVisualization({
       .append("rect")
       .attr("rx", 4)
       .attr("height", 14)
-      .attr("fill", "#08111E")
+      .attr("fill", "light-dark(#08111E, var(--surface-panel))")
       .attr("fill-opacity", 0.92);
     edgeLblEnter
       .append("text")
@@ -447,10 +462,20 @@ export default function NetworkVisualization({
 
     // 静默节点保留空心样式；其他节点统一使用灰色边框与浅色填充。
     const nodeFill = (d) =>
-      d.silent ? "#161d2b" : isSentiment ? sentimentColor(d.bert_sentiment_score) : NODE_FILL;
+      d.silent
+        ? "light-dark(#161d2b, var(--surface-neutral))"
+        : isSentiment
+          ? sentimentColor(d.bert_sentiment_score)
+          : NODE_FILL;
 
     const nodeStroke = () => NODE_COLOR;
-    const abbrColor = (d) => (d.silent ? NODE_COLOR : isSentiment ? "#0a0f16" : "#3a4452");
+
+    const abbrColor = (d) =>
+      d.silent
+        ? NODE_COLOR
+        : isSentiment
+          ? sentimentText(d.bert_sentiment_score)
+          : "light-dark(#3a4452, var(--text-primary))";
 
     const rankById = {};
     (heatmapOrder || []).forEach((id, i) => {
@@ -489,7 +514,7 @@ export default function NetworkVisualization({
     nodeEnter
       .append("circle")
       .attr("class", "n-icon-bg")
-      .attr("fill", "#f2f5f9")
+      .attr("fill", "light-dark(#f2f5f9, var(--surface-panel))")
       .attr("fill-opacity", 0.88)
       .attr("pointer-events", "none");
     nodeEnter
@@ -504,7 +529,7 @@ export default function NetworkVisualization({
       .attr("font-family", "sans-serif")
       .attr("font-size", 11)
       .attr("font-weight", 600)
-      .attr("fill", "#cfe0f2")
+      .attr("fill", "light-dark(#cfe0f2, var(--text-readable))")
       .attr("pointer-events", "none")
       .attr("opacity", 1);
     nodeEnter
@@ -528,7 +553,7 @@ export default function NetworkVisualization({
       .attr("class", "n-bc-rect")
       .attr("rx", 6.5)
       .attr("height", 13)
-      .attr("fill", "#f0f4f9")
+      .attr("fill", "light-dark(#f0f4f9, var(--surface-toolbar))")
       .attr("stroke-width", 1)
       .attr("stroke-dasharray", "3 2")
       .attr("pointer-events", "none");
@@ -546,7 +571,7 @@ export default function NetworkVisualization({
       .attr("class", "n-hr-rect")
       .attr("rx", 6.5)
       .attr("height", 13)
-      .attr("fill", "#f0f4f9")
+      .attr("fill", "light-dark(#f0f4f9, var(--surface-toolbar))")
       .attr("stroke-width", 1)
       .attr("stroke-dasharray", "3 2")
       .attr("pointer-events", "none");
@@ -571,7 +596,7 @@ export default function NetworkVisualization({
       .attr("class", "n-silent-rect")
       .attr("rx", 6.5)
       .attr("height", 13)
-      .attr("fill", "#fff1ee")
+      .attr("fill", "light-dark(#fff1ee, var(--tone-danger-surface))")
       .attr("stroke", "#e24b4a")
       .attr("stroke-width", 1)
       .attr("pointer-events", "none");
@@ -582,13 +607,13 @@ export default function NetworkVisualization({
       .attr("font-family", "monospace")
       .attr("font-size", 9)
       .attr("font-weight", 700)
-      .attr("fill", "#ff8a80")
+      .attr("fill", "light-dark(#ff8a80, var(--tone-danger-text))")
       .attr("pointer-events", "none");
     nodeEnter
       .append("circle")
       .attr("class", "n-rank-bg")
       .attr("r", 9)
-      .attr("fill", "#f0f4f9")
+      .attr("fill", "light-dark(#f0f4f9, var(--surface-toolbar))")
       .attr("stroke-width", 1.5)
       .attr("pointer-events", "none");
     nodeEnter
@@ -598,7 +623,7 @@ export default function NetworkVisualization({
       .attr("font-family", "monospace")
       .attr("font-size", 9.5)
       .attr("font-weight", 800)
-      .attr("fill", "#dbe7f5")
+      .attr("fill", "light-dark(#dbe7f5, var(--text-readable))")
       .attr("pointer-events", "none");
 
     const nodeSel = nodeEnter.merge(nodeData);
@@ -735,7 +760,7 @@ export default function NetworkVisualization({
       .on("mouseenter", function (ev, n) {
         showTT(
           ev,
-          `<div class="tt-name" style="color:#dfe7f0">${agentLabelOf(n.id, n.label)}</div>
+          `<div class="tt-name" style="color:light-dark(#dfe7f0, var(--text-readable))">${agentLabelOf(n.id, n.label)}</div>
           ${n.has_unanswered_mentions ? `<div class="tt-row"><span class="tt-k" style="color:#e24b4a">⚠ ${n.unanswered_mention_count || 0} 条未回复的点名</span><span class="tt-v" style="color:#ff8a80">被点名但未直接回复</span></div>` : ""}
           <div class="tt-row"><span class="tt-k">发出消息</span><span class="tt-v">${n.message_count}</span></div>
           <div class="tt-row"><span class="tt-k">收到消息（被点名/被回复）</span><span class="tt-v">${n.received_count ?? 0}</span></div>

@@ -1,3 +1,5 @@
+import { darkCellText } from "../../shared/lib/chartColors";
+
 export function shortBucket(bucket, granularity) {
   if (!bucket) {
     return "";
@@ -40,7 +42,7 @@ export function bluesRGB(t) {
 
 export function countColor(count, max) {
   if (!count || !max) {
-    return { bg: "#edf2f8", opacity: 1, fg: "#637a92" };
+    return { bg: "var(--surface-grid)", opacity: 1, fg: "var(--chart-empty-text)" };
   }
 
   const norm = Math.log1p(count) / Math.log1p(max);
@@ -48,13 +50,36 @@ export function countColor(count, max) {
 
   const lum = 0.299 * r + 0.587 * g + 0.114 * b;
   const fg = lum > 150 ? "#10202f" : "#fff";
+  const dark = darkCountRGB(norm);
 
-  return { bg: `rgb(${r},${g},${b})`, opacity: 1, fg };
+  const darkForeground = darkCellText(dark);
+
+  return {
+    bg: `light-dark(rgb(${r},${g},${b}), rgb(${dark.join(",")}))`,
+    opacity: 1,
+    fg: `light-dark(${fg}, ${darkForeground})`,
+  };
+}
+
+function darkCountRGB(t) {
+  const stops = [
+    [35, 54, 77],
+    [54, 94, 132],
+    [77, 136, 183],
+    [115, 176, 228],
+    [156, 208, 255],
+  ];
+
+  const x = Math.max(0, Math.min(1, t)) * (stops.length - 1);
+  const a = stops[Math.floor(x)];
+  const b = stops[Math.min(Math.floor(x) + 1, stops.length - 1)];
+
+  return a.map((c, i) => Math.round(c + (b[i] - c) * (x % 1)));
 }
 
 export function sentimentCellColor(score) {
   if (score === null || score === undefined) {
-    return { bg: "#edf2f8", opacity: 0.7 };
+    return { bg: "var(--surface-grid)", opacity: 0.7 };
   }
 
   let bg;
@@ -72,12 +97,22 @@ export function sentimentCellColor(score) {
     bg = `rgb(${r},${g},${b})`;
   }
 
-  return { bg, opacity: 1 };
+  const endpoint = score >= 0 ? [103, 173, 245] : [242, 119, 115];
+
+  const dark = [55, 70, 89].map((c, i) =>
+    Math.round(c + (endpoint[i] - c) * Math.min(1, Math.abs(score))),
+  );
+
+  return {
+    bg: `light-dark(${bg}, rgb(${dark.join(",")}))`,
+    fg: `light-dark(#fff, ${darkCellText(dark)})`,
+    opacity: 1,
+  };
 }
 
 export function semanticCellColor(distance) {
   if (distance === null || distance === undefined) {
-    return { bg: "#edf2f8", opacity: 0.7 };
+    return { bg: "var(--surface-grid)", opacity: 0.7 };
   }
 
   const t = Math.max(0, Math.min(1, distance));
@@ -85,7 +120,12 @@ export function semanticCellColor(distance) {
   const g = Math.round(0x33 + (0x4d - 0x33) * t);
   const b = Math.round(0x5e + (0xdd - 0x5e) * t);
 
-  return { bg: `rgb(${r},${g},${b})`, opacity: t < 0.05 ? 0.7 : 1 };
+  const dark = [40, 38, 70].map((c, i) => Math.round(c + ([164, 134, 245][i] - c) * t));
+
+  return {
+    bg: `light-dark(rgb(${r},${g},${b}), rgb(${dark.join(",")}))`,
+    opacity: t < 0.05 ? 0.7 : 1,
+  };
 }
 
 // 将源时间映射为热力图／折线图的桶键，与后端 bucket_expression 保持一致。

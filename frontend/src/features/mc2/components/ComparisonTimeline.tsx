@@ -376,7 +376,7 @@ export function HistoricalComparison({
                                 x2={x(t.value)}
                                 y1={0}
                                 y2={height}
-                                stroke="#d5e0ea"
+                                stroke="light-dark(#d5e0ea, var(--border-default))"
                               />
                             ))}
                             <line
@@ -384,14 +384,14 @@ export function HistoricalComparison({
                               x2={720}
                               y1={25}
                               y2={25}
-                              stroke="#8b9eaf"
+                              stroke="light-dark(#8b9eaf, var(--border-default))"
                             />
                             <line
                               x1={x(0)}
                               x2={x(0)}
                               y1={0}
                               y2={height}
-                              stroke="#a56817"
+                              stroke="light-dark(#a56817, var(--selection-anchor))"
                               strokeDasharray="4 3"
                             />
                             {marks.map(({ op: o, px, track }) => (
@@ -425,7 +425,7 @@ export function HistoricalComparison({
                                   type={o.event_type}
                                   color={
                                     activePoint?.op.event_id === o.event_id
-                                      ? "#2469b5"
+                                      ? "light-dark(#2469b5, var(--text-readable))"
                                       : fileActionColor(o.event_type)
                                   }
                                 />

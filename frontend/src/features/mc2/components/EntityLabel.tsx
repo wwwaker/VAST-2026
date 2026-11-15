@@ -1,13 +1,14 @@
+import { seriesColor } from "../../../shared/lib/chartColors";
 import { Bot, FileText, HelpCircle, MapPin, Server, UserRound, Users } from "lucide-react";
 
 const kinds = {
-  agent: { label: "智能体", color: "#8862b4", Icon: Bot },
-  person: { label: "人员", color: "#429583", Icon: UserRound },
-  system: { label: "系统", color: "#417bb4", Icon: Server },
-  file_path: { label: "文件", color: "#b17a29", Icon: FileText },
-  room: { label: "场所", color: "#638a98", Icon: MapPin },
-  team: { label: "团队", color: "#9c6b91", Icon: Users },
-  missing: { label: "缺失角色", color: "#748092", Icon: HelpCircle },
+  agent: { label: "智能体", color: seriesColor("#8862b4"), Icon: Bot },
+  person: { label: "人员", color: seriesColor("#429583"), Icon: UserRound },
+  system: { label: "系统", color: seriesColor("#417bb4"), Icon: Server },
+  file_path: { label: "文件", color: seriesColor("#b17a29"), Icon: FileText },
+  room: { label: "场所", color: seriesColor("#638a98"), Icon: MapPin },
+  team: { label: "团队", color: seriesColor("#9c6b91"), Icon: Users },
+  missing: { label: "缺失角色", color: seriesColor("#748092"), Icon: HelpCircle },
 };
 
 export const entityVisual = (kind: string) => kinds[kind as keyof typeof kinds] ?? kinds.missing;

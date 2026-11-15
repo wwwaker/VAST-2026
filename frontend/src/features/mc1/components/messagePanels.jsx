@@ -527,9 +527,9 @@ export function RelatedMessages({
 
 // Conversation Flow modal (chat-history style)
 const KIND_TAG = {
-  direct: { label: "直接回复", color: "#22c55e" },
-  addressed: { label: "点名致意", color: "#f59e0b" },
-  root: { label: "话题起点", color: "#7f93ad" },
+  direct: { label: "直接回复", color: "light-dark(#22c55e, var(--tone-teal-text))" },
+  addressed: { label: "点名致意", color: "light-dark(#f59e0b, var(--selection-anchor))" },
+  root: { label: "话题起点", color: "light-dark(#7f93ad, var(--text-readable))" },
 };
 
 export function ConversationFlowModal({
@@ -641,7 +641,7 @@ export function ConversationFlowModal({
   const why = sel && sel.why_matters;
 
   const renderBubble = (item) => {
-    const color = AGENTS[item.agent_id]?.color || "#5a7a9a";
+    const color = AGENTS[item.agent_id]?.color || "light-dark(#5a7a9a, var(--text-readable))";
     const isSelf = !!item.is_focus;
     const isReply = !isSelf && (item.reply_kind === "direct" || item.reply_kind === "addressed");
     const tag = KIND_TAG[item.reply_kind] || null;

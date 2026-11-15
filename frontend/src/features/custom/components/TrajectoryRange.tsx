@@ -47,7 +47,11 @@ export function TrajectoryRange({
               width={18}
               y={32 - (count / maximum) * 30}
               height={(count / maximum) * 30}
-              fill={inside ? barShade("#599b86", count / maximum) : "#d3dce5"}
+              fill={
+                inside
+                  ? barShade("light-dark(#599b86, var(--tone-teal-text))", count / maximum)
+                  : "light-dark(#d3dce5, var(--surface-subtle))"
+              }
             >
               <title>
                 {a.toFixed(2)}–{b.toFixed(2)} s：{count} 条事件

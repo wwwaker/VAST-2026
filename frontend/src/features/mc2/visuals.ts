@@ -1,3 +1,4 @@
+import { seriesColor } from "../../shared/lib/chartColors";
 import {
   Activity,
   MessagesSquare,
@@ -28,21 +29,21 @@ export const categoryIcon = (category: number) => categoryIcons[category - 1] ??
 
 export const fileActionColor = (action: string) =>
   action === "delete_file"
-    ? "#bd6d62"
+    ? seriesColor("#bd6d62")
     : action === "create_file"
-      ? "#398e7e"
+      ? seriesColor("#398e7e")
       : action === "read_file"
-        ? "#638ac0"
+        ? seriesColor("#638ac0")
         : action.includes("post")
-          ? "#ad8239"
+          ? seriesColor("#ad8239")
           : action.includes("queue")
-            ? "#9570b7"
-            : "#718697";
+            ? seriesColor("#9570b7")
+            : seriesColor("#718697");
 
 export const modeVisuals = {
-  types: { Icon: Layers3, color: "#338d83" },
-  system: { Icon: Network, color: "#7d6bb3" },
-  relay: { Icon: Workflow, color: "#bf6965" },
-  operations: { Icon: FolderOpen, color: "#b17a29" },
-  compare: { Icon: GitCompareArrows, color: "#638a98" },
+  types: { Icon: Layers3, color: seriesColor("#338d83") },
+  system: { Icon: Network, color: seriesColor("#7d6bb3") },
+  relay: { Icon: Workflow, color: seriesColor("#bf6965") },
+  operations: { Icon: FolderOpen, color: seriesColor("#b17a29") },
+  compare: { Icon: GitCompareArrows, color: seriesColor("#638a98") },
 };

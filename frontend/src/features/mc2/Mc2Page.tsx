@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { modeVisuals } from "./visuals";
 import { barShade } from "../../shared/ui/MetricBars";
+import { readStoredValue, writeStoredValue } from "../../shared/lib/storage";
 import windowRangeCss from "../../shared/styles/window-range.css?inline";
 import { lazy, Suspense, Profiler, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
@@ -139,7 +140,7 @@ const initial = (): Investigation => ({
   day: null,
   mode: "types",
   process: null,
-  collapsed: localStorage.getItem("mc2-overview-collapsed") === "true",
+  collapsed: readStoredValue("mc2-overview-collapsed") === "true",
   representation: "overview",
 });
 
@@ -883,7 +884,7 @@ function Mc2Workspace({ onDatasetChange }: { onDatasetChange: (id: DatasetId) =>
                   <button
                     aria-expanded={!state.collapsed}
                     onClick={() => {
-                      localStorage.setItem("mc2-overview-collapsed", String(!state.collapsed));
+                      writeStoredValue("mc2-overview-collapsed", String(!state.collapsed));
                       setState((s) => ({ ...s, collapsed: !s.collapsed }));
                     }}
                   >
@@ -1567,7 +1568,11 @@ function RelationInspector({
               y={52 - (b.count / peak) * 42}
               width={Math.max(4, ((b.end - b.start) / (last - first)) * 242 - 1)}
               height={(b.count / peak) * 42}
-              fill={bucket?.start === b.start ? "#d58c27" : barShade("#338d83", b.count / peak)}
+              fill={
+                bucket?.start === b.start
+                  ? "light-dark(#d58c27, var(--status-warning-text))"
+                  : barShade("light-dark(#338d83, var(--text-readable))", b.count / peak)
+              }
             />
           </g>
         ))}

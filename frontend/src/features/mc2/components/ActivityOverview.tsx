@@ -120,7 +120,7 @@ export function ActivityOverview({
                       x={(i * width) / totals.length}
                       width={width / totals.length}
                       height="65"
-                      fill="#f5e6ce"
+                      fill="light-dark(#f5e6ce, var(--surface-subtle))"
                     />
                   )}
                   <rect
@@ -129,7 +129,11 @@ export function ActivityOverview({
                     y={58 - (n / peak) * 51}
                     width={Math.max(2, width / totals.length - 2)}
                     height={Math.max(2, (n / peak) * 51)}
-                    fill={active ? "#ce8a35" : barShade("#338d83", n / peak)}
+                    fill={
+                      active
+                        ? "light-dark(#ce8a35, var(--status-warning-text))"
+                        : barShade("light-dark(#338d83, var(--text-readable))", n / peak)
+                    }
                   />
                   <rect
                     className="w-bar-hit"
@@ -154,7 +158,7 @@ export function ActivityOverview({
                     x2={((anchorTime - data.buckets[0]) / data.step / data.buckets.length) * width}
                     y1="0"
                     y2="65"
-                    stroke="#d58c27"
+                    stroke="light-dark(#d58c27, var(--selection-anchor))"
                     strokeWidth="2"
                     strokeDasharray="3 2"
                   />
@@ -238,7 +242,7 @@ export function ActivityOverview({
                             background: covered
                               ? n
                                 ? barShade(color, Math.log1p(n) / Math.log1p(legendMax.current.max))
-                                : "#eef2f6"
+                                : "light-dark(#eef2f6, var(--surface-grid))"
                               : undefined,
                           }}
                           onClick={() =>
@@ -295,12 +299,12 @@ export function ActivityOverview({
       </div>
       <div className="mc2-legend">
         <span>零记录</span>
-        <i style={{ background: "#eef2f6" }} />
+        <i style={{ background: "light-dark(#eef2f6, var(--surface-grid))" }} />
         <span>少</span>
         {[0.1, 0.45, 1].map((r) => (
           <i
             key={r}
-            style={{ background: barShade("#66758f", r) }}
+            style={{ background: barShade("light-dark(#66758f, var(--text-secondary))", r) }}
           />
         ))}
         <span>多 · 最大 {number(max)} · 各类别共用对数数量刻度；色相区分类别</span>
