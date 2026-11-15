@@ -12,16 +12,9 @@ __pycache__/
 *.db-wal
 *.db-shm
 
-# ---- 第三方参考工程：独立 clone，内含 150 MB neo4j.zip ----
-VAST_Challenge_2026-main/
-
 # ---- 解压后的本地数据：版本化快照及恢复说明见 datasets/README.md ----
 # data/ 是唯一数据根：process/ 标准数据、raw/ 原始包、views/ + analysis/ 派生视图
 /data/
-
-# ---- 文档进入版本管理；本地产物仍写入 build/ ----
-/docs/.local/
-/docs/**/~$*
 
 # ---- 编辑器与系统 ----
 .vscode/
@@ -29,7 +22,4 @@ VAST_Challenge_2026-main/
 .DS_Store
 Thumbs.db
 *.log
-
-# ---- 文档本地保留，不入库（避免随分支/推送流转）----
-docs/
-/frontend/REFERENCE_SOURCES.md
+~$*

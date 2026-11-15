@@ -27,4 +27,4 @@ npm run check:code    # 格式 + 静态规则 + 类型
 npm run build        # 类型检查 + 生产构建
 ```
 
-Prettier 与 ESLint 的开发依赖锁定具体版本，配置随仓库分发；编辑器支持 EditorConfig 时会自动采用基本缩进和换行设置。格式检查排除依赖、构建产物、锁文件及仅本地保留的历史来源文档。
+Prettier 与 ESLint 的开发依赖锁定具体版本，配置随仓库分发；编辑器支持 EditorConfig 时会自动采用基本缩进和换行设置。格式检查排除依赖、构建产物、覆盖率报告和锁文件。
