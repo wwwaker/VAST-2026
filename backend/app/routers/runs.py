@@ -11,18 +11,21 @@ from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ..db import get_conn, require_dataset
-from ..domain import custom_audit
-from ..domain.custom_projection import coverage, project
-from ..query import filters
-from ..query.filters import FilterError, RawFilter
-from .events import load_annotations, summarize
+from app.storage.database import get_conn, require_dataset
+import app.domain.custom.audit as custom_audit
+from app.domain.custom.projection import coverage, project
+from app.query import filters
+from app.query.filters import FilterError, RawFilter
+from app.projections.events import load_annotations, summarize
 
 router = APIRouter(prefix="/api", tags=["runs"])
 
-from ..domain.run_stages import (
-    STAGES, STAGE_RULES_VERSION, stage_of as _stage_of,
-    stage_payload as _stage_payload, stage_summary as _stage_summary, summarize_run,
+from app.domain.custom.stages import (
+    STAGES,
+    STAGE_RULES_VERSION,
+    stage_payload as _stage_payload,
+    stage_summary as _stage_summary,
+    summarize_run,
 )
 
 
@@ -265,8 +268,6 @@ def run_detail(
         "projection": projection,
         "truncated": matched > len(events),
     }
-
-
 
 
 def _metrics(events: list[dict], audit: dict) -> dict:

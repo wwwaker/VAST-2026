@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "backend"))
 
-from app.domain import mc2_files  # noqa: E402
+import app.domain.mc2.files as mc2_files  # noqa: E402
 
 TARGET_POSTS = ("MC2:event:373902", "MC2:event:27290", "MC2:event:98591")
 METHOD_VERSION = "mc2-content-audit/1"

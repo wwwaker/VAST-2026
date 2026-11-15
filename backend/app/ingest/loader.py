@@ -17,10 +17,10 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from ..config import DATA_DIR, IMPORT_VERSION
-from ..domain import event_types
-from . import derived, schema
-from .manifest import DatasetManifest
+from app.config import DATA_DIR, IMPORT_VERSION
+from app.domain import event_types
+from app.ingest import derived, schema
+from app.ingest.manifest import DatasetManifest
 
 TEXT_KEYS = (
     "content",

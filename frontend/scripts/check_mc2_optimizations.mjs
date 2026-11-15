@@ -1,105 +1,431 @@
 /** Focused contract checks with synthetic dense/multi-action data; no visual QA. */
-import assert from 'node:assert/strict';
-import { build } from 'esbuild';
-import { createRequire } from 'node:module';
-import { JSDOM } from 'jsdom';
-import React, {act} from 'react';
+import assert from "node:assert/strict";
+import { build } from "esbuild";
+import { createRequire } from "node:module";
+import { JSDOM } from "jsdom";
+import React, { act } from "react";
 
+const dom = new JSDOM('<div id="root"></div>', {
+  url: "http://localhost",
+  pretendToBeVisual: true,
+});
 
-const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost',pretendToBeVisual:true});
-for(const k of ['window','document','HTMLElement','SVGElement','Element','Node','Event','MouseEvent','KeyboardEvent','localStorage'])globalThis[k]=dom.window[k];
-Object.defineProperty(globalThis,'navigator',{value:dom.window.navigator,configurable:true});
-globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+for (const k of [
+  "window",
+  "document",
+  "HTMLElement",
+  "SVGElement",
+  "Element",
+  "Node",
+  "Event",
+  "MouseEvent",
+  "KeyboardEvent",
+  "localStorage",
+]) {
+  globalThis[k] = dom.window[k];
+}
+Object.defineProperty(globalThis, "navigator", { value: dom.window.navigator, configurable: true });
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 // Load React DOM after the DOM exists so its input-event detection uses the browser path.
-const {createRoot}=await import('react-dom/client');
-const {Simulate}=await import('react-dom/test-utils');
-globalThis.ResizeObserver=class{observe(){}disconnect(){}};
-globalThis.requestAnimationFrame=dom.window.requestAnimationFrame.bind(dom.window);
-globalThis.cancelAnimationFrame=dom.window.cancelAnimationFrame.bind(dom.window);
-dom.window.HTMLElement.prototype.scrollIntoView=function(){};
-const result=await build({stdin:{contents:`export {LocalProcess} from './src/views/mc2/migrated/LocalProcess'; export {processLayout} from './src/views/mc2/migrated/processLayout'; export {RelationMatrix} from './src/views/mc2/migrated/RelationCanvas'; export {arrange,oneHop} from './src/views/mc2/migrated/relationLayout'; export {TimeRange} from './src/views/mc2/migrated/TimeRange'; export {useRequest} from './src/views/shared/request'; export {EMPTY_FILTERS} from './src/data/filterContext'; export {narrowed} from './src/views/mc2/migrated/workspaceApi';`,resolveDir:process.cwd()},bundle:true,platform:'node',format:'cjs',write:false,external:['react','react-dom'],logLevel:'silent'});
-const mod={exports:{}};new Function('require','module','exports',result.outputFiles[0].text)(createRequire(import.meta.url),mod,mod.exports);
-const {LocalProcess,processLayout,RelationMatrix,arrange,oneHop,TimeRange,useRequest,EMPTY_FILTERS,narrowed}=mod.exports;
-let count=0;const check=(label,value)=>{assert.ok(value,label);console.log('PASS',label);count++;};
-const item=(i,context=false)=>({kind:'event',event_id:`e${i}`,actor_id:'a',time_us:100,event_type:i%2?'queue_subordinate_task':'read_file',context,roles:[],files:[]});
-const items=Array.from({length:8},(_,i)=>item(i));
-const layout=processLayout(items,[],['a'],0,200,'e0','e7');
-check('Eight simultaneous events conserve all identities in display groups',layout.marks.reduce((n,m)=>n+m.count,0)===8&&new Set(layout.marks.flatMap(m=>m.events.map(e=>e.event_id))).size===8);
-check('Anchor and selected event remain individual and exact x never shifts',layout.marks.some(m=>m.id==='e0'&&m.count===1)&&layout.marks.some(m=>m.id==='e7'&&m.count===1)&&layout.marks.every(m=>m.x===610));
-const expanded=processLayout(items,[],['a'],0,200,'e0','e7',true);
-check('Expanded same-time events use separate vertical tracks',expanded.marks.length===8&&new Set(expanded.marks.map(m=>m.y)).size===8);
-const mixed=processLayout([...items,...Array.from({length:8},(_,i)=>({...item(i,true),event_id:`c${i}`}))],[],['a'],0,200,'e0');
-check('Pixel collision groups never mix main and context',mixed.marks.every(m=>m.events.every(e=>e.context===m.context))&&mixed.marks.reduce((s,m)=>s+m.count,0)===16);
-const aggregate={aggregate_id:'group',lane_id:'a',bucket_start:105,bucket_end:110,count:640,context:false,types:{read_file:640},file_count:1,task_count:0,task_targets:0};
-const remote=processLayout([item(0)],[aggregate],['a'],0,200,'e0');
-check('Remote aggregate keeps its group identity and exact conserved total',remote.marks.reduce((s,m)=>s+m.count,0)===641&&remote.marks.some(m=>m.aggregates[0]?.aggregate_id==='group'));
-check('Restored incompatible activity type intersects global filters',narrowed({...EMPTY_FILTERS,eventTypes:['read_file']},{type:'sent',start:0,end:100,label:'sent'}).eventTypes[0]==='__no_type_intersection__');
+const { createRoot } = await import("react-dom/client");
+const { Simulate } = await import("react-dom/test-utils");
+globalThis.ResizeObserver = class {
+  observe() {}
+  disconnect() {}
+};
+globalThis.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
+globalThis.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
+dom.window.HTMLElement.prototype.scrollIntoView = function () {};
 
-const nodes=['a','b','c'].map(id=>({id,label:id,entity_type:'agent'}));
-const edge=(source,target,action,count=1)=>({source,target,action,count,relation:'file_path',first_us:0,last_us:1});
-const data={nodes,edges:[edge('a','a','read_file'),edge('a','b','read_file',2),edge('a','b','delete_file',3),edge('c','c','read_file')],meta:{data_version:'test'},mode:'system'};
-const saved=new Map(nodes.map((n,i)=>[n.id,{x:i*10,y:i*20}]));
-check('Complete cached graph positions skip changes on repeat layout',[...arrange(data,saved)].every(([id,p])=>p===saved.get(id)));
-check('One-hop only contains edges incident to focus',oneHop(data,'a').edges.length===3);
-const root=createRoot(document.getElementById('root'));let chosen=[];
-await act(async()=>root.render(React.createElement(RelationMatrix,{data,cache:new Map(),viewKey:'test',onEdge:e=>chosen.push(e),onNode:()=>{}})));
-const click=async el=>{assert.ok(el);await act(async()=>el.dispatchEvent(new MouseEvent('click',{bubbles:true})));};
-const key=async(el,k)=>act(async()=>el.dispatchEvent(new KeyboardEvent('keydown',{key:k,bubbles:true})));
-const cells=()=>[...document.querySelectorAll('td button')];
-const matrixBeforeSearch=document.querySelector('.w-matrix-scroll');
-const matrixSearch=document.querySelector('[aria-label="定位矩阵对象"]');
-await act(async()=>{matrixSearch.value='a';Simulate.change(matrixSearch,{target:matrixSearch});});
-check('Matrix candidates stay in an anchored dropdown while the same matrix remains mounted',document.querySelector('.w-matrix-search .w-matrix-search-results button')&&document.querySelector('.w-matrix-scroll')===matrixBeforeSearch);
-await key(matrixSearch,'Escape');
-check('Escape closes matrix candidates and keeps input focus',!document.querySelector('.w-matrix-search-results')&&document.activeElement===matrixSearch);
-await act(async()=>{matrixSearch.value='missing';Simulate.change(matrixSearch,{target:matrixSearch});});
-check('Missing matrix candidates show an explicit empty result',document.querySelector('.w-matrix-search-results')?.textContent.includes('没有匹配对象'));
-await act(async()=>document.querySelector('.w-matrix-scroll').dispatchEvent(new Event('pointerdown',{bubbles:true})));
-check('Clicking outside the matrix search dismisses its candidates',!document.querySelector('.w-matrix-search-results'));
-check('Matrix uses a single Tab entry and no cell Tab stops',document.querySelector('.w-matrix-scroll').tabIndex===0&&cells().every(e=>e.tabIndex===-1));
-await click(cells().find(e=>e.getAttribute('aria-label').endsWith(' 0')));
-check('Zero cell changes summary but never selects evidence',chosen.length===0&&document.querySelector('.w-matrix-summary').textContent.includes('0 个记录组合'));
-await click(cells().find(e=>e.getAttribute('aria-label').endsWith(' 5')));
-check('Multi-action cell waits for an explicit action',chosen.length===0&&document.querySelectorAll('.w-pair-types button').length>=2);
-await key(document.querySelector('.w-matrix-scroll'),'Escape');
-check('Escape cancels pending actions and preserves previous selection',chosen.length===0&&!document.querySelector('.w-pair-types'));
-await click(cells().find(e=>e.getAttribute('aria-label').endsWith(' 5')));
-await click(document.querySelector('.w-pair-types button'));
-check('Action choice selects exactly one role/source/target/action',chosen.length===1&&chosen[0].source==='a'&&chosen[0].target==='b');
-await key(document.querySelector('.w-matrix-scroll'),'Home');await key(document.querySelector('.w-matrix-scroll'),'ArrowDown');
-check('Arrow navigation moves focus through continuous matrix cells',document.activeElement?.tagName==='BUTTON'&&document.activeElement.closest('td'));
+const result = await build({
+  stdin: {
+    contents: `export {LocalProcess} from './src/features/mc2/components/LocalProcess'; export {processLayout} from './src/features/mc2/layout/process'; export {RelationMatrix} from './src/features/mc2/components/RelationCanvas'; export {arrange,oneHop} from './src/features/mc2/layout/relations'; export {TimeRange} from './src/features/mc2/components/TimeRange'; export {useRequest} from './src/shared/hooks/request'; export {EMPTY_FILTERS} from './src/shared/api/filters'; export {narrowed} from './src/features/mc2/api';`,
+    resolveDir: process.cwd(),
+  },
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+  write: false,
+  external: ["react", "react-dom"],
+  logLevel: "silent",
+});
 
-let calls=0,latest='';
-function Consumer({enabled,scope}){const q=useRequest(scope,async()=>{calls++;return scope;},enabled);latest=q.data??'';return null;}
-await act(async()=>root.render(React.createElement(Consumer,{enabled:true,scope:'first'})));
-await act(async()=>root.render(React.createElement(Consumer,{enabled:false,scope:'second'})));
-check('Hidden subscription pauses new queries while retaining committed data',calls===1&&latest==='first');
-await act(async()=>root.render(React.createElement(Consumer,{enabled:true,scope:'second'})));
-check('Reopened subscription queries its current scope',calls===2&&latest==='second');
+const mod = { exports: {} };
+new Function("require", "module", "exports", result.outputFiles[0].text)(
+  createRequire(import.meta.url),
+  mod,
+  mod.exports,
+);
 
-let commits=0;const activity={buckets:[0,86400e6,2*86400e6],step:86400e6,cells:[],coverage:{start:0,end:3*86400e6}};
-await act(async()=>root.render(React.createElement(TimeRange,{data:activity,filters:{...EMPTY_FILTERS},change:()=>commits++,granularity:'day',setGranularity:()=>{}})));
-const range=document.querySelector('.tl-range-multi input');assert.ok(range);
-await act(async()=>Simulate.pointerDown(range));
-await act(async()=>{range.value='1';Simulate.change(range,{target:range});await new Promise(r=>setTimeout(r,240));});
-check('Pointer dragging previews without committing query changes',commits===0);
-await act(async()=>{window.dispatchEvent(new Event('pointerup'));});
-await act(async()=>{await new Promise(r=>setTimeout(r,240));});
-check('Pointer release commits the final range once',commits===1);
-const originalFetch=globalThis.fetch;
-const denseItems=items.map(i=>({...i,time_us:100e6,category:4,preview:'精确测试记录',context_sources:[]}));
-const denseAggregate={...aggregate,bucket_start:105e6,bucket_end:110e6,kind:'aggregate'};
-const denseData={valid:true,anchor:'e0',anchor_time:100e6,start:0,end:200e6,items:denseItems,aggregates:[denseAggregate],lanes:[{id:'a',label:'A',entity_type:'agent'}],links:[],main_count:648,context_count:0,outside_main:0,total:648,data_version:'synthetic-dense',selection_key:'synthetic-dense',invalid_reasons:[]};
-globalThis.fetch=async()=>new Response(JSON.stringify(denseData),{status:200,headers:{'content-type':'application/json'}});
-await act(async()=>root.render(React.createElement(LocalProcess,{value:{anchor:'e0',scope:{filters:{...EMPTY_FILTERS}},seconds:60,context:true,expand:false,pinned:false},currentScope:{filters:{...EMPTY_FILTERS}},update:()=>{},open:()=>{},types:[]})));
-await act(async()=>{await new Promise(r=>setTimeout(r,30));});
-const aggregateMark=[...document.querySelectorAll('.w-process-mark')].find(e=>e.getAttribute('aria-label').startsWith('聚合'));
-check('Dense process uses circular aggregate marks rather than numbered rectangles',aggregateMark?.querySelector('circle.w-process-aggregate')&&!aggregateMark.querySelector('rect'));
-await act(async()=>Simulate.mouseEnter(aggregateMark));
-check('Aggregate hover exposes exact counts and group meaning inside the plot',document.querySelector('.w-process-plot [role=tooltip]')?.textContent.includes('聚合'));
-await act(async()=>Simulate.mouseLeave(aggregateMark));
-const collision=[...document.querySelectorAll('.w-process-mark')].find(e=>e.getAttribute('aria-label').startsWith('聚合')&&e.getAttribute('aria-label')!=='聚合 640 条 主选');
+const {
+  LocalProcess,
+  processLayout,
+  RelationMatrix,
+  arrange,
+  oneHop,
+  TimeRange,
+  useRequest,
+  EMPTY_FILTERS,
+  narrowed,
+} = mod.exports;
+
+let count = 0;
+
+const check = (label, value) => {
+  assert.ok(value, label);
+  console.log("PASS", label);
+  count++;
+};
+
+const item = (i, context = false) => ({
+  kind: "event",
+  event_id: `e${i}`,
+  actor_id: "a",
+  time_us: 100,
+  event_type: i % 2 ? "queue_subordinate_task" : "read_file",
+  context,
+  roles: [],
+  files: [],
+});
+
+const items = Array.from({ length: 8 }, (_, i) => item(i));
+const layout = processLayout(items, [], ["a"], 0, 200, "e0", "e7");
+check(
+  "Eight simultaneous events conserve all identities in display groups",
+  layout.marks.reduce((n, m) => n + m.count, 0) === 8 &&
+    new Set(layout.marks.flatMap((m) => m.events.map((e) => e.event_id))).size === 8,
+);
+check(
+  "Anchor and selected event remain individual and exact x never shifts",
+  layout.marks.some((m) => m.id === "e0" && m.count === 1) &&
+    layout.marks.some((m) => m.id === "e7" && m.count === 1) &&
+    layout.marks.every((m) => m.x === 610),
+);
+const expanded = processLayout(items, [], ["a"], 0, 200, "e0", "e7", true);
+check(
+  "Expanded same-time events use separate vertical tracks",
+  expanded.marks.length === 8 && new Set(expanded.marks.map((m) => m.y)).size === 8,
+);
+
+const mixed = processLayout(
+  [...items, ...Array.from({ length: 8 }, (_, i) => ({ ...item(i, true), event_id: `c${i}` }))],
+  [],
+  ["a"],
+  0,
+  200,
+  "e0",
+);
+
+check(
+  "Pixel collision groups never mix main and context",
+  mixed.marks.every((m) => m.events.every((e) => e.context === m.context)) &&
+    mixed.marks.reduce((s, m) => s + m.count, 0) === 16,
+);
+
+const aggregate = {
+  aggregate_id: "group",
+  lane_id: "a",
+  bucket_start: 105,
+  bucket_end: 110,
+  count: 640,
+  context: false,
+  types: { read_file: 640 },
+  file_count: 1,
+  task_count: 0,
+  task_targets: 0,
+};
+
+const remote = processLayout([item(0)], [aggregate], ["a"], 0, 200, "e0");
+check(
+  "Remote aggregate keeps its group identity and exact conserved total",
+  remote.marks.reduce((s, m) => s + m.count, 0) === 641 &&
+    remote.marks.some((m) => m.aggregates[0]?.aggregate_id === "group"),
+);
+check(
+  "Restored incompatible activity type intersects global filters",
+  narrowed(
+    { ...EMPTY_FILTERS, eventTypes: ["read_file"] },
+    { type: "sent", start: 0, end: 100, label: "sent" },
+  ).eventTypes[0] === "__no_type_intersection__",
+);
+
+const nodes = ["a", "b", "c"].map((id) => ({ id, label: id, entity_type: "agent" }));
+
+const edge = (source, target, action, count = 1) => ({
+  source,
+  target,
+  action,
+  count,
+  relation: "file_path",
+  first_us: 0,
+  last_us: 1,
+});
+
+const data = {
+  nodes,
+  edges: [
+    edge("a", "a", "read_file"),
+    edge("a", "b", "read_file", 2),
+    edge("a", "b", "delete_file", 3),
+    edge("c", "c", "read_file"),
+  ],
+  meta: { data_version: "test" },
+  mode: "system",
+};
+
+const saved = new Map(nodes.map((n, i) => [n.id, { x: i * 10, y: i * 20 }]));
+check(
+  "Complete cached graph positions skip changes on repeat layout",
+  [...arrange(data, saved)].every(([id, p]) => p === saved.get(id)),
+);
+check("One-hop only contains edges incident to focus", oneHop(data, "a").edges.length === 3);
+const root = createRoot(document.getElementById("root"));
+const chosen = [];
+await act(async () =>
+  root.render(
+    React.createElement(RelationMatrix, {
+      data,
+      cache: new Map(),
+      viewKey: "test",
+      onEdge: (e) => chosen.push(e),
+      onNode: () => {},
+    }),
+  ),
+);
+
+const click = async (el) => {
+  assert.ok(el);
+  await act(async () => el.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+};
+
+const key = async (el, k) =>
+  act(async () => el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })));
+
+const cells = () => [...document.querySelectorAll("td button")];
+const matrixBeforeSearch = document.querySelector(".w-matrix-scroll");
+const matrixSearch = document.querySelector('[aria-label="定位矩阵对象"]');
+await act(async () => {
+  matrixSearch.value = "a";
+  Simulate.change(matrixSearch, { target: matrixSearch });
+});
+check(
+  "Matrix candidates stay in an anchored dropdown while the same matrix remains mounted",
+  document.querySelector(".w-matrix-search .w-matrix-search-results button") &&
+    document.querySelector(".w-matrix-scroll") === matrixBeforeSearch,
+);
+await key(matrixSearch, "Escape");
+check(
+  "Escape closes matrix candidates and keeps input focus",
+  !document.querySelector(".w-matrix-search-results") && document.activeElement === matrixSearch,
+);
+await act(async () => {
+  matrixSearch.value = "missing";
+  Simulate.change(matrixSearch, { target: matrixSearch });
+});
+check(
+  "Missing matrix candidates show an explicit empty result",
+  document.querySelector(".w-matrix-search-results")?.textContent.includes("没有匹配对象"),
+);
+await act(async () =>
+  document
+    .querySelector(".w-matrix-scroll")
+    .dispatchEvent(new Event("pointerdown", { bubbles: true })),
+);
+check(
+  "Clicking outside the matrix search dismisses its candidates",
+  !document.querySelector(".w-matrix-search-results"),
+);
+check(
+  "Matrix uses a single Tab entry and no cell Tab stops",
+  document.querySelector(".w-matrix-scroll").tabIndex === 0 &&
+    cells().every((e) => e.tabIndex === -1),
+);
+await click(cells().find((e) => e.getAttribute("aria-label").endsWith(" 0")));
+check(
+  "Zero cell changes summary but never selects evidence",
+  chosen.length === 0 &&
+    document.querySelector(".w-matrix-summary").textContent.includes("0 个记录组合"),
+);
+await click(cells().find((e) => e.getAttribute("aria-label").endsWith(" 5")));
+check(
+  "Multi-action cell waits for an explicit action",
+  chosen.length === 0 && document.querySelectorAll(".w-pair-types button").length >= 2,
+);
+await key(document.querySelector(".w-matrix-scroll"), "Escape");
+check(
+  "Escape cancels pending actions and preserves previous selection",
+  chosen.length === 0 && !document.querySelector(".w-pair-types"),
+);
+await click(cells().find((e) => e.getAttribute("aria-label").endsWith(" 5")));
+await click(document.querySelector(".w-pair-types button"));
+check(
+  "Action choice selects exactly one role/source/target/action",
+  chosen.length === 1 && chosen[0].source === "a" && chosen[0].target === "b",
+);
+await key(document.querySelector(".w-matrix-scroll"), "Home");
+await key(document.querySelector(".w-matrix-scroll"), "ArrowDown");
+check(
+  "Arrow navigation moves focus through continuous matrix cells",
+  document.activeElement?.tagName === "BUTTON" && document.activeElement.closest("td"),
+);
+
+let calls = 0;
+let latest = "";
+
+function Consumer({ enabled, scope }) {
+  const q = useRequest(
+    scope,
+    async () => {
+      calls++;
+
+      return scope;
+    },
+    enabled,
+  );
+
+  latest = q.data ?? "";
+
+  return null;
+}
+
+await act(async () =>
+  root.render(React.createElement(Consumer, { enabled: true, scope: "first" })),
+);
+await act(async () =>
+  root.render(React.createElement(Consumer, { enabled: false, scope: "second" })),
+);
+check(
+  "Hidden subscription pauses new queries while retaining committed data",
+  calls === 1 && latest === "first",
+);
+await act(async () =>
+  root.render(React.createElement(Consumer, { enabled: true, scope: "second" })),
+);
+check("Reopened subscription queries its current scope", calls === 2 && latest === "second");
+
+let commits = 0;
+
+const activity = {
+  buckets: [0, 86400e6, 2 * 86400e6],
+  step: 86400e6,
+  cells: [],
+  coverage: { start: 0, end: 3 * 86400e6 },
+};
+
+await act(async () =>
+  root.render(
+    React.createElement(TimeRange, {
+      data: activity,
+      filters: { ...EMPTY_FILTERS },
+      change: () => commits++,
+      granularity: "day",
+      setGranularity: () => {},
+    }),
+  ),
+);
+const range = document.querySelector(".tl-range-multi input");
+assert.ok(range);
+await act(async () => Simulate.pointerDown(range));
+await act(async () => {
+  range.value = "1";
+  Simulate.change(range, { target: range });
+  await new Promise((r) => setTimeout(r, 240));
+});
+check("Pointer dragging previews without committing query changes", commits === 0);
+await act(async () => {
+  window.dispatchEvent(new Event("pointerup"));
+});
+await act(async () => {
+  await new Promise((r) => setTimeout(r, 240));
+});
+check("Pointer release commits the final range once", commits === 1);
+const originalFetch = globalThis.fetch;
+
+const denseItems = items.map((i) => ({
+  ...i,
+  time_us: 100e6,
+  category: 4,
+  preview: "精确测试记录",
+  context_sources: [],
+}));
+
+const denseAggregate = { ...aggregate, bucket_start: 105e6, bucket_end: 110e6, kind: "aggregate" };
+
+const denseData = {
+  valid: true,
+  anchor: "e0",
+  anchor_time: 100e6,
+  start: 0,
+  end: 200e6,
+  items: denseItems,
+  aggregates: [denseAggregate],
+  lanes: [{ id: "a", label: "A", entity_type: "agent" }],
+  links: [],
+  main_count: 648,
+  context_count: 0,
+  outside_main: 0,
+  total: 648,
+  data_version: "synthetic-dense",
+  selection_key: "synthetic-dense",
+  invalid_reasons: [],
+};
+
+globalThis.fetch = async () =>
+  new Response(JSON.stringify(denseData), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
+await act(async () =>
+  root.render(
+    React.createElement(LocalProcess, {
+      value: {
+        anchor: "e0",
+        scope: { filters: { ...EMPTY_FILTERS } },
+        seconds: 60,
+        context: true,
+        expand: false,
+        pinned: false,
+      },
+      currentScope: { filters: { ...EMPTY_FILTERS } },
+      update: () => {},
+      open: () => {},
+      types: [],
+    }),
+  ),
+);
+await act(async () => {
+  await new Promise((r) => setTimeout(r, 30));
+});
+
+const aggregateMark = [...document.querySelectorAll(".w-process-mark")].find((e) =>
+  e.getAttribute("aria-label").startsWith("聚合"),
+);
+
+check(
+  "Dense process uses circular aggregate marks rather than numbered rectangles",
+  aggregateMark?.querySelector("circle.w-process-aggregate") &&
+    !aggregateMark.querySelector("rect"),
+);
+await act(async () => Simulate.mouseEnter(aggregateMark));
+check(
+  "Aggregate hover exposes exact counts and group meaning inside the plot",
+  document.querySelector(".w-process-plot [role=tooltip]")?.textContent.includes("聚合"),
+);
+await act(async () => Simulate.mouseLeave(aggregateMark));
+
+const collision = [...document.querySelectorAll(".w-process-mark")].find(
+  (e) =>
+    e.getAttribute("aria-label").startsWith("聚合") &&
+    e.getAttribute("aria-label") !== "聚合 640 条 主选",
+);
+
 await click(collision);
-check('Collision aggregate opens exact member records for selection',document.querySelector('.w-event-inspector')?.textContent.includes('像素碰撞分组'));
-globalThis.fetch=originalFetch;
-await act(async()=>root.unmount());dom.window.close();console.log(`Passed ${count} focused optimization checks. Synthetic DOM only.`);process.exit(0);
+check(
+  "Collision aggregate opens exact member records for selection",
+  document.querySelector(".w-event-inspector")?.textContent.includes("像素碰撞分组"),
+);
+globalThis.fetch = originalFetch;
+await act(async () => root.unmount());
+dom.window.close();
+console.log(`Passed ${count} focused optimization checks. Synthetic DOM only.`);
+process.exit(0);

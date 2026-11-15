@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from app.domain.mc2_reading import summary
+from app.domain.mc2.reading import summary
 
 
 class Mc2ReadingTests(unittest.TestCase):

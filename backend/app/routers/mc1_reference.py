@@ -2,9 +2,9 @@
 from collections import Counter, defaultdict
 from fastapi import APIRouter, Request, HTTPException
 
-from ..domain.mc1_reference import data
-from ..domain.mc1_reference.config import MERGER_KEYWORDS, TEXT_SOURCE_OPTIONS
-from ..domain.mc1_reference.context import build_message_context, build_reply_thread
+import app.domain.mc1.reference.data as data
+from app.domain.mc1.reference.config import MERGER_KEYWORDS, TEXT_SOURCE_OPTIONS
+from app.domain.mc1.reference.context import build_message_context, build_reply_thread
 
 router = APIRouter(prefix='/api/mc1-reference/api', tags=['mc1-reference'])
 
@@ -50,7 +50,7 @@ def heatmap(request: Request):
 
 @router.get('/line-chart')
 def line_chart(request: Request):
-    from ..domain.mc1_reference.market import series
+    from app.domain.mc1.reference.market import series
     p = request.query_params
     buckets = data.axes(p)
     return {'time_buckets': buckets, 'series': series(data.snapshot()[1], buckets, p.get('granularity', 'hourly'),

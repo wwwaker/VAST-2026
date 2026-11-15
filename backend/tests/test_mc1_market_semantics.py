@@ -2,8 +2,8 @@
 import unittest
 
 from . import helpers
-from app.domain.mc1_reference import data
-from app.domain.mc1_reference.market import series
+import app.domain.mc1.reference.data as data
+from app.domain.mc1.reference.market import series
 
 
 class MarketSemanticsTest(unittest.TestCase):

@@ -8,8 +8,8 @@ from threading import Barrier, Event, Lock
 from unittest.mock import patch
 
 from . import helpers
-from app.domain import mc2_cache
-from app.domain.mc2_relations import type_overview
+import app.domain.mc2.cache as mc2_cache
+from app.domain.mc2.relations import type_overview
 from app.query.filters import RawFilter
 from app.routers.mc2_workspace import RELATIONS, base, meta
 

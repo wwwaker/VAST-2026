@@ -9,7 +9,7 @@ try:
 except ImportError:  # 允许 python -m unittest discover -s tests 直接发现
     import helpers
 
-from app.domain import custom_audit
+import app.domain.custom.audit as custom_audit
 
 
 def _events(conn, run_id: str) -> list[dict]:

@@ -10,9 +10,9 @@ import json
 
 from fastapi import APIRouter, HTTPException, Query
 
-from ..db import get_conn, require_dataset
-from ..domain import event_types
-from .events import _preview
+from app.storage.database import get_conn, require_dataset
+from app.domain import event_types
+from app.projections.events import _preview
 
 router = APIRouter(prefix="/api/entities", tags=["entities"])
 

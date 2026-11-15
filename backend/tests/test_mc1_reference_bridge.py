@@ -8,8 +8,8 @@ except ImportError:
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.datastructures import QueryParams
-from app.db import get_conn
-from app.domain.mc1_reference import data
+from app.storage.database import get_conn
+import app.domain.mc1.reference.data as data
 from app.routers.mc1_reference import router
 
 

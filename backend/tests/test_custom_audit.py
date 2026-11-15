@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from app.domain.custom_audit import audit_run
+from app.domain.custom.audit import audit_run
 
 RUN = "run-test"
 

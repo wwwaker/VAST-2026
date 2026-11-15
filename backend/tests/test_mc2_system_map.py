@@ -9,11 +9,7 @@ except ImportError:  # 允许 python -m unittest discover -s tests 直接发现
 
 from fastapi import HTTPException
 
-from app.routers.system_overview import (
-    clear_cache,
-    system_overview,
-    system_overview_members,
-)
+from app.routers.system_overview import clear_cache, system_overview, system_overview_members
 
 TARGET = "MC2:event:373902"
 

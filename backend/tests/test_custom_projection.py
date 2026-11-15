@@ -10,8 +10,8 @@ try:
 except ImportError:
     import helpers
     from test_custom_audit import event, base_events, HASH, RUN
-from app.domain.custom_audit import audit_run
-from app.domain.custom_projection import project
+from app.domain.custom.audit import audit_run
+from app.domain.custom.projection import project
 from app.routers import runs
 
 

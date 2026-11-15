@@ -5,78 +5,23 @@ Local context includes incoming roles even when participants omits that role.
 """
 from __future__ import annotations
 
-from collections import defaultdict
-from dataclasses import replace
+from app.query.mc2_selection import base, selected, participation_clause, RELATIONS, FILE_ROLES
+
 import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ..db import get_conn, require_dataset
-from ..domain import event_types
-from ..domain import mc2_files, mc2_cache, mc2_projection
-from ..domain.mc2_relations import type_overview
-from ..query import filters
-from ..query.filters import RawFilter, FilterError
-from .events import summarize
+from app.storage.database import get_conn, require_dataset
+from app.domain import event_types
+import app.domain.mc2.files as mc2_files
+import app.domain.mc2.cache as mc2_cache
+import app.domain.mc2.projection as mc2_projection
+from app.domain.mc2.relations import type_overview
+from app.query import filters
+from app.query.filters import RawFilter, FilterError
+from app.projections.events import summarize
 
 router = APIRouter(prefix="/api/mc2", tags=["mc2-workspace"])
-FILE_ROLES = ("file_path", "queued_file_path", "post_content_source")
-RELATIONS = {
-    "queue_target_agent": "任务目标 · 智能体",
-    "queue_target_person": "任务目标 · 人员",
-    "mail_recipient": "邮件收件角色",
-    "mail_sender": "邮件发件角色",
-    "a2a_destination": "智能体通信目标",
-    "meeting_invitee": "会议邀请对象",
-    "system_party": "系统参与角色",
-    "room": "场所角色",
-    "file_path": "文件操作",
-    "queued_file_path": "任务文件参数",
-    "post_content_source": "发布来源引用",
-}
-
-
-def base(raw: RawFilter):
-    try:
-        ctx = raw.to_context("MC2")
-        participant = ctx.participant_id
-        sel = filters.build_selection(ctx.model_copy(update={"participant_id": None}) if participant else ctx)
-        if participant:
-            params = {}
-            sel = sel.extend(participation_clause([participant], params), params, f"participant:{participant}")
-            sel = replace(sel, context=ctx)
-        return sel
-    except FilterError as exc:
-        raise HTTPException(exc.status_code, exc.detail) from exc
-
-
-def selected(raw: RawFilter, file_id=None, no_file=False, relation=None,
-             source=None, target=None, action=None):
-    sel = base(raw)
-    if file_id or no_file:
-        clause = ("e.event_id IN (SELECT rf.event_id FROM relations rf WHERE rf.dataset_id='MC2' "
-                  "AND rf.event_id IS NOT NULL AND rf.relation IN "
-                  "('file_path','queued_file_path','post_content_source')")
-        if file_id:
-            sel = sel.extend(clause + " AND rf.dst_id=:w_file)", {"w_file": file_id}, f"file:{file_id}")
-        else:
-            sel = sel.extend("NOT " + clause + ")", {}, "no-file")
-    if relation:
-        if relation not in RELATIONS:
-            raise HTTPException(400, "未知关系类型")
-        clause = ("EXISTS (SELECT 1 FROM relations rr WHERE rr.dataset_id=e.dataset_id "
-                  "AND rr.event_id=e.event_id AND rr.target_kind='entity' AND rr.relation=:w_rel")
-        params = {"w_rel": relation}
-        if source:
-            clause += " AND rr.src_id IS NULL" if source == "__missing__" else " AND rr.src_id=:w_src"
-            params["w_src"] = source
-        if target:
-            clause += " AND rr.dst_id=:w_dst"
-            params["w_dst"] = target
-        sel = sel.extend(clause + ")", params, json.dumps([relation, source, target]))
-    if action:
-        sel = sel.extend("e.event_type=:w_action", {"w_action": action}, f"action:{action}")
-    return sel
 
 
 def meta(conn, sel):
@@ -165,7 +110,7 @@ def relations(raw: RawFilter = Depends(filters.filter_params), file_id: str | No
               relation: str | None = None):
     sel = selected(raw, file_id, no_file)
     with get_conn() as conn:
-        from ..domain.mc2_semantics import registry
+        from app.domain.mc2.semantics import registry
         data = mc2_cache.cached(conn, ("relations", projection_key(sel), file_id, mode, relation),
                                 lambda: _relations(conn, sel, file_id, mode, relation))
         return {**data, "semantics": registry()}
@@ -254,21 +199,6 @@ def evidence(raw: RawFilter = Depends(filters.filter_params), file_id: str | Non
         return {"meta": meta(conn, sel), "items": items, "next_cursor": nxt, "timeline": timeline}
 
 
-def participation_clause(ids, params, prefix="participant"):
-    marks = []
-    for i, entity in enumerate(ids):
-        key = f"{prefix}{i}"
-        params[key] = entity
-        marks.append(f":{key}")
-    if not marks:
-        return "0"
-    values = ",".join(marks)
-    return (f"(e.actor_id IN ({values}) OR EXISTS (SELECT 1 FROM relations rp "
-            "WHERE rp.dataset_id=e.dataset_id AND rp.event_id=e.event_id AND rp.target_kind='entity' "
-            "AND rp.derivation LIKE 'source:%' "
-            f"AND (rp.src_id IN ({values}) OR rp.dst_id IN ({values}))))")
-
-
 @router.get("/process")
 def process(anchor: str, raw: RawFilter = Depends(filters.filter_params), file_id: str | None = None,
             no_file: bool = False, relation: str | None = None, source: str | None = None,
@@ -276,7 +206,7 @@ def process(anchor: str, raw: RawFilter = Depends(filters.filter_params), file_i
             seconds: int = Query(60, ge=1, le=86400), context: bool = False,
             expand: bool = False, actors: str = "", bins: int = Query(240, ge=32, le=512), selected_event: str | None = None,
             expected_version: str | None = None):
-    from ..domain import mc2_process
+    import app.domain.mc2.process as mc2_process
     with get_conn() as conn:
         packet = mc2_process.collect(conn, raw, anchor, file_id, no_file, relation, source,
                                      target, action, seconds, context, expand, actors, bins, selected_event)
@@ -287,7 +217,7 @@ def process(anchor: str, raw: RawFilter = Depends(filters.filter_params), file_i
 
 @router.get('/file-info')
 def file_info(file_id: str):
-    from ..domain import mc2_files
+    import app.domain.mc2.files as mc2_files
     with get_conn() as conn:
         try:
             info = mc2_cache.cached(conn, ('file-info', file_id), lambda: mc2_files.content_status(conn, 'MC2', file_id))
@@ -304,7 +234,7 @@ def process_members(anchor: str, aggregate_id: str, data_version: str, selection
                     seconds: int = Query(60, ge=1, le=86400), context: bool = False, expand: bool = False,
                     actors: str = "", bins: int = Query(240, ge=32, le=512), selected_event: str | None = None,
                     cursor: str | None = None, member_action: str | None = None):
-    from ..domain import mc2_process
+    import app.domain.mc2.process as mc2_process
     with get_conn() as conn:
         packet = mc2_process.collect(conn, raw, anchor, file_id, no_file, relation, source,
                                     target, action, seconds, context, expand, actors, bins, selected_event)
@@ -346,13 +276,13 @@ def comparison(before_us: int | None = None, offset: int = Query(0, ge=0)):
 
 @router.get('/file-patterns')
 def file_patterns(offset: int = Query(0, ge=0), sort: str = Query('files', pattern='^(files|actions)$')):
-    from ..domain import mc2_fingerprints
+    import app.domain.mc2.fingerprints as mc2_fingerprints
     with get_conn() as conn:
         return mc2_fingerprints.patterns(conn, offset, sort)
 
 
 @router.get('/file-pattern-members')
 def file_pattern_members(pattern_id: str, offset: int = Query(0, ge=0), q: str = '', data_version: str | None = None):
-    from ..domain import mc2_fingerprints
+    import app.domain.mc2.fingerprints as mc2_fingerprints
     with get_conn() as conn:
         return mc2_fingerprints.members(conn, pattern_id, offset, q, data_version)

@@ -9,9 +9,10 @@ from unittest.mock import patch
 
 from . import helpers
 from fastapi import HTTPException
-from app import case_store, notes_store
-from app.db import get_conn
-from app.domain import ui_snapshot
+import app.storage.cases as case_store
+import app.storage.notes as notes_store
+from app.storage.database import get_conn
+import app.domain.investigations.snapshots as ui_snapshot
 from app.routers.cases import CaseCreate, create_case, export_case, get_case
 
 

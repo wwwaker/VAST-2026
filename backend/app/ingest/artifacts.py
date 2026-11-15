@@ -12,7 +12,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from ..config import ARTIFACT_ROOT
+from app.config import ARTIFACT_ROOT
 
 MANIFEST_REL = "process/views/manifest.json"
 MANIFEST_KEY = {"MC1": "mc1", "MC2": "mc2", "CUSTOM": "custom"}

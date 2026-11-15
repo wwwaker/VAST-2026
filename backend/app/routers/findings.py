@@ -13,9 +13,9 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from .. import case_store
-from ..db import get_conn
-from .cases import resolve_case
+import app.storage.cases as case_store
+from app.storage.database import get_conn
+from app.routers.cases import resolve_case
 
 router = APIRouter(prefix="/api/findings", tags=["findings"])
 

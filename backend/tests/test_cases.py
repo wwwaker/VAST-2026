@@ -11,8 +11,8 @@ except ImportError:  # 允许 python -m unittest discover -s tests 直接发现
 
 from fastapi import HTTPException
 
-from app.db import get_conn
-from app.domain import cases as case_domain
+from app.storage.database import get_conn
+import app.domain.investigations.presets as case_domain
 from app.routers.cases import get_case, list_cases
 
 CASE_PATH = os.path.join(

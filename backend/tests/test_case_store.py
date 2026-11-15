@@ -13,9 +13,10 @@ except ImportError:  # 允许 python -m unittest discover -s tests 直接发现
 
 from fastapi import HTTPException
 
-from app import case_store, notes_store
-from app.db import get_conn
-from app.domain import export as export_domain
+import app.storage.cases as case_store
+import app.storage.notes as notes_store
+from app.storage.database import get_conn
+import app.domain.investigations.export as export_domain
 from app.routers.cases import CaseCreate, create_case, delete_case, export_case, get_case, list_cases
 from app.routers.findings import FindingCreate, create_finding, delete_finding, list_findings
 

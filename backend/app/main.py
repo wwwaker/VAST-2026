@@ -14,10 +14,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from .config import DB_PATH, FRONTEND_DIST
-from .ingest import schema
-from .notes_store import ensure_schema as ensure_notes_schema
-from .routers import (
+from app.config import DB_PATH, FRONTEND_DIST
+from app.ingest import schema
+from app.storage.notes import ensure_schema as ensure_notes_schema
+from app.routers import (
     cases,
     compare,
     datasets,
@@ -25,14 +25,12 @@ from .routers import (
     events,
     files,
     findings,
-    graph,
     mc1,
     mc1_reference,
     mc2_workspace,
     notes,
     patterns,
     runs,
-    search,
     system_overview,
     traces,
     transitions,
@@ -56,7 +54,7 @@ app.add_middleware(
 async def mc2_timing(request, call_next):
     if not request.url.path.startswith('/api/mc2/'):
         return await call_next(request)
-    from .query.timing import request_metrics
+    from app.query.timing import request_metrics
     metrics = {'db_ms': 0.0}
     token = request_metrics.set(metrics)
     started = perf_counter()
@@ -71,10 +69,8 @@ async def mc2_timing(request, call_next):
 app.include_router(datasets.router)
 app.include_router(events.router)
 app.include_router(entities.router)
-app.include_router(graph.router)
 app.include_router(compare.router)
 app.include_router(notes.router)
-app.include_router(search.router)
 app.include_router(runs.router)
 app.include_router(files.router)
 app.include_router(traces.router)

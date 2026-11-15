@@ -4,7 +4,9 @@ import sqlite3
 import unittest
 from fastapi import HTTPException
 from . import helpers
-from app.domain import mc2_process, mc2_fingerprints, mc2_cache
+import app.domain.mc2.process as mc2_process
+import app.domain.mc2.fingerprints as mc2_fingerprints
+import app.domain.mc2.cache as mc2_cache
 from app.query.filters import RawFilter
 
 

@@ -10,8 +10,8 @@ except ImportError:  # 允许 python -m unittest discover -s tests 直接发现
 
 from fastapi import HTTPException
 
-from app.db import get_conn
-from app.domain import mc2_files
+from app.storage.database import get_conn
+import app.domain.mc2.files as mc2_files
 from app.query.filters import RawFilter
 from app.routers.files import file_track
 from app.routers.traces import traces

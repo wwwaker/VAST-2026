@@ -14,8 +14,8 @@ from time import perf_counter
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from fastapi.testclient import TestClient
 from app.main import app
-from app.db import get_conn
-from app.domain import mc2_cache
+from app.storage.database import get_conn
+import app.domain.mc2.cache as mc2_cache
 
 
 def main():

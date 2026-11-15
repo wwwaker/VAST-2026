@@ -11,11 +11,11 @@ import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ..db import get_conn, require_dataset
-from ..domain import mc2_files
-from ..query import filters
-from ..query.filters import FilterError, RawFilter
-from .events import _preview
+from app.storage.database import get_conn, require_dataset
+import app.domain.mc2.files as mc2_files
+from app.query import filters
+from app.query.filters import FilterError, RawFilter
+from app.projections.events import _preview
 
 router = APIRouter(prefix="/api", tags=["traces"])
 

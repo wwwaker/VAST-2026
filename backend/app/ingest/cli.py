@@ -20,10 +20,10 @@ import time
 import uuid
 from datetime import datetime, timezone
 
-from ..config import BUILD_DIR, DB_PATH
-from . import schema
-from .loader import DatasetStats, load_dataset
-from .manifest import ALL
+from app.config import BUILD_DIR, DB_PATH
+from app.ingest import schema
+from app.ingest.loader import DatasetStats, load_dataset
+from app.ingest.manifest import ALL
 
 VALIDATION_REPORT = os.path.join(BUILD_DIR, "ingest-validation.json")
 
@@ -211,13 +211,13 @@ def main() -> None:
         with closing(sqlite3.connect(f"file:{target}?mode=ro", uri=True)) as reader:
             has_mc2 = reader.execute("SELECT 1 FROM datasets WHERE dataset_id='MC2'").fetchone() is not None
         if has_mc2:
-            from ..domain.mc2_projection import build as build_mc2_projection
+            from app.domain.mc2.projection import build as build_mc2_projection
             try:
                 projection = build_mc2_projection(target)
                 print(f"MC2 关系预计算：{projection['buckets']} 个日期/动作桶 · {projection['seconds']:.2f}s")
             except (sqlite3.Error, OSError, RuntimeError) as exc:
                 print(f"MC2 预计算未完成，将使用精确查询：{exc}")
-            from ..domain.mc2_fingerprints import build as build_mc2_fingerprints
+            from app.domain.mc2.fingerprints import build as build_mc2_fingerprints
             try:
                 patterns = build_mc2_fingerprints(target)
                 print(f"MC2 精确文件模式：{patterns['file_total']} 个文件 · {patterns['pattern_total']} 种模式")

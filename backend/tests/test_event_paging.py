@@ -29,7 +29,7 @@ class MicrosecondPagingTest(unittest.TestCase):
         self.addCleanup(lambda: os.path.exists(self.path) and os.remove(self.path))
 
     def _page(self, raw: RawFilter, cursor: str | None, limit: int = 1):
-        with patch("app.db.DB_PATH", self.path):
+        with patch("app.storage.database.DB_PATH", self.path):
             return list_events("MC1", raw, None, limit, cursor, "desc")
 
     def test_order_and_no_loss(self) -> None:

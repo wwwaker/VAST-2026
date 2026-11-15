@@ -9,8 +9,8 @@ except ImportError:  # 允许 python -m unittest discover -s tests 直接发现
 
 from fastapi import HTTPException
 
-from app.db import get_conn
-from app.domain import mc2_patterns
+from app.storage.database import get_conn
+import app.domain.mc2.patterns as mc2_patterns
 from app.routers.patterns import file_posts, interventions
 
 TARGET = "MC2:event:373902"

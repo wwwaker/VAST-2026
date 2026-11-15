@@ -7,8 +7,8 @@ try:
 except ImportError:  # 允许 python -m unittest discover -s tests 直接发现
     import helpers
 
-from app.db import get_conn
-from app.domain import mc1_context
+from app.storage.database import get_conn
+import app.domain.mc1.context as mc1_context
 from app.query.filters import RawFilter
 from app.routers.mc1 import activity as activity_endpoint
 from app.routers.mc1 import decision_context as decision_endpoint

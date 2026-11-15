@@ -27,7 +27,7 @@ class HalfOpenWindowTest(unittest.TestCase):
         self.addCleanup(lambda: os.path.exists(self.path) and os.remove(self.path))
 
     def _compare(self, **kwargs):
-        with patch("app.db.DB_PATH", self.path):
+        with patch("app.storage.database.DB_PATH", self.path):
             return compare("MC1", **kwargs)
 
     def test_boundary_event_only_in_right_window(self) -> None:

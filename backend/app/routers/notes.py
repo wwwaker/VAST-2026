@@ -9,8 +9,8 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from .. import notes_store
-from ..db import get_conn, require_dataset
+import app.storage.notes as notes_store
+from app.storage.database import get_conn, require_dataset
 
 router = APIRouter(prefix="/api/notes", tags=["notes"])
 

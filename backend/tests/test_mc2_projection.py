@@ -5,8 +5,8 @@ import unittest
 from unittest.mock import patch
 
 from . import helpers
-from app.domain import mc2_projection
-from app.domain.mc2_relations import type_overview
+import app.domain.mc2.projection as mc2_projection
+from app.domain.mc2.relations import type_overview
 from app.query.filters import DAY_US, RawFilter
 from app.routers.mc2_workspace import RELATIONS, selected, meta, _facet_data, _relations
 
@@ -76,7 +76,7 @@ class Mc2ProjectionTests(unittest.TestCase):
                 with self.subTest(raw=raw, mode=mode, role=role):
                     sel = selected(raw)
                     actual = mc2_projection.details(self.conn, sel, None, mode, role, RELATIONS)
-                    with patch("app.domain.mc2_projection.details", return_value=None):
+                    with patch("app.domain.mc2.projection.details", return_value=None):
                         expected = _relations(self.conn, sel, None, mode, role)
                     self.assertIsNotNone(actual)
                     # SQL ties do not specify edge order; compare full records by key.
@@ -126,7 +126,7 @@ class Mc2ProjectionTests(unittest.TestCase):
     def test_failed_rebuild_keeps_previous_projection_and_source(self):
         mc2_projection.build(self.path)
         before = mc2_projection.overview(self.conn, selected(RawFilter()), RELATIONS)
-        with patch("app.domain.mc2_projection.os.replace", side_effect=OSError("test failure")):
+        with patch("app.domain.mc2.projection.os.replace", side_effect=OSError("test failure")):
             with self.assertRaises(OSError):
                 mc2_projection.build(self.path)
         self.assertEqual(mc2_projection.overview(self.conn, selected(RawFilter()), RELATIONS), before)

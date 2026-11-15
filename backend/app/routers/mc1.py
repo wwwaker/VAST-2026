@@ -11,11 +11,11 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ..db import get_conn, require_dataset
-from ..domain import mc1_context
-from ..query import filters
-from ..query.filters import FilterError, RawFilter
-from .events import load_annotations, summarize
+from app.storage.database import get_conn, require_dataset
+import app.domain.mc1.context as mc1_context
+from app.query import filters
+from app.query.filters import FilterError, RawFilter
+from app.projections.events import load_annotations, summarize
 
 router = APIRouter(prefix="/api", tags=["mc1"])
 

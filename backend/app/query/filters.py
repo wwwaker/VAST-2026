@@ -20,7 +20,7 @@ from typing import Any
 from fastapi import Query
 from pydantic import BaseModel, Field
 
-from ..domain import event_types
+from app.domain import event_types
 
 CONTRACT_VERSION = 2
 

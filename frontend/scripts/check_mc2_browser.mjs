@@ -1,82 +1,313 @@
 /** Actual Chromium layout/input regression for MC2 research tools and process range. */
-import puppeteer from 'puppeteer-core';
-import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-const out=path.resolve('../build/mc2-ui-review');fs.mkdirSync(out,{recursive:true});
-const browser=await puppeteer.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true,args:['--no-sandbox','--disable-gpu'],defaultViewport:{width:1440,height:1000}});
-const page=await browser.newPage(),errors=[],checks=[];
-page.on('pageerror',e=>errors.push(String(e)));
-const shadow='[data-testid="mc2-reference"] >>> ';
-const wait=selector=>page.waitForFunction(selector=>!!document.querySelector('[data-testid="mc2-reference"]')?.shadowRoot?.querySelector(selector),{timeout:20000,polling:'raf'},selector);
-const button=async label=>{const h=await page.evaluateHandle(label=>[...document.querySelector('[data-testid="mc2-reference"]').shadowRoot.querySelectorAll('button')].find(b=>b.textContent.trim()===label),label);assert.ok(h.asElement(),label);await h.asElement().click();await h.dispose();};
-const check=(label,result)=>{assert.ok(result,label);checks.push(label);console.log('PASS',label);};
-const bounds=async selector=>page.$eval(shadow+selector,e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height};});
-try{
-  await page.goto((process.argv[2]??'http://127.0.0.1:8000')+'/?mc2=reference',{waitUntil:'networkidle0'});
-  await wait('.mc2-cell');
-  await button('文件指纹');await wait('.w-pattern-row');
-  check('Fingerprint opens as a dialog over the original activity matrix',await page.$eval(shadow+'.w-research-dialog',e=>e.getAttribute('role')==='dialog')&&!!await page.$(shadow+'.mc2-cell'));
-  await page.click(shadow+'.w-pattern-row');await wait('.w-pattern-members article');
-  const desktop=await bounds('.w-research-dialog');
-  check('1440px dialog fits the viewport',desktop.x>=0&&desktop.y>=0&&desktop.w<=1440&&desktop.y+desktop.h<=1000);
-  const columns=await page.$eval(shadow+'.w-fingerprint-workbench',e=>getComputedStyle(e).gridTemplateColumns);
-  check('Desktop fingerprint uses separate sequence and member columns',columns.split(' ').length===2);
-  check('Search input receives the styled border and padding',await page.$eval(shadow+'[aria-label="搜索模式成员"]',e=>{const s=getComputedStyle(e);return s.borderTopStyle==='solid'&&s.borderRadius==='8px'&&parseFloat(s.paddingLeft)>=10;}));
-  await page.click(shadow+'[aria-label="搜索模式成员"]');await page.type(shadow+'[aria-label="搜索模式成员"]','no-such-file-path');
-  await wait('.w-pattern-member-list .mc2-empty');
-  check('Member search presents a clear empty state',await page.$eval(shadow+'.w-pattern-member-list',e=>e.textContent.includes('没有匹配路径')));
-  await page.click(shadow+'[aria-label="搜索模式成员"]',{clickCount:3});await page.keyboard.press('Backspace');await wait('.w-pattern-members article');
-  await button('阅读真实操作序列');await wait('.mc2-reader .mc2-type-counts');
-  check('Reader stacks above an inert research dialog with scrolling locked',await page.$eval(shadow+'.w-research-dialog',e=>e.inert)&&await page.evaluate(()=>document.body.style.overflow==='hidden'));
-  await page.keyboard.press('Escape');
-  await page.waitForFunction(()=>document.querySelector('[data-testid="mc2-reference"]').shadowRoot.activeElement?.textContent==='阅读真实操作序列');
-  check('Closing Reader resumes the same research dialog and returns focus',await page.evaluate(()=>{const r=document.querySelector('[data-testid="mc2-reference"]').shadowRoot;return !r.querySelector('.w-research-dialog').inert&&r.activeElement?.textContent==='阅读真实操作序列'&&document.body.style.overflow==='hidden';}));
-  await page.screenshot({path:path.join(out,'fingerprint-1440.png')});
-  for(const width of [1920,768]){
-    await page.setViewport({width,height:1000});
-    await page.waitForFunction(()=>{const e=document.querySelector('[data-testid="mc2-reference"]').shadowRoot.querySelector('.w-research-dialog');return e&&e.getBoundingClientRect().width<=innerWidth;});
-    const r=await bounds('.w-research-dialog');
-    check(`${width}px research dialog stays within the viewport`,r.x>=0&&r.y>=0&&r.x+r.w<=width+.5);
-    check(`${width}px research body avoids horizontal page overflow`,await page.$eval(shadow+'.w-research-body',e=>e.scrollWidth<=e.clientWidth+1));
-    await page.screenshot({path:path.join(out,`fingerprint-${width}.png`)});
+import puppeteer from "puppeteer-core";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+const out = path.resolve("../build/mc2-ui-review");
+fs.mkdirSync(out, { recursive: true });
+
+const browser = await puppeteer.launch({
+  executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe",
+  headless: true,
+  args: ["--no-sandbox", "--disable-gpu"],
+  defaultViewport: { width: 1440, height: 1000 },
+});
+
+const page = await browser.newPage();
+const errors = [];
+const checks = [];
+page.on("pageerror", (e) => errors.push(String(e)));
+const shadow = '[data-testid="mc2-reference"] >>> ';
+
+const wait = (selector) =>
+  page.waitForFunction(
+    (selector) =>
+      !!document
+        .querySelector('[data-testid="mc2-reference"]')
+        ?.shadowRoot?.querySelector(selector),
+    { timeout: 20000, polling: "raf" },
+    selector,
+  );
+
+const button = async (label) => {
+  const h = await page.evaluateHandle(
+    (label) =>
+      [
+        ...document
+          .querySelector('[data-testid="mc2-reference"]')
+          .shadowRoot.querySelectorAll("button"),
+      ].find((b) => b.textContent.trim() === label),
+    label,
+  );
+
+  assert.ok(h.asElement(), label);
+  await h.asElement().click();
+  await h.dispose();
+};
+
+const check = (label, result) => {
+  assert.ok(result, label);
+  checks.push(label);
+  console.log("PASS", label);
+};
+
+const bounds = async (selector) =>
+  page.$eval(shadow + selector, (e) => {
+    const r = e.getBoundingClientRect();
+
+    return { x: r.x, y: r.y, w: r.width, h: r.height };
+  });
+
+try {
+  await page.goto((process.argv[2] ?? "http://127.0.0.1:8000") + "/?mc2=reference", {
+    waitUntil: "networkidle0",
+  });
+  await wait(".mc2-cell");
+  await button("文件指纹");
+  await wait(".w-pattern-row");
+  check(
+    "Fingerprint opens as a dialog over the original activity matrix",
+    (await page.$eval(shadow + ".w-research-dialog", (e) => e.getAttribute("role") === "dialog")) &&
+      !!(await page.$(shadow + ".mc2-cell")),
+  );
+  await page.click(shadow + ".w-pattern-row");
+  await wait(".w-pattern-members article");
+  const desktop = await bounds(".w-research-dialog");
+  check(
+    "1440px dialog fits the viewport",
+    desktop.x >= 0 && desktop.y >= 0 && desktop.w <= 1440 && desktop.y + desktop.h <= 1000,
+  );
+
+  const columns = await page.$eval(
+    shadow + ".w-fingerprint-workbench",
+    (e) => getComputedStyle(e).gridTemplateColumns,
+  );
+
+  check(
+    "Desktop fingerprint uses separate sequence and member columns",
+    columns.split(" ").length === 2,
+  );
+  check(
+    "Search input receives the styled border and padding",
+    await page.$eval(shadow + '[aria-label="搜索模式成员"]', (e) => {
+      const s = getComputedStyle(e);
+
+      return (
+        s.borderTopStyle === "solid" && s.borderRadius === "8px" && parseFloat(s.paddingLeft) >= 10
+      );
+    }),
+  );
+  await page.click(shadow + '[aria-label="搜索模式成员"]');
+  await page.type(shadow + '[aria-label="搜索模式成员"]', "no-such-file-path");
+  await wait(".w-pattern-member-list .mc2-empty");
+  check(
+    "Member search presents a clear empty state",
+    await page.$eval(shadow + ".w-pattern-member-list", (e) =>
+      e.textContent.includes("没有匹配路径"),
+    ),
+  );
+  await page.click(shadow + '[aria-label="搜索模式成员"]', { clickCount: 3 });
+  await page.keyboard.press("Backspace");
+  await wait(".w-pattern-members article");
+  await button("阅读真实操作序列");
+  await wait(".mc2-reader .mc2-type-counts");
+  check(
+    "Reader stacks above an inert research dialog with scrolling locked",
+    (await page.$eval(shadow + ".w-research-dialog", (e) => e.inert)) &&
+      (await page.evaluate(() => document.body.style.overflow === "hidden")),
+  );
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="mc2-reference"]').shadowRoot.activeElement
+        ?.textContent === "阅读真实操作序列",
+  );
+  check(
+    "Closing Reader resumes the same research dialog and returns focus",
+    await page.evaluate(() => {
+      const r = document.querySelector('[data-testid="mc2-reference"]').shadowRoot;
+
+      return (
+        !r.querySelector(".w-research-dialog").inert &&
+        r.activeElement?.textContent === "阅读真实操作序列" &&
+        document.body.style.overflow === "hidden"
+      );
+    }),
+  );
+  await page.screenshot({ path: path.join(out, "fingerprint-1440.png") });
+  for (const width of [1920, 768]) {
+    await page.setViewport({ width, height: 1000 });
+    await page.waitForFunction(() => {
+      const e = document
+        .querySelector('[data-testid="mc2-reference"]')
+        .shadowRoot.querySelector(".w-research-dialog");
+
+      return e && e.getBoundingClientRect().width <= innerWidth;
+    });
+    const r = await bounds(".w-research-dialog");
+    check(
+      `${width}px research dialog stays within the viewport`,
+      r.x >= 0 && r.y >= 0 && r.x + r.w <= width + 0.5,
+    );
+    check(
+      `${width}px research body avoids horizontal page overflow`,
+      await page.$eval(shadow + ".w-research-body", (e) => e.scrollWidth <= e.clientWidth + 1),
+    );
+    await page.screenshot({ path: path.join(out, `fingerprint-${width}.png`) });
   }
-  await page.setViewport({width:1440,height:1000});
-  await page.keyboard.press('Escape');
-  await page.waitForFunction(()=>document.querySelector('[data-testid="mc2-reference"]').shadowRoot.activeElement?.textContent==='文件指纹');
-  check('Escape returns keyboard focus to fingerprint entry',await page.evaluate(()=>document.querySelector('[data-testid="mc2-reference"]').shadowRoot.activeElement?.textContent==='文件指纹'));
-  await button('发布实例比较');await wait('[aria-label="发布实例真实时间对齐"]');
-  await page.screenshot({path:path.join(out,'comparison-1440.png')});
-  await page.keyboard.press('Escape');
-  await button('异常发布与附近参与者');await wait('[aria-label="过程图窗口起点"]');
-  const plot=await page.$(shadow+'.w-process-plot');await plot.scrollIntoView();
-  const mark=await page.$(shadow+'.w-process-mark');await mark.hover();await wait('.w-process-tooltip');
-  const before=await bounds('.w-process-plot');
-  await page.mouse.move(10,10);
-  const after=await bounds('.w-process-plot');
-  check('Process hover tooltip does not move or resize the plot',before.y===after.y&&before.h===after.h);
-  await button('全部窗口');
-  const track=await bounds('.w-process-range .tl-range-multi');
-  const summary=await page.$eval(shadow+'[data-testid="process-summary"]',e=>e.textContent);
-  await page.mouse.move(track.x+1,track.y+8);await page.mouse.down();await page.mouse.move(track.x+track.w*.2,track.y+8,{steps:12});await page.mouse.up();
-  const start=await page.$eval(shadow+'[aria-label="过程图窗口起点"]',e=>Number(e.value));
-  check('Dragging the start handle changes the local graph range',start>0);
-  await page.mouse.move(track.x+track.w-1,track.y+8);await page.mouse.down();await page.mouse.move(track.x+track.w*.8,track.y+8,{steps:12});await page.mouse.up();
-  const end=await page.$eval(shadow+'[aria-label="过程图窗口终点"]',e=>[Number(e.value),Number(e.max)]);
-  check('Dragging the end handle changes its endpoint',end[0]<end[1]);
-  const span=end[0]-start;
-  await page.mouse.move(track.x+track.w*.5,track.y+8);await page.mouse.down();await page.mouse.move(track.x+track.w*.6,track.y+8,{steps:12});await page.mouse.up();
-  const moved=await page.evaluate(()=>{const r=document.querySelector('[data-testid="mc2-reference"]').shadowRoot;return [...r.querySelectorAll('.w-process-range input[type=range]')].map(e=>Number(e.value));});
-  check('Dragging the middle pans both endpoints while preserving duration',moved[0]>start&&Math.abs(moved[1]-moved[0]-span)<.01);
+  await page.setViewport({ width: 1440, height: 1000 });
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="mc2-reference"]').shadowRoot.activeElement
+        ?.textContent === "文件指纹",
+  );
+  check(
+    "Escape returns keyboard focus to fingerprint entry",
+    await page.evaluate(
+      () =>
+        document.querySelector('[data-testid="mc2-reference"]').shadowRoot.activeElement
+          ?.textContent === "文件指纹",
+    ),
+  );
+  await button("发布实例比较");
+  await wait('[aria-label="发布实例真实时间对齐"]');
+  await page.screenshot({ path: path.join(out, "comparison-1440.png") });
+  await page.keyboard.press("Escape");
+  await button("异常发布与附近参与者");
+  await wait('[aria-label="过程图窗口起点"]');
+  const plot = await page.$(shadow + ".w-process-plot");
+  await plot.scrollIntoView();
+  const mark = await page.$(shadow + ".w-process-mark");
+  await mark.hover();
+  await wait(".w-process-tooltip");
+  const before = await bounds(".w-process-plot");
+  await page.mouse.move(10, 10);
+  const after = await bounds(".w-process-plot");
+  check(
+    "Process hover tooltip does not move or resize the plot",
+    before.y === after.y && before.h === after.h,
+  );
+
+  const clickRangeAction = async (label) => {
+    const handle = await page.evaluateHandle(
+      (label) =>
+        [
+          ...document
+            .querySelector('[data-testid="mc2-reference"]')
+            .shadowRoot.querySelectorAll(".w-process-range button"),
+        ].find((el) => el.textContent === label),
+      label,
+    );
+
+    assert.ok(handle.asElement(), label);
+    await handle.asElement().evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await handle.asElement().click();
+    await handle.dispose();
+  };
+
+  await clickRangeAction("全部窗口");
+  // Native range inputs round values to the millisecond step; the API end may include one extra microsecond.
+  await page.waitForFunction(() => {
+    const root = document.querySelector('[data-testid="mc2-reference"]').shadowRoot;
+    const a = root.querySelector('[aria-label="过程图窗口起点"]');
+    const b = root.querySelector('[aria-label="过程图窗口终点"]');
+
+    return Number(a.value) === 0 && Math.abs(Number(b.value) - Number(b.max)) <= Number(b.step);
+  });
+  await page.$eval(shadow + ".w-process-range .tl-range-multi", (el) =>
+    el.scrollIntoView({ block: "center" }),
+  );
+  const track = await bounds(".w-process-range .tl-range-multi");
+
+  const summary = await page.$eval(
+    shadow + '[data-testid="process-summary"]',
+    (e) => e.textContent,
+  );
+
+  await page.mouse.move(track.x + 7, track.y + track.h / 2);
+  await page.mouse.down();
+  await page.mouse.move(track.x + track.w * 0.2, track.y + track.h / 2, { steps: 12 });
+  await page.mouse.up();
+  const start = await page.$eval(shadow + '[aria-label="过程图窗口起点"]', (e) => Number(e.value));
+  check("Dragging the start handle changes the local graph range", start > 0);
+  const endTrack = await bounds(".w-process-range .tl-range-multi");
+  await page.mouse.move(endTrack.x + endTrack.w - 7, endTrack.y + endTrack.h / 2);
+  await page.mouse.down();
+  await page.mouse.move(endTrack.x + endTrack.w * 0.8, endTrack.y + endTrack.h / 2, { steps: 12 });
+  await page.mouse.up();
+
+  const end = await page.$eval(shadow + '[aria-label="过程图窗口终点"]', (e) => [
+    Number(e.value),
+    Number(e.max),
+  ]);
+
+  check("Dragging the end handle changes its endpoint", end[0] < end[1]);
+  const span = end[0] - start;
+  const selectedWindow = await bounds(".w-process-range .tl-window-drag");
+  await page.mouse.move(
+    selectedWindow.x + selectedWindow.w / 2,
+    selectedWindow.y + selectedWindow.h / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    selectedWindow.x + selectedWindow.w / 2 + endTrack.w * 0.05,
+    selectedWindow.y + selectedWindow.h / 2,
+    { steps: 12 },
+  );
+  await page.mouse.up();
+
+  const moved = await page.evaluate(() => {
+    const r = document.querySelector('[data-testid="mc2-reference"]').shadowRoot;
+
+    return [...r.querySelectorAll(".w-process-range input[type=range]")].map((e) =>
+      Number(e.value),
+    );
+  });
+
+  check(
+    "Dragging the middle pans both endpoints while preserving duration",
+    moved[0] > start && Math.abs(moved[1] - moved[0] - span) < 0.01,
+  );
   // The visible marker count changes with the viewport; the query counts must not.
-  const queryCounts=s=>s.split(' · 可见')[0];
-  check('Range input preserves the underlying main/context query counts',queryCounts(summary)===queryCounts(await page.$eval(shadow+'[data-testid="process-summary"]',e=>e.textContent)));
-  await button('聚焦活动');await mark.dispose();
-  const hovered=await page.$(shadow+'.w-process-mark');await hovered.hover();await wait('.w-process-tooltip');
-  await page.screenshot({path:path.join(out,'process-1440.png')});
+  const queryCounts = (s) => s.split(" · 可见")[0];
+  check(
+    "Range input preserves the underlying main/context query counts",
+    queryCounts(summary) ===
+      queryCounts(
+        await page.$eval(shadow + '[data-testid="process-summary"]', (e) => e.textContent),
+      ),
+  );
+  await clickRangeAction("聚焦活动");
+  await mark.dispose();
+  await wait(".w-process-mark");
+  const hovered = await page.$(shadow + ".w-process-mark");
+  await hovered.hover();
+  await wait(".w-process-tooltip");
+  await page.screenshot({ path: path.join(out, "process-1440.png") });
   await hovered.dispose();
-  check('No browser JavaScript errors',errors.length===0);
-  fs.writeFileSync(path.join(out,'checks.json'),JSON.stringify({checks,errors},null,2));
+  check("No browser JavaScript errors", errors.length === 0);
+  fs.writeFileSync(path.join(out, "checks.json"), JSON.stringify({ checks, errors }, null, 2));
   console.log(`Passed ${checks.length} Chromium checks; screenshots: ${out}`);
-}catch(error){await page.screenshot({path:path.join(out,'failure.png')});console.log(await page.evaluate(()=>{const r=document.querySelector('[data-testid="mc2-reference"]')?.shadowRoot;return {errors:[],dialogs:[...r.querySelectorAll('[role=dialog]')].map(e=>({inert:e.inert,hidden:e.getAttribute('aria-hidden')})),selected:r.querySelector('.w-pattern-row[aria-pressed=true]')?.textContent,detail:r.querySelector('.w-pattern-detail')?.textContent,status:[...r.querySelectorAll('[role=alert]')].map(e=>e.textContent)};}));throw error;
-}finally{await browser.close();}
+} catch (error) {
+  await page.screenshot({ path: path.join(out, "failure.png") });
+  console.log(
+    await page.evaluate(() => {
+      const r = document.querySelector('[data-testid="mc2-reference"]')?.shadowRoot;
+
+      return {
+        errors: [],
+        dialogs: [...r.querySelectorAll("[role=dialog]")].map((e) => ({
+          inert: e.inert,
+          hidden: e.getAttribute("aria-hidden"),
+        })),
+        selected: r.querySelector(".w-pattern-row[aria-pressed=true]")?.textContent,
+        detail: r.querySelector(".w-pattern-detail")?.textContent,
+        status: [...r.querySelectorAll("[role=alert]")].map((e) => e.textContent),
+      };
+    }),
+  );
+  throw error;
+} finally {
+  await browser.close();
+}

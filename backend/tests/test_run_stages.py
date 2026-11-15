@@ -3,8 +3,8 @@ import unittest
 from contextlib import contextmanager
 from unittest.mock import patch
 from . import helpers
-from app.db import get_conn
-from app.domain import run_stages
+from app.storage.database import get_conn
+import app.domain.custom.stages as run_stages
 from app.routers import runs
 
 

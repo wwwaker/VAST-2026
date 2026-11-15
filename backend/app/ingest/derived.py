@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import os
 
-from . import artifacts
+from app.ingest import artifacts
 
 
 def _scalar(conn, sql: str, params: tuple):
