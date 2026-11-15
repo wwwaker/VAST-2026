@@ -35,6 +35,7 @@ import { EMPTY_FILTERS, type Filters } from "../../shared/api/filters";
 import type { DatasetId } from "../../shared/types/dataset";
 import referenceCss from "../../shared/styles/workspace-base.css?inline";
 import themeCss from "../../shared/styles/workspace-theme.css?inline";
+import layoutCss from "../../shared/styles/workspace-layout.css?inline";
 import css from "./styles/page.css?inline";
 import sharedCss from "../../shared/styles/workspace-controls.css?inline";
 import { WorkspaceHeader } from "../../shared/ui/WorkspaceHeader";
@@ -92,7 +93,7 @@ export function Mc2Page({ onDatasetChange }: { onDatasetChange: (id: DatasetId) 
   return (
     <ShadowWorkspace
       testId="mc2-reference"
-      styles={referenceCss + themeCss + windowRangeCss + sharedCss + css + workspaceCss}
+      styles={referenceCss + layoutCss + themeCss + windowRangeCss + sharedCss + css + workspaceCss}
     >
       <Profiler
         id="MC2"

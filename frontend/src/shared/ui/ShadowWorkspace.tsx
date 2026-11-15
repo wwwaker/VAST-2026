@@ -29,7 +29,7 @@ export function ShadowWorkspace({
     <div
       ref={host}
       data-testid={testId}
-      style={{ minHeight: "100vh", background: "#f5f7fa" }}
+      style={{ minHeight: "100vh" }}
     >
       {shadow &&
         createPortal(

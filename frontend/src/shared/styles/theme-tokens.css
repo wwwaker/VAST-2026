@@ -1,0 +1,111 @@
+/* Light palette. Inherited through each workspace's ShadowRoot from :root. */
+:root {
+  --color-scheme: light;
+
+  /* Surfaces */
+  --surface-page: #f5f7fa;
+  --surface-panel: #fff;
+  --surface-subtle: #f8fafc;
+  --surface-toolbar: #f5f8fc;
+  --surface-header: #fafcfd;
+  --surface-neutral: #fafbfc;
+  --surface-inset: #f3f6fa;
+  --surface-tag: #f0f4f8;
+  --surface-grid: #edf2f8;
+  --surface-info: #edf3fb;
+  --surface-info-soft: #edf4ff;
+  --surface-hover: #f0f6fd;
+  --surface-selection: #edf5ff;
+  --surface-nav-selection: #eaf2ff;
+  --surface-selection-strong: #dbeafe;
+  --surface-code: #eaf1fb;
+  --surface-explanation: #f1f6fc;
+  --surface-keyword-hover: #deebfc;
+  --surface-market-hover: #eef4fb;
+  --surface-market-selection: #e8f2fa;
+  --surface-market-note: #f5f8fb;
+  --surface-floating: #fffffff5;
+  --overlay-backdrop: #162c4770;
+
+  /* Text: preserve the existing reading hierarchy and workspace variants. */
+  --text-primary: #203047;
+  --text-workspace: #263c51;
+  --text-heading: #25364d;
+  --text-body: #334b66;
+  --text-readable: #34516e;
+  --text-dialog-muted: #40556e;
+  --text-secondary: #52677d;
+  --text-muted: #617187;
+  --text-label: #50657d;
+  --text-status: #235b9c;
+  --text-link: #245eaa;
+  --text-keyword: #285f9b;
+  --text-nav-active: #1d58b0;
+  --text-row-active: #1d5292;
+  --text-agent: #305b87;
+  --text-time-marker: #29496c;
+  --text-sequence-hint: #526e8b;
+  --text-metadata: #365779;
+  --text-message: #253b53;
+  --text-filter-title: #354b62;
+  --text-market-active: #1c5889;
+  --text-market-outside: #79521a;
+  --text-market-event: #8e512e;
+  --text-inverse: #fff;
+
+  /* Borders: retain distinct values until a deliberate visual redesign. */
+  --border-default: #dce3ec;
+  --border-section: #dfe7ed;
+  --border-control: #c7d3e2;
+  --border-nav: #d1ddeb;
+  --border-button: #cbd7e5;
+  --border-divider: #d2dce8;
+  --border-message: #d8e2ed;
+  --border-plot: #d5e0ed;
+  --border-details: #d5e0ea;
+  --border-subtle: #e3e9ee;
+  --border-info: #c7d8ee;
+  --border-keyword: #bed1eb;
+  --border-metadata: #cfdaea;
+  --border-control-strong: #7b8fa3;
+  --border-nav-active: #b7cff2;
+  --border-scope: #b9cadb;
+  --border-market-details: #9cb7d0;
+  --border-market-quote: #6386ab;
+  --border-market-note: #7e9caf;
+  --border-button-hover: #4d8bc9;
+
+  /* Interaction roles can diverge when another theme is introduced. */
+  --accent: #2469b5;
+  --accent-bright: #378add;
+  --action-background: #2469b5;
+  --action-border: #2469b5;
+  --action-foreground: #fff;
+  --focus-ring: #2563eb;
+  --selection-outline: #dc8b25;
+  --selection-anchor: #d58c27;
+  --selection-border: #6695d3;
+  --selection-row-hover: #e4edf9;
+
+  /* Shared status and evidence badges */
+  --status-positive: #168367;
+  --status-negative: #b74438;
+  --status-warning-text: #945507;
+  --status-warning-surface: #fff5e5;
+  --status-warning-border: #edcb93;
+  --status-success-text: #176b58;
+  --status-success-surface: #e8f6f2;
+  --status-success-border: #a8d5c9;
+  --status-reset-text: #ad522d;
+  --status-reset-surface: #fff0e9;
+  --status-reset-border: #f0af96;
+
+  /* Shared chart chrome; data series retain their own semantic palettes. */
+  --chart-empty-text: #637a92;
+  --chart-range-track: #d6e1ef;
+  --chart-bar: #6e9fcb;
+  --chart-baseline: #a7b6c6;
+  --chart-market-price: #14778a;
+  --chart-market-sentiment: #98621a;
+  --shadow-card: 0 3px 14px #1c3d6410;
+}

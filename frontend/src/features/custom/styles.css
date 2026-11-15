@@ -26,7 +26,7 @@
 }
 .cu-app h2 span {
   font-weight: 400;
-  color: #617187;
+  color: var(--text-muted);
 }
 .cu-app button[aria-pressed="true"] {
   background: #eaf2fc;
@@ -185,14 +185,14 @@
   position: sticky;
   left: 0;
   z-index: 1;
-  background: #f5f8fc;
+  background: var(--surface-toolbar);
 }
 .cu-coverage-matrix th {
   padding: 0;
   font-weight: 500;
   text-align: left;
   color: #61768a;
-  background: #f5f8fc;
+  background: var(--surface-toolbar);
 }
 .cu-app .cu-coverage-matrix th button {
   display: flex;
@@ -238,7 +238,7 @@
   min-width: 0;
   padding: 4px 10px;
   text-align: left;
-  background: #fafcfd;
+  background: var(--surface-header);
   border-color: #e1e7ec;
   border-radius: 5px;
 }
@@ -250,13 +250,19 @@
 .cu-app .cu-coverage-group.selected {
   border-color: #7ca7cf;
   box-shadow: inset 0 0 0 1px #7ca7cf;
-  background: #edf5ff;
+  background: var(--surface-selection);
 }
 .cu-app .cu-coverage-matrix .uncollected {
   text-align: center;
   font-size: 11px;
   color: #9a805b;
-  background: repeating-linear-gradient(135deg, #fafbfc, #fafbfc 5px, #f0f2f4 5px, #f0f2f4 7px);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--surface-neutral),
+    var(--surface-neutral) 5px,
+    #f0f2f4 5px,
+    #f0f2f4 7px
+  );
 }
 .cu-coverage-foot {
   display: flex;
@@ -273,7 +279,7 @@
   align-items: center;
   gap: 4px;
   border: 1px solid #dbe4ed;
-  background: #f5f8fb;
+  background: var(--surface-market-note);
   color: #627c93;
   padding: 2px 7px;
   border-radius: 12px;
@@ -313,7 +319,7 @@
 }
 .cu-status-strip details p {
   padding: 8px;
-  background: #f5f8fc;
+  background: var(--surface-toolbar);
 }
 .cu-run-nav {
   display: flex;
@@ -351,7 +357,7 @@
 }
 .cu-app .cu-tabs button {
   font-size: 13px;
-  background: #fff;
+  background: var(--surface-panel);
 }
 .cu-app .cu-tabs button[aria-pressed="true"] {
   background: #eaf2fb;
@@ -414,12 +420,14 @@
   color: #6b8095;
   font-size: 11px;
 }
-.inspector-below > .cu-inspector > .cu-checks {
+.inspector-below > .cu-inspector > .cu-checks,
+.cu-comparison-inspector .cu-checks {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0 20px;
 }
-.inspector-below > .cu-inspector > .cu-records {
+.inspector-below > .cu-inspector > .cu-records,
+.cu-comparison-inspector .cu-records {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
@@ -439,7 +447,7 @@
   overflow-wrap: anywhere;
   max-height: 420px;
   overflow: auto;
-  background: #f0f4f8;
+  background: var(--surface-tag);
   padding: 12px;
   border-radius: 5px;
 }
@@ -459,7 +467,7 @@
   flex-direction: column;
   align-items: flex-start;
   text-align: left;
-  background: #f5f8fc;
+  background: var(--surface-toolbar);
   padding: 9px 12px;
   font-size: 12px;
   max-width: 300px;
@@ -515,7 +523,6 @@
 }
 .cu-node.selected rect {
   stroke: #2d75b7;
-  stroke-width: 3;
 }
 .cu-node text {
   font-size: 11px;
@@ -684,7 +691,7 @@
   font-size: 10px;
   fill: #5f7c95;
   paint-order: stroke;
-  stroke: #fff;
+  stroke: var(--text-inverse);
   stroke-width: 3px;
   stroke-linejoin: round;
 }
@@ -768,9 +775,7 @@
 }
 .cu-pair-side {
   min-width: 0;
-  padding: 14px;
   border: 1px solid #dce6ef;
-  border-radius: 8px;
 }
 .cu-pair-side h3 {
   padding-bottom: 10px;
@@ -785,16 +790,6 @@
 .cu-comparison-inspector {
   margin-top: 18px;
 }
-.cu-comparison-inspector .cu-checks {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0 20px;
-}
-.cu-comparison-inspector .cu-records {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
 .cu-reader-overlay {
   z-index: 100;
 }
@@ -802,7 +797,7 @@
   max-width: 1000px;
   width: min(1000px, 94vw);
   max-height: 90vh;
-  background: #f8fafc;
+  background: var(--surface-subtle);
 }
 .cu-reader .flow-modal-head {
   display: flex;
@@ -810,7 +805,7 @@
   gap: 10px;
   padding: 18px;
   border-bottom: 1px solid #dce5ed;
-  background: #fff;
+  background: var(--surface-panel);
 }
 .cu-reader .flow-modal-head > div {
   flex: 1;
@@ -830,7 +825,7 @@
 }
 .cu-reader-body > section,
 .cu-reader-body > details {
-  background: #fff;
+  background: var(--surface-panel);
   border: 1px solid #e1e8ee;
   border-radius: 7px;
   padding: 14px;
@@ -840,7 +835,7 @@
   padding: 18px;
   max-width: none;
   line-height: 1.8;
-  background: #fff;
+  background: var(--surface-panel);
 }
 .cu-reader .msg-meta {
   display: flex;
@@ -870,7 +865,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f5f8fb;
+  background: var(--surface-market-note);
   color: #7290aa;
   border: 1px solid #e0e8ef;
   border-radius: 8px;
@@ -954,21 +949,15 @@
 .cu-app svg [role="button"]:focus {
   outline: none;
 }
-.cu-app svg [role="button"]:focus-visible rect {
-  stroke: #2563eb;
-  stroke-width: 2.5;
-}
-.cu-app svg [role="button"]:focus-visible circle {
-  stroke: #2563eb;
-  stroke-width: 2.5;
-}
+.cu-app svg [role="button"]:focus-visible rect,
+.cu-app svg [role="button"]:focus-visible circle,
 .cu-app .cu-edge:focus-visible path:not(.cu-edge-hit) {
-  stroke: #2563eb;
+  stroke: var(--focus-ring);
   stroke-width: 2.5;
 }
 .cu-node.selected rect {
   stroke-width: 2;
-  fill: #edf5ff;
+  fill: var(--surface-selection);
 }
 .cu-node.selected text {
   fill: #245f9d;
@@ -1025,9 +1014,9 @@
 .cu-run-matrix th {
   font-weight: 500;
   text-align: left;
-  color: #50657d;
+  color: var(--text-label);
   padding: 4px 7px;
-  background: #f5f8fc;
+  background: var(--surface-toolbar);
 }
 .cu-run-matrix thead th {
   position: sticky;
@@ -1078,7 +1067,7 @@
   border-radius: 5px;
 }
 .cu-app button.cu-run-cell.selected {
-  background: #edf5ff;
+  background: var(--surface-selection);
   border-color: #7ca7cf;
   box-shadow: inset 0 0 0 1px #7ca7cf;
 }
@@ -1099,9 +1088,16 @@
   font-size: 10px;
   color: #8191a2;
   white-space: nowrap;
+  flex-wrap: wrap;
 }
 .cu-matrix-absent {
-  background: repeating-linear-gradient(135deg, #fafbfc, #fafbfc 5px, #f0f3f7 5px, #f0f3f7 7px);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--surface-neutral),
+    var(--surface-neutral) 5px,
+    #f0f3f7 5px,
+    #f0f3f7 7px
+  );
   text-align: center;
   color: #94a0ac;
   vertical-align: middle !important;
@@ -1113,7 +1109,7 @@
   flex-wrap: wrap;
   min-height: 64px;
   padding: 12px 3px 0;
-  color: #617187;
+  color: var(--text-muted);
   font-size: 12px;
 }
 .cu-matrix-selection > div:first-child {
@@ -1141,7 +1137,7 @@
   gap: 14px;
   flex-wrap: wrap;
   font-size: 12px;
-  color: #617187;
+  color: var(--text-muted);
   margin: 12px 0;
 }
 .cu-metric-legend span {
@@ -1153,11 +1149,11 @@
   display: inline-block;
   width: 16px;
   height: 5px;
-  background: #6e9fcb;
+  background: var(--chart-bar);
   border-radius: 2px;
 }
 .cu-metric-legend .baseline i {
-  background: #a7b6c6;
+  background: var(--chart-baseline);
 }
 .cu-metric-legend small {
   margin-left: auto;
@@ -1187,6 +1183,9 @@
 }
 .cu-metric-heading b {
   font-weight: 500;
+  display: flex;
+  gap: 6px;
+  align-items: center;
 }
 .cu-metric-heading small {
   color: #72879c;
@@ -1289,11 +1288,6 @@
   justify-content: center;
   font-size: 11px;
 }
-.cu-metric-heading b {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
 .cu-metric-heading b svg {
   flex-shrink: 0;
 }
@@ -1329,9 +1323,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid #d1ddeb;
+  border: 1px solid var(--border-nav);
   border-radius: 6px;
-  background: #fff;
+  background: var(--surface-panel);
   padding: 5px 9px;
   min-height: 30px;
   color: #506a83;
@@ -1349,7 +1343,7 @@
   width: 218px;
 }
 .cu-role-picker .cu-role-all {
-  border-bottom: 1px solid #e3e9ee;
+  border-bottom: 1px solid var(--border-subtle);
   padding-bottom: 8px;
   margin-bottom: 8px;
 }
@@ -1369,23 +1363,17 @@
   stroke: var(--cu-role-color);
   stroke-opacity: 1;
 }
-.cu-app .cu-call text {
-  fill: var(--cu-role-color);
-}
 .cu-app .cu-event-dot circle {
   stroke: var(--cu-role-color);
 }
 .cu-app .cu-event-dot.selected circle {
-  fill: #fff;
+  fill: var(--text-inverse);
   stroke: var(--cu-role-color);
   stroke-width: 3;
 }
 .cu-app .cu-event-dot.attention circle {
   stroke: #b27e34;
   fill: #fff2df;
-}
-.cu-app .cu-event-dot .cu-dot-count {
-  fill: var(--cu-role-color);
 }
 .cu-app .cu-event-dot circle[fill="none"] {
   fill: none;
@@ -1402,9 +1390,6 @@
 .cu-reader-reference > svg {
   vertical-align: middle;
   margin-left: 6px;
-}
-.cu-cell-counts {
-  flex-wrap: wrap;
 }
 
 /* Readable evidence labels; audit classifications retain their meaning. */
@@ -1437,7 +1422,7 @@
     .cu-reader-reference
   ) {
   font-size: 12px;
-  color: #52677d;
+  color: var(--text-secondary);
 }
 .cu-app
   :is(.cu-inspector, .cu-trajectory-tools, .cu-time-nav, .cu-actions)
@@ -1446,7 +1431,7 @@
   min-height: 32px;
 }
 .cu-app .cu-svg-scroll svg text {
-  fill: #34516e;
+  fill: var(--text-readable);
   font-size: 12px;
 }
 .cu-app .cu-svg-scroll svg .cu-node-title {
@@ -1457,11 +1442,11 @@
 }
 .cu-app .cu-svg-scroll svg .cu-col-heading,
 .cu-app .cu-svg-scroll svg .cu-edge text {
-  fill: #52677d;
+  fill: var(--text-secondary);
 }
 .cu-app .cu-call text,
 .cu-app .cu-event-dot .cu-dot-count {
-  fill: #34516e !important;
+  fill: var(--text-readable) !important;
 }
 @media (pointer: coarse) {
   .cu-app :is(.cu-inspector, .cu-trajectory-tools, .cu-time-nav, .cu-actions) :is(button, summary) {
@@ -1471,7 +1456,7 @@
 
 .cu-app :is(.cu-chip, .cu-status-strip details, .cu-note, .cu-summary-metrics) {
   font-size: 12px;
-  color: #52677d;
+  color: var(--text-secondary);
 }
 .cu-app .cu-chip.good {
   color: #356453;
@@ -1483,13 +1468,13 @@
   color: #984a42;
 }
 .cu-app .cu-edge path:not(.cu-edge-hit) {
-  stroke: #7b8fa3;
+  stroke: var(--border-control-strong);
 }
 .cu-app .cu-edge.active path:not(.cu-edge-hit) {
   stroke: #52799d;
 }
 .cu-app .cu-node rect {
-  stroke: #7b8fa3;
+  stroke: var(--border-control-strong);
 }
 .cu-app .cu-node.good rect {
   stroke: #5b8379;
@@ -1498,5 +1483,5 @@
   stroke: #9b762f;
 }
 .cu-app .cu-node.selected rect {
-  stroke: #2469b5;
+  stroke: var(--accent);
 }

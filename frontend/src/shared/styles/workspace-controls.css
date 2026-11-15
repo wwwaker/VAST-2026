@@ -1,17 +1,17 @@
 /* Shared MC2 workspace controls. CUSTOM uses the same rules, not a copy. */
 .workspace-shell button:not(:where(.fp-toggle, .tl-play, .tl-tick, .flow-back, .flow-close)) {
-  border: 1px solid #cbd7e5;
+  border: 1px solid var(--border-button);
   border-radius: 8px;
-  background: #fff;
-  color: #34516e;
+  background: var(--surface-panel);
+  color: var(--text-readable);
   padding: 7px 11px;
   cursor: pointer;
   text-align: center;
 }
 .workspace-shell
   button:not(:where(.fp-toggle, .tl-play, .tl-tick, .flow-back, .flow-close)):hover:not(:disabled) {
-  border-color: #4d8bc9;
-  background: #f0f6fd;
+  border-color: var(--border-button-hover);
+  background: var(--surface-hover);
 }
 .workspace-shell button:disabled {
   opacity: 0.45;
@@ -65,18 +65,18 @@
   text-align: left;
 }
 .workspace-shell .filter-panel .collapsible {
-  border-bottom: 1px solid #e3e9ee;
+  border-bottom: 1px solid var(--border-subtle);
 }
 .workspace-shell .filter-panel .collapsible-body {
   padding: 2px 0 12px;
 }
 .workspace-shell .filter-panel .collapsible-title {
-  color: #354b62;
+  color: var(--text-filter-title);
 }
 .workspace-shell .global-controls .gc-clear-filters {
-  background: #fff0e9;
-  color: #ad522d;
-  border-color: #f0af96;
+  background: var(--status-reset-surface);
+  color: var(--status-reset-text);
+  border-color: var(--status-reset-border);
 }
 .metric-bars {
   display: grid;
@@ -89,26 +89,26 @@
   align-items: center;
   gap: 7px;
   font-size: 12px;
-  color: #617187;
+  color: var(--text-muted);
 }
 .metric-bar-track {
   height: 7px;
-  background: #edf2f8;
+  background: var(--surface-grid);
   border-radius: 3px;
   overflow: hidden;
 }
 .metric-bar-track i {
   display: block;
   height: 100%;
-  background: #6e9fcb;
+  background: var(--chart-bar);
   border-radius: 3px;
 }
 .metric-bar.baseline .metric-bar-track i {
-  background: #a7b6c6;
+  background: var(--chart-baseline);
 }
 .metric-bar b {
   font-weight: 500;
   text-align: right;
   font-variant-numeric: tabular-nums;
-  color: #34516e;
+  color: var(--text-readable);
 }

@@ -1,5 +1,5 @@
 :root {
-  color-scheme: light;
+  color-scheme: var(--color-scheme);
   font-family:
     system-ui,
     -apple-system,
@@ -9,8 +9,8 @@
     sans-serif;
   font-size: 14px;
   line-height: 1.55;
-  background: #f5f7fa;
-  color: #203047;
+  background: var(--surface-page);
+  color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
 }
 * {
@@ -23,7 +23,7 @@ body,
   margin: 0;
 }
 ::selection {
-  background: #dbeafe;
+  background: var(--surface-selection-strong);
 }
 @media (prefers-reduced-motion: reduce) {
   *,

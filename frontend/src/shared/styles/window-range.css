@@ -12,7 +12,7 @@
   cursor: grabbing;
 }
 .tl-window-drag:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
 }
 .tl-range-multi input[type="range"] {

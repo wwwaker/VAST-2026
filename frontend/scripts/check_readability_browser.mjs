@@ -3,7 +3,12 @@ import puppeteer from "puppeteer-core";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-const out = path.resolve("../build/readability-ui-review");
+import {
+  lightThemeSnapshot,
+  replayLightTheme,
+  restoreLightTheme,
+} from "./light_theme_snapshot.mjs";
+const out = path.resolve(process.env.MAS_UI_REVIEW_OUT ?? "../build/readability-ui-review");
 fs.mkdirSync(out, { recursive: true });
 
 const browser = await puppeteer.launch({
@@ -13,6 +18,35 @@ const browser = await puppeteer.launch({
 });
 
 const page = await browser.newPage();
+if (process.env.MAS_LIGHT_THEME_SNAPSHOT) {
+  await page.emulateMediaFeatures([{ name: "prefers-reduced-motion", value: "reduce" }]);
+}
+
+const screenshot = async (options) => {
+  if (process.env.MAS_LIGHT_THEME_SNAPSHOT) {
+    // D3's four-second edge pulse uses timers even when reduced motion is enabled.
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll("[data-testid]")].every(
+        (element) => !element.shadowRoot?.querySelector(".edge-new"),
+      ),
+    );
+  }
+  const previous = await replayLightTheme(page);
+  if (previous) {
+    const originalPath = path.join(out, "replayed-before", path.basename(options.path));
+    fs.mkdirSync(path.dirname(originalPath), { recursive: true });
+    try {
+      await lightThemeSnapshot(page, originalPath);
+      await page.screenshot({ ...options, path: originalPath });
+    } finally {
+      await restoreLightTheme(page, previous);
+    }
+  }
+  await lightThemeSnapshot(page, options.path);
+
+  return page.screenshot(options);
+};
+
 const checks = [];
 const measurements = [];
 const errors = [];
@@ -21,14 +55,19 @@ const base = process.argv[2] ?? "http://127.0.0.1:8000";
 let workspace = "mc2-reference";
 const root = () => `[data-testid="${workspace}"] >>> `;
 
-const wait = (selector) =>
-  page.waitForFunction(
+const wait = async (selector) => {
+  await page.waitForFunction(
     (host, selector) =>
       !!document.querySelector(`[data-testid="${host}"]`)?.shadowRoot?.querySelector(selector),
     { timeout: 30000 },
     workspace,
     selector,
   );
+  if (process.env.MAS_LIGHT_THEME_SNAPSHOT) {
+    // Finish React's two-frame scroll restoration before the caller positions a screenshot.
+    await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 250)));
+  }
+};
 
 const click = async (label) => {
   const el = await page.evaluateHandle(
@@ -112,7 +151,7 @@ async function checkPatternColumns(width) {
       return a.top >= b.top && a.bottom <= b.bottom;
     }),
   );
-  await page.screenshot({ path: path.join(out, `patterns-bottom-${width}.png`) });
+  await screenshot({ path: path.join(out, `patterns-bottom-${width}.png`) });
   await page.$eval(root() + ".w-pattern-list", (e) => (e.scrollTop = 0));
   await page.click(root() + ".w-pattern-row");
   await wait('.w-pattern-members .w-pending-region[data-refresh-state="ready"] article');
@@ -145,6 +184,7 @@ async function checkPatternColumns(width) {
   const readerButton = readerButtons.at(-1);
   await readerButton.click();
   await wait(".mc2-reader .mc2-type-counts");
+  await screenshot({ path: path.join(out, `mc2-reader-${width}.png`) });
 
   const positions = await page.evaluate(() => {
     const r = document.querySelector('[data-testid="mc2-reference"]').shadowRoot;
@@ -309,6 +349,15 @@ try {
       workspace = "mc2-reference";
       await page.goto(base + "/?mc2=reference", { waitUntil: "networkidle0" });
       await wait(".mc2-cell");
+      await screenshot({ path: path.join(out, `mc2-overview-${width}.png`) });
+      if (width === 1440 && process.env.MAS_LIGHT_THEME_SNAPSHOT) {
+        await page.hover(root() + ".workspace-nav button");
+        await screenshot({ path: path.join(out, "mc2-nav-hover-1440.png") });
+        await page.focus(root() + ".workspace-nav button");
+        await page.keyboard.press("Tab");
+        await screenshot({ path: path.join(out, "mc2-nav-focus-1440.png") });
+        await page.mouse.move(0, 0);
+      }
       await click("文件指纹");
       await wait(".w-pattern-row");
       await readable(
@@ -328,7 +377,7 @@ try {
           ),
         );
       }
-      await page.screenshot({ path: path.join(out, `patterns-list-${width}.png`) });
+      await screenshot({ path: path.join(out, `patterns-list-${width}.png`) });
       if (width === 768) {
         await page.$eval(root() + ".w-research-body", (e) => (e.scrollTop = 180));
       }
@@ -357,7 +406,7 @@ try {
           (await page.$eval(root() + ".w-pattern-browser", (e) => e.hidden)) &&
             (await page.$eval(root() + ".w-pattern-detail", (e) => !e.hidden)),
         );
-        await page.screenshot({ path: path.join(out, `patterns-detail-${width}.png`) });
+        await screenshot({ path: path.join(out, `patterns-detail-${width}.png`) });
         await click("返回模式列表");
         await page.waitForFunction(() => {
           const r = document.querySelector('[data-testid="mc2-reference"]').shadowRoot;
@@ -405,7 +454,7 @@ try {
         ".w-compare-axis text,.w-compare-row-tools span,.w-compare-row-tools button",
         "comparison " + width,
       );
-      await page.screenshot({ path: path.join(out, `comparison-${width}.png`) });
+      await screenshot({ path: path.join(out, `comparison-${width}.png`) });
       await click("清空选择");
       check(
         `${width}: cleared comparison remains empty`,
@@ -424,11 +473,12 @@ try {
           (e) => e.getBoundingClientRect().width >= e.viewBox.baseVal.width,
         ),
       );
-      await page.screenshot({ path: path.join(out, `process-${width}.png`) });
+      await screenshot({ path: path.join(out, `process-${width}.png`) });
 
       workspace = "mc1-reference";
       await page.goto(base + "/?mc1=reference", { waitUntil: "networkidle0" });
       await wait('.market-chart [data-testid="raw-stock-path"]');
+      await screenshot({ path: path.join(out, `mc1-overview-${width}.png`) });
       check(
         `${width}: forecast layer defaults off`,
         !(await page.$(root() + "[data-evidence-kind]")),
@@ -495,7 +545,7 @@ try {
         ),
       );
       await readable(".market-chart svg text,.market-hover,.scope-badge", "market " + width);
-      await page.screenshot({ path: path.join(out, `market-${width}.png`) });
+      await screenshot({ path: path.join(out, `market-${width}.png`) });
       await click("全部原值");
       check(
         `${width}: full raw scale restores 180 and both 18 values at actual coordinates`,
@@ -506,11 +556,11 @@ try {
             es.filter((e) => e.getAttribute("data-raw-price") === "18").length === 2,
         )) && !(await page.$(root() + "[data-outside-price]")),
       );
-      await page.screenshot({ path: path.join(out, `market-all-values-${width}.png`) });
+      await screenshot({ path: path.join(out, `market-all-values-${width}.png`) });
       await click("走势放大");
       await page.click(root() + ".market-controls input");
       await wait('[data-evidence-kind="forecast"]');
-      await page.screenshot({ path: path.join(out, `market-evidence-${width}.png`) });
+      await screenshot({ path: path.join(out, `market-evidence-${width}.png`) });
       if (width === 1920) {
         await (
           await page.$(root() + ".market-chart")
@@ -535,7 +585,7 @@ try {
         "market detail " + width,
       );
       await page.$eval(root() + ".market-details", (e) => e.scrollIntoView({ block: "center" }));
-      await page.screenshot({ path: path.join(out, `market-detail-${width}.png`) });
+      await screenshot({ path: path.join(out, `market-detail-${width}.png`) });
       if (width === 1920) {
         await click("关闭详情");
         await page.click(root() + ".lc-series-controls input");
@@ -599,7 +649,7 @@ try {
           }),
         );
         await page.$eval(root() + ".market-chart", (e) => e.scrollIntoView({ block: "center" }));
-        await page.screenshot({ path: path.join(out, "market-daily-1920.png") });
+        await screenshot({ path: path.join(out, "market-daily-1920.png") });
       }
     }
   }
@@ -612,6 +662,7 @@ try {
     workspace = "custom-reference";
     await page.goto(base + "/?custom=reference", { waitUntil: "networkidle0" });
     await wait(".cu-case-button:not(:disabled)");
+    await screenshot({ path: path.join(out, `custom-collection-${width}.png`) });
     await page.click(root() + '[data-case="custom-stale-published"]');
     await wait('[data-testid="version-graph"]');
     await page.$eval(root() + '[data-testid="version-graph"]', (e) =>
@@ -629,19 +680,19 @@ try {
           .every((e) => e.getBoundingClientRect().width >= e.viewBox.baseVal.width - 0.5),
       ),
     );
-    await page.screenshot({ path: path.join(out, `custom-graph-${width}.png`) });
+    await screenshot({ path: path.join(out, `custom-graph-${width}.png`) });
     await click("运行轨迹");
     await wait('[aria-label="六角色真实时间轨迹"]');
     await readable(".cu-svg-scroll svg text,.cu-time-scale>span", "custom trajectory " + width);
     await page.$eval(root() + '[aria-label="六角色真实时间轨迹"]', (e) =>
       e.scrollIntoView({ block: "center" }),
     );
-    await page.screenshot({ path: path.join(out, `custom-trajectory-${width}.png`) });
+    await screenshot({ path: path.join(out, `custom-trajectory-${width}.png`) });
   }
   check("No browser JavaScript errors", errors.length === 0);
 } catch (error) {
   console.error("Browser check failed:", error);
-  await page.screenshot({ path: path.join(out, "failure.png") }).catch(() => {});
+  await screenshot({ path: path.join(out, "failure.png") }).catch(() => {});
   throw error;
 } finally {
   fs.writeFileSync(
