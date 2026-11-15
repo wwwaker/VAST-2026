@@ -30,6 +30,7 @@ try{
   await button('阅读真实操作序列');await wait('.mc2-reader .mc2-type-counts');
   check('Reader stacks above an inert research dialog with scrolling locked',await page.$eval(shadow+'.w-research-dialog',e=>e.inert)&&await page.evaluate(()=>document.body.style.overflow==='hidden'));
   await page.keyboard.press('Escape');
+  await page.waitForFunction(()=>document.querySelector('[data-testid="mc2-reference"]').shadowRoot.activeElement?.textContent==='阅读真实操作序列');
   check('Closing Reader resumes the same research dialog and returns focus',await page.evaluate(()=>{const r=document.querySelector('[data-testid="mc2-reference"]').shadowRoot;return !r.querySelector('.w-research-dialog').inert&&r.activeElement?.textContent==='阅读真实操作序列'&&document.body.style.overflow==='hidden';}));
   await page.screenshot({path:path.join(out,'fingerprint-1440.png')});
   for(const width of [1920,768]){
@@ -42,6 +43,7 @@ try{
   }
   await page.setViewport({width:1440,height:1000});
   await page.keyboard.press('Escape');
+  await page.waitForFunction(()=>document.querySelector('[data-testid="mc2-reference"]').shadowRoot.activeElement?.textContent==='文件指纹');
   check('Escape returns keyboard focus to fingerprint entry',await page.evaluate(()=>document.querySelector('[data-testid="mc2-reference"]').shadowRoot.activeElement?.textContent==='文件指纹'));
   await button('发布实例比较');await wait('[aria-label="发布实例真实时间对齐"]');
   await page.screenshot({path:path.join(out,'comparison-1440.png')});

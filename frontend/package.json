@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "check:readability-browser": "node scripts/check_readability_browser.mjs",
+    "check:readability": "node scripts/check_readability.mjs",
     "check:ui": "node scripts/ui_check.mjs",
     "check:mc1-migration": "node scripts/check_mc1_migration.mjs",
     "check:custom-migration": "node scripts/check_custom_migration.mjs",

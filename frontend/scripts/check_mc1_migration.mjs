@@ -149,7 +149,7 @@ try {
   await click(document.querySelector('.edge-hit'));
   await wait(() => document.querySelector('.net-edge.selected') && document.querySelectorAll('.network-card > .detail-card:last-child .message').length > 0);
   check('Network edge opens its evidence messages', true);
-  await click(button('◧ 并排对比'));
+  await click(button('◧ 热力图 / 网络并排'));
   check('Reference comparison mode keeps heatmap/network and hides side filters', document.querySelector('.compare-row') && !document.querySelector('.filter-panel') && !document.querySelector('.seqflow-card'));
   await click(button('MC2'));
   check('Dataset navigation calls the existing workspace switch', destination === 'MC2');

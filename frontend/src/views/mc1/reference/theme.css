@@ -92,3 +92,52 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .flow-back, .flow-close { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+
+.scope-badge { display:inline-block; color:#52677d; background:#f0f4f8; border:1px solid #b9cadb; border-radius:5px; padding:3px 7px; font-size:12px; font-weight:400; line-height:1.5; vertical-align:middle; }
+.market-chart { color:#34516e; background:#fff; }
+.market-chart .lc-head { display:block; padding:14px; }
+.market-chart h3 { font-size:15px; color:#34516e; }
+.market-controls { display:flex; gap:12px; justify-content:space-between; flex-wrap:wrap; margin:10px 0; color:#52677d; font-size:12px; }
+.market-controls label { display:flex; flex-direction:row; gap:6px; align-items:center; font-size:13px; }
+.market-legend { display:flex; flex-wrap:wrap; gap:8px 16px; font-size:12px; color:#52677d; }
+.market-chart .lc-scroll { background:#fff; overflow-x:auto; }
+.market-chart .market-svg { display:block; background:#fff; }
+.market-chart svg text { fill:#34516e; font-size:12px; }
+.market-chart svg [role=button] { cursor:pointer; }
+.market-chart svg [role=button]:focus-visible { outline:2px solid #2469b5; outline-offset:-2px; }
+.market-hover { min-height:38px; padding:8px 14px; color:#52677d; font-size:12px; border-top:1px solid #d5e0ea; }
+.market-details { margin:0 14px 14px; padding:14px; border:1px solid #9cb7d0; border-radius:8px; background:#f8fafc; font-size:13px; line-height:1.6; overflow-wrap:anywhere; }
+.market-details:focus { outline:2px solid #2469b5; outline-offset:2px; }
+.market-detail-head { display:flex; justify-content:space-between; gap:12px; align-items:center; }
+.market-detail-head h4 { margin:0; font-size:14px; }
+.market-chart button { min-height:32px; font-size:13px; }
+.market-detail-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; margin-top:10px; }
+.market-details p { margin:8px 0; }
+.market-details code { font-size:12px; color:#52677d; white-space:normal; overflow-wrap:anywhere; }
+.market-details summary { cursor:pointer; min-height:32px; }
+.market-details article { margin-top:10px; padding:12px; background:#fff; border:1px solid #d5e0ea; border-radius:6px; }
+.market-details blockquote { margin:10px 0; padding:8px 12px; border-left:3px solid #6386ab; font-size:13px; color:#34516e; white-space:pre-wrap; }
+.market-changes { border-top:1px solid #d5e0ea; padding-top:8px; }
+.seqflow-head .scope-badge { font-size:12px; }
+@media(max-width:800px) { .market-detail-grid { grid-template-columns:1fr; gap:8px; } }
+@media(pointer:coarse) { .market-chart :is(button,summary) { min-height:44px; } }
+
+.market-chart,.market-details { scroll-margin-top:125px; }
+
+.market-chart button { padding:6px 10px; border:1px solid #7b8fa3; border-radius:8px; color:#34516e; background:#fff; cursor:pointer; }
+.market-chart button:hover { background:#eef4fb; }
+.market-display-controls { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.market-scale { display:inline-flex; border:1px solid #7b8fa3; border-radius:8px; overflow:hidden; }
+.market-chart .market-scale button { border:0; border-radius:0; min-height:32px; padding:5px 12px; }
+.market-chart .market-scale button+button { border-left:1px solid #7b8fa3; }
+.market-chart .market-scale button[aria-pressed=true] { color:#1c5889; background:#e8f2fa; font-weight:600; box-shadow:inset 0 -2px #2469b5; }
+.market-chart .market-scale button:focus-visible { outline-offset:-3px; }
+.market-legend>span { display:inline-flex; align-items:center; gap:6px; }
+.market-line-key { display:inline-block; width:22px; border-top:3px solid #14778a; }
+.market-line-key.sentiment { border-color:#98621a; }
+.market-scale-note { margin:10px 0 0; padding:7px 10px; border-left:3px solid #7e9caf; background:#f5f8fb; color:#52677d; font-size:12px; line-height:1.6; }
+.market-plot-frame { position:relative; }
+.market-chart .market-fixed-axis { position:absolute; top:0; left:0; pointer-events:none; }
+.market-chart svg .market-axis-title { font-weight:600; }
+.market-chart [data-outside-price] text { fill:#79521a; font-size:12px; }
+.market-chart .market-svg [data-testid=market-event-marker] text { fill:#8e512e; font-weight:600; }

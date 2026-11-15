@@ -386,7 +386,7 @@ try {
   check('Comparison uses common real time and explicit full-history reading', shadow.querySelector('.w-research-dialog').textContent.includes('共同视窗') && buttons('完整真实时间').length === 1);
   await click(buttons('字段表')[0]);
   await wait(() => shadow.querySelector('.w-comparison'));
-  check('Historical comparison names the explicit-source subset and missing creation', shadow.querySelector('.w-research-dialog').textContent.includes('3 个有明确来源') && shadow.querySelector('.w-comparison').textContent.includes('未见明确创建记录') && shadow.querySelector('.w-comparison').textContent.includes('2秒'));
+  check('Historical comparison names the explicit-source subset and missing creation', shadow.querySelector('.w-research-dialog').textContent.includes('候选 3 例') && shadow.querySelector('.w-comparison').textContent.includes('未见创建记录') && shadow.querySelector('.w-comparison').textContent.includes('2秒'));
   await click(shadow.querySelector('[aria-label="关闭发布比较"]'));
   await click(buttons('恢复全范围')[0]);
   await wait(ready);

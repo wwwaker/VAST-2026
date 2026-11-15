@@ -173,7 +173,7 @@ export function SequentialFlow({
   return (
     <div className="seqflow-card">
       <div className="seqflow-head">
-        <h3>事件序列 → 绕过禁运管控的那次发布（人工分析）</h3>
+        <h3>事件序列 → 绕过禁运管控的那次发布 <span className="scope-badge" title="跟随时间桶和本图类型/连线开关；不跟随热力图关键词、渠道等内容筛选。连线为人工分析，不表示已验证因果。">人工分析 · 按时间显示</span></h3>
         <span className="muted small seqflow-hint"
           title="节点 = 关键事件，位置与下方热力图使用同一时间桶。连线为参考工程的人工分析标记，不代表系统已验证的因果。">
           {alwaysShowLabels ? '点击节点查看详情' : '悬停查看事件名 · 点击查看详情'}

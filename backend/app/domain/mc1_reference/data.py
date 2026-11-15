@@ -70,6 +70,8 @@ def _snapshot(version, modified, size):
         messages.append(m)
     rounds = []
     market = {r['round_index']: r for r in views.get('market_by_round', [])}
+    from . import market as market_adapter
+    market_evidence = market_adapter.evidence(market, {m['message_id']: m for m in messages}, views.get('environment_events', []))
     for r in timeline:
         idx = r['round_index']; price = market.get(idx, {})
         msgs = [m for m in messages if m['round_index'] == idx]
@@ -82,6 +84,11 @@ def _snapshot(version, modified, size):
                        'stock_price_value': price.get('raw_price_value'), 'stock_price': price.get('raw_stock_price'),
                        'market_sentiment': price.get('market_sentiment_label'),
                        'market_sentiment_value': price.get('market_sentiment_value'),
+                       'market_source': market_adapter.source(price) if price else None,
+                       'reported_percent_change': price.get('reported_percent_change'),
+                       'price_status': price.get('price_status', 'missing'),
+                       'price_disputed': price.get('price_status') in ('narrative_price', 'reported_price', 'model_baseline'),
+                       'price_evidence': [market_evidence[idx]] if idx in market_evidence else [],
                        'has_merger_context': any(related(str(e.get('value', ''))) for e in environment),
                        'source_pointer': r.get('source_pointer'), 'provenance_kind': 'environment_narrative'})
     if not rounds:

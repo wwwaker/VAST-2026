@@ -108,3 +108,25 @@
 .cu-app .cu-call:focus-visible,.cu-app .cu-event-dot:focus-visible{filter:drop-shadow(0 0 2px #8295ab)}
 
 .cu-case-button>svg{margin-left:auto;flex:none}.cu-reader-reference>svg{vertical-align:middle;margin-left:6px}.cu-cell-counts{flex-wrap:wrap}
+
+/* Readable evidence labels; audit classifications retain their meaning. */
+.cu-app :is(.cu-inspector,.cu-status-strip,.cu-path-summary,.cu-route,.cu-time-nav,.cu-trajectory-tools,.cu-handoff-notes,.cu-record-open) { font-size:13px; line-height:1.5; }
+.cu-app :is(.cu-route small,.cu-route b,.cu-checks dd,.cu-time-scale,.cu-record .msg-meta,.cu-record .comm-id,.cu-record-open p,.cu-record-open small,.cu-cell-checks,.cu-cell-counts,.cu-reader-reference) { font-size:12px; color:#52677d; }
+.cu-app :is(.cu-inspector,.cu-trajectory-tools,.cu-time-nav,.cu-actions) :is(button,input,select,summary) { font-size:13px; min-height:32px; }
+.cu-app .cu-svg-scroll svg text { fill:#34516e; font-size:12px; }
+.cu-app .cu-svg-scroll svg .cu-node-title { font-size:13px; }
+.cu-app .cu-svg-scroll svg .cu-node-small { font-size:12px; }
+.cu-app .cu-svg-scroll svg .cu-col-heading,.cu-app .cu-svg-scroll svg .cu-edge text { fill:#52677d; }
+.cu-app .cu-call text,.cu-app .cu-event-dot .cu-dot-count { fill:#34516e!important; }
+@media(pointer:coarse) { .cu-app :is(.cu-inspector,.cu-trajectory-tools,.cu-time-nav,.cu-actions) :is(button,summary) { min-height:44px; } }
+
+.cu-app :is(.cu-chip,.cu-status-strip details,.cu-note,.cu-summary-metrics) { font-size:12px; color:#52677d; }
+.cu-app .cu-chip.good { color:#356453; }
+.cu-app .cu-chip.attention { color:#845510; }
+.cu-app .cu-chip.danger { color:#984a42; }
+.cu-app .cu-edge path:not(.cu-edge-hit) { stroke:#7b8fa3; }
+.cu-app .cu-edge.active path:not(.cu-edge-hit) { stroke:#52799d; }
+.cu-app .cu-node rect { stroke:#7b8fa3; }
+.cu-app .cu-node.good rect { stroke:#5b8379; }
+.cu-app .cu-node.attention rect { stroke:#9b762f; }
+.cu-app .cu-node.selected rect { stroke:#2469b5; }

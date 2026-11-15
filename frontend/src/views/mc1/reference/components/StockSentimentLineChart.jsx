@@ -1,318 +1,102 @@
-// Stock Price / BERT Sentiment Line Chart
-
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { scaleLinear } from 'd3-scale';
 import { CELL, LABEL_COL, EVENT_MARKERS, sentimentLabelOf } from '../constants.js';
-import { shortBucket, pctClass, fmtPct, fmtSigned, timeToBucket } from '../utils.js';
+import { shortBucket, timeToBucket } from '../utils.js';
 
-//   substring(r.hour,0,13) + ':00:00'
-
-const PRICE_CORRECTIONS = {
-
-  '2046-06-05T09:00:00': {
-    price: 28.98,
-
-    reason:
-      '原始 stock_price 缺失（null）。依据 percent_change 字段的 -8% 反推：'
-      + '$31.50 × (1 - 0.08) = $28.98（$31.50 为 6 月 4 日 09:00 最后一次确认的收盘价）。',
-  },
-
-  '2046-06-05T10:00:00': {
-    price: 25.5024,
-
-    reason:
-      '原始 stock_price 缺失（null）。依据 percent_change 字段的 -12% 反推：'
-      + '$28.98 × (1 - 0.12) = $25.5024（基于已修正的 9:00 价格）。',
-  },
-
-  '2046-06-05T11:00:00': {
-    price: 27.80,
-
-    reason:
-      '原始值为“$180”——这是 1.8 亿美元收购估值串到了价格字段。'
-      + '事件叙述明确写着“$27.80，下跌 4.2%”，percent_change 字段也独立印证了 -4.2%。'
-      + '$27.80 与前后价格也吻合（10:00 的 $25.50 → 12:00 的 $27.20），'
-      + '而 $180 相当于不可能出现的 6 倍暴涨。叙述标注的时间是“上午 10 点”，但这个标签本身也标错了'
-      + '（它实际指向一条 10:30 的评论请求）。综合叙述内容以及与其他消息的一致性，判定 $27.80 为正确价格。',
-  },
-
-  '2046-06-05T14:00:00': {
-    price: 26.40,
-
-    reason:
-      '原始值为 $18.0，与内部数据不符。消息 20460605_18_005 直接给出了确切数字——'
-      + '“股价 $26.40，MAC 滚动均值 $27.10”——因此该小时采用 $26.40。',
-  },
-
-  '2046-06-05T15:00:00': {
-    price: 25.80,
-
-    reason:
-      '原始值为 $18.0，没有反映更新后的模型。消息 20460605_19_030 明确说明模型已按“$25.80 基准”重建，'
-      + '因此该小时的修正价格采用 $25.80。',
-  },
-
-  '2046-06-05T16:00:00': {
-    price: 35.5,
-
-    reason:
-      '原始 stock_price 缺失（null）。消息 20460605_20_019 预测：若 TenantThread 在 4:30 获得 CivicLoom 同意后自行公布，'
-      + '盘后价格将重新定价至 $33–$38。由于公布确实发生，取该区间中值作为估计：($33 + $38) / 2 = $35.5。',
-  },
-
-  '2046-06-05T17:00:00': {
-    price: 35,
-
-    reason:
-      '原始 stock_price 缺失（null）。消息 20460605_21_003 给出两种情形——约 5:15 自行公布，或推迟到 6:00。'
-      + '实际公布发生在 5:19–5:27，因此以“公布情形”的预测（$33–$37）为参照取中值：'
-      + '($33 + $37) / 2 = $35。',
-  },
-
-  '2046-06-05T18:00:00': {
-    price: 33.05,
-
-    reason:
-      '原始 stock_price 缺失（null）。当日最终总结（消息 20460605_22_056）给出的盘后 $TTHR 为'
-      + '“中值 $33.05，较 $31.20 开盘上涨 5.9%”，因此该小时采用 $33.05。',
-  },
-};
-
-export function StockSentimentLineChart({
-  data, granularity, showStock, showSentiment, scrollRef, onScroll,
-}) {
-  const [hover, setHover] = useState(null);
-
-  const [picked, setPicked] = useState(null); // index | null
-
-  const buckets = data?.time_buckets || [];
-  const rawSeries = data?.series || [];
-
-  const series = React.useMemo(() => {
-    const s = rawSeries.map((row) => {
-      const corr = PRICE_CORRECTIONS[row.time_bucket];
-      return corr
-        ? { ...row, stock_price: corr.price, correction_reason: corr.reason }
-        : { ...row, correction_reason: null };
-    });
-
-    let prev = null;
-    for (const row of s) {
-      if (row.stock_price != null) {
-        row.stock_price_change_pct =
-          prev != null && prev !== 0
-            ? Math.round(((row.stock_price - prev) / Math.abs(prev)) * 10000) / 100
-            : null;
-        prev = row.stock_price;
-      }
-    }
-    return s;
-  }, [rawSeries]);
-
-  const cell = CELL[granularity];
-  const plotW = buckets.length * cell.w;
-
-  const RIGHT_PAD = 48;
-  const height = 200;
-  const padTop = 16, padBottom = 28;
-  const innerH = height - padTop - padBottom;
-
-  const xAt = (i) => LABEL_COL + i * cell.w + cell.w / 2;
-
-  const PRICE_AXIS_MAX = 38.70;
-  const PRICE_AXIS_MIN = 18.00;
-
-  const prices = series.map(s => s.stock_price).filter(v => v !== null && v !== undefined);
-  const pMax = PRICE_AXIS_MAX;
-  const pMin = PRICE_AXIS_MIN;
-  const yPrice = (v) => padTop + innerH - ((v - pMin) / (pMax - pMin)) * innerH;
-
-  const ySent = (v) => padTop + innerH - ((v + 1) / 2) * innerH;
-
-  function buildPath(accessor, yFn) {
-    let d = '';
-    let pen = false;
-    series.forEach((s, i) => {
-      const v = accessor(s);
-      if (v === null || v === undefined) { pen = false; return; }
-      const cmd = pen ? 'L' : 'M';
-      d += `${cmd}${xAt(i)},${yFn(v)} `;
-      pen = true;
-    });
-    return d.trim();
-  }
-
-  const stockPath = buildPath(s => s.stock_price, yPrice);
-  const sentPath = buildPath(s => s.market_sentiment_value, ySent);
-
-  const nothing = !showStock && !showSentiment;
-
-  const CORRECTED_COLOR = '#3b82f6';
-
-  const pickedRow = picked !== null ? series[picked] : null;
-
-  return (
-    <div className="linechart-card">
-      <div className="lc-head">
-        <h3>股价与市场情绪</h3>
-        <div className="lc-legend">
-          <span className="lc-key"><span className="lc-swatch" style={{ background: '#148a9c' }} /> 股价（美元）</span>
-          <span className="lc-key"><span className="lc-swatch" style={{ background: '#f59e0b' }} /> 市场情绪（−1…+1）</span>
-          <span className="lc-key"><span className="lc-swatch" style={{ background: CORRECTED_COLOR }} /> 修正 / 估计值（点击查看依据）</span>
-        </div>
-        <span className="muted small">环境快照 + 参考工程人工修正；含预测区间中值估计，点击蓝点查看依据 · 非全部为实测股价</span>
-      </div>
-      <div className="lc-scroll" ref={scrollRef} onScroll={onScroll}>
-        <svg width={LABEL_COL + plotW + RIGHT_PAD} height={height} className="lc-svg"
-          onMouseLeave={() => setHover(null)}>
-          {/* baseline */}
-          <line x1={LABEL_COL} y1={padTop + innerH} x2={LABEL_COL + plotW} y2={padTop + innerH}
-            stroke="#263244" strokeWidth="1" />
-          {/* sentiment 0 line */}
-          {showSentiment && (
-            <line x1={LABEL_COL} y1={ySent(0)} x2={LABEL_COL + plotW} y2={ySent(0)}
-              stroke="#33405580" strokeDasharray="3 3" strokeWidth="1" />
-          )}
-
-          {/* y-axis labels: left = stock price (cyan), right = sentiment scale (amber) */}
-          {showStock && prices.length > 0 && (
-            <g>
-              <text x={LABEL_COL - 6} y={yPrice(pMax) + 3} textAnchor="end" fontSize="9" fill="#22d3ee">${pMax.toFixed(2)}</text>
-              <text x={LABEL_COL - 6} y={yPrice(pMin) + 3} textAnchor="end" fontSize="9" fill="#22d3ee">${pMin.toFixed(2)}</text>
-            </g>
-          )}
-          {showSentiment && (
-            <g>
-              <text x={LABEL_COL + plotW + 2} y={ySent(1) + 3} fontSize="9" fill="#f59e0b">+1 正面</text>
-              <text x={LABEL_COL + plotW + 2} y={ySent(0) + 3} fontSize="9" fill="#f59e0b">0 中性</text>
-              <text x={LABEL_COL + plotW + 2} y={ySent(-1) + 3} fontSize="9" fill="#f59e0b">-1 危急</text>
-            </g>
-          )}
-
-          {/* olay işaretleri (leak / embargo): dikey kesikli çizgi + etiket */}
-          {EVENT_MARKERS.map((mk, mi) => {
-            const i = buckets.indexOf(timeToBucket(mk.time, granularity));
-            if (i < 0) return null;
-            return (
-              <g key={mk.id}>
-                <line x1={xAt(i)} y1={padTop - 4} x2={xAt(i)} y2={padTop + innerH}
-                  stroke={mk.color} strokeDasharray="4 3" strokeWidth="1.5" />
-                <text x={xAt(i) + 4} y={padTop + 7 + mi * 11} fontSize="9"
-                  fill={mk.color} fontWeight="700">{mk.short}</text>
-              </g>
-            );
-          })}
-
-          {/* hover guide + column hit areas */}
-          {buckets.map((b, i) => (
-            <rect key={b} x={LABEL_COL + i * cell.w} y={padTop} width={cell.w} height={innerH}
-              fill={hover === i ? 'rgba(96,165,250,0.08)' : 'transparent'}
-              onMouseEnter={() => setHover(i)} />
-          ))}
-
-          {nothing && (
-            <text x={LABEL_COL + plotW / 2} y={height / 2} textAnchor="middle"
-              fill="#5a7a9a" fontSize="13">未选择任何曲线</text>
-          )}
-
-          {/* lines */}
-          {showStock && stockPath && (
-            <path d={stockPath} fill="none" stroke="#22d3ee" strokeWidth="2" />
-          )}
-          {showSentiment && sentPath && (
-            <path d={sentPath} fill="none" stroke="#f59e0b" strokeWidth="2" />
-          )}
-
-          {showStock && series.map((s, i) => {
-            if (s.stock_price == null) return null;
-            const corrected = !!s.correction_reason;
-            const isPicked = picked === i;
-            return (
-              <g key={`p${i}`}>
-                {corrected && (
-                  <circle
-                    cx={xAt(i)} cy={yPrice(s.stock_price)} r={12}
-                    fill="transparent" style={{ cursor: 'pointer' }}
-                    onClick={() => setPicked(isPicked ? null : i)}
-                  />
-                )}
-                {corrected && (
-                  <circle
-                    cx={xAt(i)} cy={yPrice(s.stock_price)} r={isPicked ? 7 : 5.5}
-                    fill="none" stroke={CORRECTED_COLOR} strokeWidth={isPicked ? 2.5 : 1.5}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => setPicked(isPicked ? null : i)}
-                  />
-                )}
-                <circle
-                  cx={xAt(i)} cy={yPrice(s.stock_price)}
-                  r={corrected ? 3 : (hover === i ? 4 : 2.5)}
-                  fill={corrected ? CORRECTED_COLOR : '#148a9c'}
-                  style={corrected ? { cursor: 'pointer' } : undefined}
-                  onClick={corrected ? () => setPicked(isPicked ? null : i) : undefined}
-                />
-              </g>
-            );
-          })}
-          {/* points (sentiment) */}
-          {showSentiment && series.map((s, i) => s.market_sentiment_value != null && (
-            <circle key={`s${i}`} cx={xAt(i)} cy={ySent(s.market_sentiment_value)} r={hover === i ? 4 : 2.5}
-              fill="#f59e0b" />
-          ))}
-
-          {/* x labels */}
-          {buckets.map((b, i) => (
-            <text key={`x${b}`} x={xAt(i)} y={height - 8} textAnchor="middle"
-              fontSize="9" fill="#7a8aa0" fontFamily="monospace">
-              {shortBucket(b, granularity)}
-            </text>
-          ))}
-        </svg>
-      </div>
-
-      {pickedRow && pickedRow.correction_reason && (
-        <div
-          className="lc-correction-note"
-          style={{
-            margin: '6px 0 2px', padding: '8px 10px',
-            border: `1px solid ${CORRECTED_COLOR}`,
-            borderRadius: 6, background: 'rgba(59,130,246,0.10)',
-            fontSize: 12, lineHeight: 1.5,
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-            <b style={{ color: CORRECTED_COLOR }}>
-              已修正 · {pickedRow.time_bucket} → ${parseFloat(pickedRow.stock_price.toFixed(4))}
-            </b>
-            <span
-              style={{ cursor: 'pointer', color: '#7a8aa0' }}
-              onClick={() => setPicked(null)}
-            >✕</span>
-          </div>
-          <div style={{ marginTop: 4, color: '#38516b' }}>{pickedRow.correction_reason}</div>
-        </div>
-      )}
-
-      {/* tooltip-like summary */}
-      <div className="lc-summary">
-        {hover === null && !pickedRow && <span className="muted small">将鼠标悬停在任意列上，即可查看该时间桶的股价与市场情绪。点击高亮的圆点可查看该数值被修正的原因。</span>}
-        {hover !== null && series[hover] && (
-          <div className="lc-readout">
-            <b>{series[hover].time_bucket}</b>
-            {showStock && (
-              <span>股价：<b>{series[hover].stock_price != null ? `$${series[hover].stock_price.toFixed(2)}` : '—'}</b>
-                {' '}（<span className={pctClass(series[hover].stock_price_change_pct)}>
-                  {fmtPct(series[hover].stock_price_change_pct)}</span>）
-                {series[hover].correction_reason ? <span style={{ color: CORRECTED_COLOR }}> · 已修正</span> : ''}</span>
-            )}
-            {showSentiment && (
-              <span>市场情绪：<b>{sentimentLabelOf(series[hover].market_sentiment_label) || '—'}</b>
-                {series[hover].market_sentiment_value != null
-                  ? ` (${fmtSigned(series[hover].market_sentiment_value)})`
-                  : ''}</span>
-            )}
-          </div>
-        )}
-      </div>
+const labels = {derived:'百分比推导',narrative:'叙述候选价',reported:'消息引述',model_baseline:'模型基准',forecast:'条件预测',after_hours_report:'盘后消息引述'};
+const money = v => v == null ? '未记录' : `$${Number(v).toLocaleString('en-US',{maximumFractionDigits:6})}`;
+const pct = v => v == null ? '未记录' : `${v>0?'+':''}${Number(v.toFixed(4))}%`;
+const sentimentLabel = value => sentimentLabelOf(value?.toLowerCase());
+const evidenceColor = e => e.kind==='forecast'?'#92631b':e.kind==='model_baseline'?'#78509a':'#2469b5';
+function EvidenceMark({e,x,y}) {
+  const color=evidenceColor(e);
+  if(e.range){const top=y(e.range[1]),bottom=y(e.range[0]);return <g stroke={color} strokeWidth={2} fill="none"><line x1={x} x2={x} y1={top} y2={bottom} strokeDasharray="4 3"/><path d={`M${x-6} ${top}h12 M${x-6} ${bottom}h12`}/></g>;}
+  const cy=y(e.value);
+  if(e.kind==='derived')return <path d={`M${x} ${cy-6}l6 6-6 6-6-6Z`} fill="white" stroke={color} strokeWidth={2}/>;
+  if(e.kind==='model_baseline')return <line x1={x-8} x2={x+8} y1={cy} y2={cy} stroke={color} strokeWidth={3}/>;
+  return <rect x={x-5} y={cy-5} width={10} height={10} fill="white" stroke={color} strokeWidth={2}/>;
+}
+function Source({source}) {
+  return source?<span>轮次 {source.round_index} · {source.recorded_time}（{source.time_precision==='message'?'消息时间':'轮次精度'}）<br/><code>{source.source_pointer||'来源指针未记录'}</code></span>:<span>未记录来源</span>;
+}
+// Only the display domain changes. Disputed source values remain selectable at
+// the range boundary, and the full scale shows every original value in place.
+export function priceDomain(series,extra,mode) {
+  const raw=series.filter(s=>Number.isFinite(s.stock_price));
+  const ordinary=raw.filter(s=>!s.price_disputed);
+  const values=(mode==='focus'&&ordinary.length?ordinary:raw).map(s=>s.stock_price);
+  if(extra)values.push(...series.flatMap(s=>(s.price_evidence||[]).flatMap(e=>e.range||[e.value])).filter(Number.isFinite));
+  const low=values.length?Math.min(...values):0,high=values.length?Math.max(...values):1;
+  const pad=Math.max((high-low)*.07,Math.abs(high)*.01,.5);
+  return scaleLinear().domain([low-pad,high+pad]).nice(4).domain();
+}
+function trace(series,value,x,y,step=false) {
+  let path='',last=null;
+  series.forEach((s,i)=>{
+    const v=value(s);if(v==null){last=null;return;}
+    path+=last==null?`M${x(i)},${y(v)} `:step?`H${x(i)} V${y(v)} `:`L${x(i)},${y(v)} `;
+    last=i;
+  });
+  return path.trim();
+}
+function area(series,value,x,y,baseline,step=false) {
+  let path='',run=[];
+  const finish=()=>{if(run.length>1){path+=`M${x(run[0].i)},${baseline} L${x(run[0].i)},${y(run[0].v)} `;run.slice(1).forEach(p=>{path+=step?`H${x(p.i)} V${y(p.v)} `:`L${x(p.i)},${y(p.v)} `;});path+=`L${x(run.at(-1).i)},${baseline} Z `;}run=[];};
+  series.forEach((s,i)=>{const v=value(s);if(v==null)finish();else run.push({i,v});});finish();return path.trim();
+}
+export function StockSentimentLineChart({data,granularity,showStock,showSentiment,scrollRef,onScroll,onReadMessage}) {
+  const [extra,setExtra]=useState(false),[scale,setScale]=useState('focus'),[picked,setPicked]=useState(null),[hover,setHover]=useState(null),[scrollLeft,setScrollLeft]=useState(0);
+  const returnFocus=useRef(null),panel=useRef(null);
+  const buckets=data?.time_buckets||[],series=data?.series||[];
+  useEffect(()=>{setPicked(null);setHover(null);},[data,granularity]);
+  const cell=CELL[granularity],plotW=buckets.length*cell.w,width=LABEL_COL+plotW+55;
+  const priceTop=48,priceBottom=208,sentTop=showStock?274:46,sentBottom=sentTop+100;
+  const height=showSentiment?sentBottom+36:showStock?264:64;
+  const [pMin,pMax]=priceDomain(series,extra,scale),y=scaleLinear().domain([pMin,pMax]).range([priceBottom,priceTop]);
+  const x=i=>LABEL_COL+(i+.5)*cell.w,within=v=>v!=null&&v>=pMin&&v<=pMax;
+  const raw=s=>within(s.stock_price)?s.stock_price:null;
+  const path=trace(series,raw,x,y),fill=area(series,raw,x,y,priceBottom);
+  const outside=series.filter(s=>s.stock_price!=null&&!within(s.stock_price));
+  const outsideValues=[...new Set(outside.map(s=>s.stock_price))].map(money).join('、');
+  const allLevels=[{keys:['positive'],label:'正面'},{keys:['recovering','optimistic'],label:'回升 / 乐观'},{keys:['neutral'],label:'中性'},{keys:['cautious'],label:'谨慎'},{keys:['low'],label:'低迷'},{keys:['negative'],label:'负面'},{keys:['critical'],label:'危急'}];
+  const levels=allLevels;
+  const level=s=>{const i=levels.findIndex(l=>l.keys.includes(s.market_sentiment_label?.toLowerCase()));return i<0?null:i;};
+  const sy=i=>sentTop+(levels.length>1?i/(levels.length-1):.5)*(sentBottom-sentTop);
+  const sentimentPath=trace(series,level,x,sy,true),sentimentFill=area(series,level,x,sy,sentBottom,true);
+  const events=EVENT_MARKERS.reduce((list,m)=>{const i=buckets.indexOf(timeToBucket(m.time,granularity));if(i>=0){const existing=list.find(e=>e.i===i);if(existing)existing.short+=` / ${m.short}`;else list.push({...m,i});}return list;},[]);
+  const selected=series.find(s=>s.time_bucket===picked),hovered=series.find(s=>s.time_bucket===hover);
+  const choose=(bucket,el)=>{returnFocus.current=el;setPicked(bucket);requestAnimationFrame(()=>panel.current?.focus({preventScroll:true}));};
+  const close=()=>{setPicked(null);returnFocus.current?.focus({preventScroll:true});};
+  const markerProps=(s,label)=>({role:'button',tabIndex:0,'aria-label':`${s.time_bucket} ${label}`,'aria-pressed':picked===s.time_bucket,onClick:e=>choose(s.time_bucket,e.currentTarget),onKeyDown:e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose(s.time_bucket,e.currentTarget);}},onMouseEnter:()=>setHover(s.time_bucket),onFocus:()=>setHover(s.time_bucket)});
+  const timeLabelWidth=granularity==='hourly'?106:40,timeLabelEvery=Math.ceil((timeLabelWidth+14)/cell.w);
+  return <div className="linechart-card market-chart" onKeyDown={e=>{if(e.key==='Escape'&&picked){e.stopPropagation();close();}}}>
+    <div className="lc-head"><h3>股价与市场情绪 <span className="scope-badge" title="跟随时间范围；关键词、渠道等内容筛选不重新计算环境快照。">环境记录 · 按时间显示</span></h3>
+      <div className="market-controls"><span>同一时间轴 · 按时间桶等距排列</span><div className="market-display-controls">{showStock&&<div className="market-scale" role="group" aria-label="股价纵轴范围"><button aria-pressed={scale==='focus'} onClick={()=>setScale('focus')}>走势放大</button><button aria-pressed={scale==='all'} onClick={()=>setScale('all')}>全部原值</button></div>}<label><input type="checkbox" checked={extra} onChange={e=>setExtra(e.target.checked)}/>显示推导与引述</label></div></div>
+      <div className="market-legend">{showStock&&<><span><i className="market-line-key"/>原始价格</span><span>外圈：存在不同口径</span><span>— 缺失</span></>}{showSentiment&&<span><i className="market-line-key sentiment"/>情绪类别阶梯线</span>}{showStock&&extra&&<><span>◇ 百分比推导</span><span>□ 文本引述</span><span>━ 模型基准</span><span>┬┴ 条件预测范围</span></>}</div>
+      {showStock&&<p className="market-scale-note" data-testid="market-scale-note">{scale==='focus'?`当前纵轴 ${money(pMin)}～${money(pMax)}。${outside.length?`${outside.length} 条不同口径原值（${outsideValues}）以边界箭头标出；可切换“全部原值”查看实际高度。`:'所有原始价格均在当前范围内。'}`:'完整纵轴包含全部原始价格；不同口径值保留外圈。'}</p>}
     </div>
-  );
+    <div className="market-plot-frame">
+      <div className="lc-scroll" ref={scrollRef} onScroll={e=>{setScrollLeft(e.currentTarget.scrollLeft);onScroll?.(e);}}><svg width={width} height={height} className="lc-svg market-svg" aria-label="股价走势与市场情绪阶梯线" role="group" onMouseLeave={()=>setHover(null)}>
+        {showStock&&<><rect x={LABEL_COL} y={priceTop} width={plotW} height={priceBottom-priceTop} fill="#f7fbfc"/>{y.ticks(4).map(v=><line key={v} x1={LABEL_COL} x2={LABEL_COL+plotW} y1={y(v)} y2={y(v)} stroke="#dce7ec"/>)}<path d={fill} fill="#14778a" fillOpacity=".09"/><path data-testid="raw-stock-path" d={path} fill="none" stroke="#14778a" strokeWidth={2.5} strokeLinejoin="round"/></>}
+        {showSentiment&&<><rect x={LABEL_COL} y={sentTop-10} width={plotW} height={sentBottom-sentTop+20} fill="#fffcf6"/>{levels.map((l,i)=><line key={l.label} x1={LABEL_COL} x2={LABEL_COL+plotW} y1={sy(i)} y2={sy(i)} stroke="#ece5d8" strokeDasharray="3 4"/>)}<path d={sentimentFill} fill="#ad761c" fillOpacity=".10"/><path data-testid="market-sentiment-path" d={sentimentPath} fill="none" stroke="#98621a" strokeWidth={2.5} strokeLinejoin="round"/></>}
+        {events.map(e=><g key={e.id} data-testid="market-event-marker"><line x1={x(e.i)} x2={x(e.i)} y1={showStock?priceTop:sentTop} y2={showSentiment?sentBottom:priceBottom} stroke="#b56843" strokeDasharray="4 4"/><text x={x(e.i)} y={showStock?18:20} textAnchor="middle">{e.short}</text></g>)}
+        {series.map((s,i)=><g key={s.time_bucket}>
+          <g {...markerProps(s,'查看该桶记录与来源')} data-market-bucket={s.time_bucket}><title>{s.time_bucket} · 原始价格 {money(s.stock_price)} · 市场情绪 {sentimentLabel(s.market_sentiment_label)||'未记录'}</title><rect x={LABEL_COL+i*cell.w} y={26} width={cell.w} height={height-56} fill={picked===s.time_bucket?'#2469b514':hover===s.time_bucket?'#2469b509':'transparent'}/>
+            {showStock&&s.stock_price!=null&&(within(s.stock_price)?<><circle cx={x(i)} cy={y(s.stock_price)} r={13} fill="transparent"/><circle data-raw-price={s.stock_price} cx={x(i)} cy={y(s.stock_price)} r={hover===s.time_bucket?5:3.5} fill="#14778a"/>{s.price_disputed&&<circle cx={x(i)} cy={y(s.stock_price)} r={8} fill="none" stroke="#92631b" strokeWidth={2}/>}</>:<g data-outside-price={s.stock_price} transform={`translate(${x(i)} ${s.stock_price>pMax?priceTop-15:priceBottom+19})`}><rect x={-23} y={-10} width={46} height={20} rx={4} fill="#fff6e6" stroke="#ab782c"/><text y={4} textAnchor="middle">{s.stock_price>pMax?'↑':'↓'}{money(s.stock_price)}</text></g>)}
+            {showStock&&s.stock_price==null&&<text data-missing-price x={x(i)} y={priceBottom+23} textAnchor="middle">—</text>}
+            {showSentiment&&level(s)!=null&&<circle cx={x(i)} cy={sy(level(s))} r={hover===s.time_bucket?5:3.5} fill="#98621a"/>}
+          </g>
+          {showStock&&extra&&(s.price_evidence||[]).map((e,j)=><g key={`${e.source_pointer}:${j}`} data-evidence-kind={e.kind} {...markerProps(s,`${labels[e.kind]} ${e.range?e.range.join('～'):e.value}`)}><title>{labels[e.kind]} · {e.recorded_time} · {e.range?e.range.join('～'):e.value} · 位置代表证据所属时间桶</title>{e.range&&<rect x={x(i)-12} y={y(e.range[1])} width={24} height={y(e.range[0])-y(e.range[1])} fill="#b07a22" fillOpacity=".12"/>}<circle cx={x(i)} cy={y(e.range?(e.range[0]+e.range[1])/2:e.value)} r={13} fill="transparent"/><EvidenceMark e={e} x={x(i)} y={y}/></g>)}
+          {i%timeLabelEvery===0&&(i===0?scrollLeft===0:x(i)-scrollLeft>=LABEL_COL+timeLabelWidth/2)&&<text data-market-time-label x={i===0?LABEL_COL+6:x(i)} y={height-8} textAnchor={i===0?'start':'middle'}>{shortBucket(s.time_bucket,granularity)}</text>}
+        </g>)}
+        {!showStock&&!showSentiment&&<text x={LABEL_COL} y={25}>请选择股价或情绪轨道</text>}
+      </svg></div>
+      <svg className="market-fixed-axis" width="100%" height={height} aria-label="固定纵轴"><rect width={LABEL_COL} height={height} fill="white"/>{showStock&&<><text x={16} y={20} className="market-axis-title">股价（美元）</text>{y.ticks(4).map(v=><g key={v}><text data-price-tick={v} x={LABEL_COL-16} y={y(v)+4} textAnchor="end">{money(v)}</text><line x1={LABEL_COL-8} x2={LABEL_COL} y1={y(v)} y2={y(v)} stroke="#9bb5c1"/></g>)}</>}{showSentiment&&<><text x={16} y={sentTop-22} className="market-axis-title">市场情绪</text><text x={LABEL_COL+8} y={sentTop-22}>类别等距排列 · 连线仅表示状态变化</text>{levels.map((l,i)=><text key={l.label} x={LABEL_COL-16} y={sy(i)+4} textAnchor="end">{l.label}</text>)}</>}<line x1={LABEL_COL-.5} x2={LABEL_COL-.5} y1={26} y2={height-27} stroke="#d5e0ea"/></svg>
+    </div>
+    <div className="market-hover" aria-live="polite">{hovered?`${hovered.time_bucket} · 原始价格 ${money(hovered.stock_price)} · ${sentimentLabel(hovered.market_sentiment_label)||'情绪未记录'}${hovered.price_disputed?' · 存在不同口径':''}`:'选择时间桶查看原值、来源与含义；缺失保留断点，预测不作为观测。'}</div>
+    {selected&&<section className="market-details" ref={panel} tabIndex={-1} aria-label="市场记录来源详情"><div className="market-detail-head"><h4>{selected.time_bucket} · {granularity==='daily'?'日桶':'小时桶'}</h4><button onClick={close}>关闭详情</button></div><div className="market-detail-grid"><div><b>原始价格快照：{money(selected.stock_price)}</b>{selected.price_disputed&&<p>存在不同口径，尚未裁定真值。</p>}<p>原字段：{selected.raw_stock_price??'null'}<br/><Source source={selected.price_source}/></p></div><div><b>环境情绪：{sentimentLabel(selected.market_sentiment_label)||'未记录'}</b><p>类别映射值：{selected.market_sentiment_value??'未记录'}，不代表连续测量或消息情绪均值。<br/><Source source={selected.sentiment_source}/></p></div></div>
+      <div className="market-changes"><p>原文报告涨跌幅：<b>{pct(selected.reported_percent_change)}</b>（属于该来源快照，不自动解释为日收益）<br/><Source source={selected.reported_change_source}/></p><p>相邻原始快照的记录值变化：<b>{selected.computed_change?.value==null?`不计算：${selected.computed_change?.reason||'缺失'}`:pct(selected.computed_change.value)}</b>{selected.computed_change?.value!=null&&<> · 基准 {money(selected.computed_change.basis.value)} / {selected.computed_change.basis.time_bucket}<br/>公式：（{money(selected.stock_price)} − {money(selected.computed_change.basis.value)}）÷ |{money(selected.computed_change.basis.value)}| × 100%<br/><Source source={selected.computed_change.basis.source}/></>}</p></div>
+      {(selected.price_evidence||[]).length>0&&<details open={extra}><summary>附加来源 · {selected.price_evidence.length} 项（不替换原值）</summary>{selected.price_evidence.map((e,i)=><article key={i}><b>{labels[e.kind]}：{e.range?`${money(e.range[0])}～${money(e.range[1])}`:money(e.value)}</b><p><Source source={e}/>{e.claimed_time&&<><br/>文本声称时间：{e.claimed_time}</>}{e.time_conflict&&<><br/>{e.time_conflict}</>}</p>{e.condition&&<p>前提与替代情景：{e.condition}</p>}{e.assumptions?.map(a=><p key={a}>{a}</p>)}{e.basis&&<p>推导基准 {money(e.basis.value)} · {e.basis.recorded_time} · {e.basis.kind==='derived'?'推导值':'原始快照'}<br/><code>{e.basis.source_pointer}</code>{e.basis.basis&&<><br/>上游基准 {money(e.basis.basis.value)} · {e.basis.basis.recorded_time}</>}<br/>报告 {pct(e.reported_percent_change)}；计算 {money(e.basis.value)} × (1 + {e.reported_percent_change}/100)</p>}{e.text&&<blockquote>{e.text}</blockquote>}{e.message_id&&onReadMessage&&<button onClick={()=>onReadMessage(e.message_id)}>阅读依据消息 · {e.message_id}</button>}</article>)}</details>}
+    </section>}
+  </div>;
 }

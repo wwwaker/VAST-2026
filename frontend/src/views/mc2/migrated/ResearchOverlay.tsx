@@ -8,11 +8,11 @@ export function ResearchOverlay({ kind, close, suspended, children }: { kind:"pa
   useReaderScrollLock(modal);
   const patterns=kind==="patterns", title=patterns?"文件指纹":"发布实例比较", Icon=patterns?Fingerprint:GitCompareArrows;
   return <div className="w-research-overlay" onMouseDown={e=>{if(e.target===e.currentTarget&&!suspended)close();}}>
-    <div ref={el=>{modal.current=el;if(el)el.inert=suspended;}} className="w-research-dialog" role="dialog" aria-modal={!suspended} aria-hidden={suspended||undefined} aria-labelledby="mc2-research-title" onKeyDown={e=>{
+    <div ref={el=>{modal.current=el;if(el)el.inert=suspended;}} className="w-research-dialog" data-research-kind={kind} role="dialog" aria-modal={!suspended} aria-hidden={suspended||undefined} aria-labelledby="mc2-research-title" onKeyDown={e=>{
       if(suspended)return;
       if(e.key==="Escape"){e.stopPropagation();close();}
       if(e.key==="Tab"){
-        const controls=[...e.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),a[href],summary,[tabindex="0"]')].filter(n=>!n.closest('[inert]')&&(!n.closest('details:not([open])')||n.tagName==='SUMMARY'));
+        const controls=[...e.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),a[href],summary,[tabindex="0"]')].filter(n=>n.getClientRects().length>0&&!n.closest('[hidden]')&&!n.closest('[inert]')&&(!n.closest('details:not([open])')||n.tagName==='SUMMARY'));
         const root=e.currentTarget.getRootNode(),active=root instanceof ShadowRoot?root.activeElement:document.activeElement;
         if(e.shiftKey&&active===controls[0]){e.preventDefault();controls.at(-1)?.focus();}
         else if(!e.shiftKey&&active===controls.at(-1)){e.preventDefault();controls[0]?.focus();}

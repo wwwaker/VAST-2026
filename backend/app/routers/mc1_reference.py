@@ -50,26 +50,11 @@ def heatmap(request: Request):
 
 @router.get('/line-chart')
 def line_chart(request: Request):
-    p = request.query_params; buckets = data.axes(p); by_bucket = {}
-    for r in data.snapshot()[1]:
-        start, end = p.get('start_time', ''), p.get('end_time', '')
-        if (start and r['hour'] < start) or (end and r['hour'] > end): continue
-        b = data.bucket(r['hour'], p.get('granularity','hourly'))
-        if b in buckets:
-            previous = by_bucket.get(b, {})
-            by_bucket[b] = {**r,
-                'stock_price_value': r.get('stock_price_value') if r.get('stock_price_value') is not None else previous.get('stock_price_value'),
-                'market_sentiment': r.get('market_sentiment') or previous.get('market_sentiment'),
-                'market_sentiment_value': r.get('market_sentiment_value') if r.get('market_sentiment_value') is not None else previous.get('market_sentiment_value')}
-    series = []; prev = None
-    for b in buckets:
-        r = by_bucket.get(b, {}); price = r.get('stock_price_value')
-        series.append({'time_bucket': b, 'stock_price': price,
-                       'stock_price_change_pct': (price-prev)/abs(prev)*100 if price is not None and prev else None,
-                       'market_sentiment_label': r.get('market_sentiment'), 'market_sentiment_value': r.get('market_sentiment_value'),
-                       'source_pointer': r.get('source_pointer')})
-        if price is not None: prev = price
-    return {'time_buckets': buckets, 'series': series}
+    from ..domain.mc1_reference.market import series
+    p = request.query_params
+    buckets = data.axes(p)
+    return {'time_buckets': buckets, 'series': series(data.snapshot()[1], buckets, p.get('granularity', 'hourly'),
+            p.get('start_time', ''), p.get('end_time', ''))}
 
 
 @router.get('/messages')

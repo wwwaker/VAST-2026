@@ -663,13 +663,13 @@ const HELP_EXTERNAL_CHANNEL = '公开动态没有接收者，因此不会形成�
       <ViewControls views={[
         { id: 'heatmap', label: '热力图', checked: showHeatmap, change: setShowHeatmap },
         { id: 'sequence', label: '事件流', checked: showSeqFlow, change: setShowSeqFlow, disabled: sideBySide },
-        { id: 'line', label: '折线图', checked: showLineChart, change: setShowLineChart, disabled: sideBySide },
+        { id: 'line', label: '市场图', checked: showLineChart, change: setShowLineChart, disabled: sideBySide },
         { id: 'network', label: '网络图', checked: showNetwork, change: setShowNetwork },
       ]}>
         <button type="button" className={`fp-toggle gc-compare-toggle ${sideBySide ? 'on' : ''}`}
           onClick={() => setSideBySide(v => !v)}
-          title="将热力图与网络图并排显示以便对比（开启时会隐藏筛选面板与折线图）。">
-          {sideBySide ? '◧ 并排对比：已开启' : '◧ 并排对比'}
+          title="热力图 / 网络并排；开启时暂不显示筛选面板、人工序列与市场图，返回后恢复原显隐选择。">
+          {sideBySide ? '◧ 热力图 / 网络并排：已开启' : '◧ 热力图 / 网络并排'}
         </button>
         <button type="button" className="fp-toggle gc-filters-toggle" disabled={sideBySide} onClick={() => setFiltersOpen(o => !o)}>
           {effFiltersOpen ? '隐藏筛选' : '显示筛选'}
@@ -957,13 +957,13 @@ const HELP_EXTERNAL_CHANNEL = '公开动态没有接收者，因此不会形成�
             {effShowLineChart && (
               <>
                 <div className="lc-series-controls">
-                  <span className="control-title">折线图序列：</span>
+                  <span className="control-title">市场图轨道：</span>
                   <label className="check"><input type="checkbox" checked={showStockPriceLine} onChange={e => setShowStockPriceLine(e.target.checked)} /> <span className="lg-swatch" style={{ background: '#22d3ee' }} /> 股价</label>
                   <label className="check"><input type="checkbox" checked={showBertSentimentLine} onChange={e => setShowBertSentimentLine(e.target.checked)} /> <span className="lg-swatch" style={{ background: '#f59e0b' }} /> 市场情绪</label>
                 </div>
                 <StockSentimentLineChart data={lineChart} granularity={granularity}
                   showStock={showStockPriceLine} showSentiment={showBertSentimentLine}
-                  scrollRef={lineScrollRef} onScroll={handleLineScroll} />
+                  scrollRef={lineScrollRef} onScroll={handleLineScroll} onReadMessage={selectMessage} />
               </>
             )}
           </div>
@@ -1101,7 +1101,7 @@ const HELP_EXTERNAL_CHANNEL = '公开动态没有接收者，因此不会形成�
             <div className="network-card">
               <div className="heatmap-title">
                 <div className="nv-head-left">
-                  <h2>沟通网络（回复关系图）</h2>
+                  <h2>沟通网络（回复关系图） <span className="scope-badge" title="时间始终跟随全局窗口；独立状态仅表示内容筛选独立。">{netMirrorsHeatmap?'跟随热力图':'独立内容筛选'}</span></h2>
                   <span className="muted small">{(displayNetwork.nodes || []).length} 个 Agent · {displayNetwork.edges?.length || 0} 条连线</span>
                 </div>
                 <div className="nv-head-right">
