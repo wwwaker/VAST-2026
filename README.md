@@ -25,7 +25,17 @@
 
 ## 准备数据
 
-数据文件与本地数据库不随代码仓库分发。启动前，需要已有 `build/mas.db`，或准备以下文件后导入：
+完整数据以约 16 MiB 的压缩快照随仓库分发，位置为 `datasets/data-snapshot.zip`。解压后的 `data/` 约 218.46 MiB，仍不直接纳入 Git；分析数据库与笔记库也不入库。
+
+克隆项目后，在根目录执行以下命令，恢复到约定的 `data/` 目录；仅需 Python 标准库，不需要联网：
+
+```shell
+python tools/data_bundle.py restore
+```
+
+脚本校验压缩包及每个文件的 SHA-256，已有内容一致时直接跳过，同名文件内容不同时停止且不覆盖。本地已有匹配数据也可以直接运行 `python tools/data_bundle.py verify` 校验。完整操作、官方来源和大小限制见 [数据分发与恢复](datasets/README.md)。
+
+数据库导入使用的标准化文件位于：
 
 ```text
 data/process/
@@ -42,7 +52,9 @@ data/process/
    └─ labels.json
 ```
 
-MC1 的情绪、关键词和背景信息等还会使用配套的派生数据，包括 `data/process/views/manifest.json` 及其声明的文件（如 `mc1/views.json`）。仅复制数据库不能恢复全部功能；迁移已有项目时，请一并保留 `data/` 目录。派生文件缺失或与源事件版本不匹配时，对应能力会停用，重新导入数据库不会自动生成这些文件。
+快照还包含配套派生数据，包括 `data/process/views/manifest.json` 及其声明的文件（如 MC1 情绪、关键词和背景使用的 `mc1/views.json`）。仅复制数据库不能恢复全部功能；迁移已有项目时，需一并恢复快照或保留匹配的 `data/`。派生文件缺失或与源事件版本不匹配时，对应能力会停用，重新导入数据库不会自动生成这些文件。
+
+`python tools/data_bundle.py download-official` 可从比赛官方 GitHub 固定版本下载 MC1、MC2 原始 ZIP 到 `data/raw/official_data/`。官方格式与当前导入格式不同，也不包含 CUSTOM 和本项目派生视图，因此启动完整项目应使用 `restore`。
 
 ## 安装与启动
 
@@ -54,7 +66,7 @@ MC1 的情绪、关键词和背景信息等还会使用配套的派生数据，�
 python -m pip install -r backend/requirements.txt
 ```
 
-如果尚无数据库，准备好数据文件后执行一次导入；已有可用的 `build/mas.db` 时跳过：
+先按上节恢复数据；如果尚无数据库，再执行一次导入。已有可用的 `build/mas.db` 时跳过导入：
 
 ```shell
 cd backend
