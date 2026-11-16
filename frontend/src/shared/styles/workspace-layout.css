@@ -44,6 +44,10 @@ select {
 .compact-header {
   flex-wrap: wrap;
 }
+.workspace-heading {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .detail-body,
 .flow-list,
 .context-section {

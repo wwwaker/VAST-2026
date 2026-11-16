@@ -4,7 +4,7 @@ import { RefreshCcw, Play, Pause } from "lucide-react";
 import NetworkVisualization, { AGENTS, channelColor } from "./components/NetworkVisualization.jsx";
 
 import { AgentIcon } from "./components/AgentIcon.jsx";
-import { ThemeSelect } from "../../shared/ui/ThemeSelect";
+import { WorkspaceHeader } from "../../shared/ui/WorkspaceHeader";
 
 import {
   API,
@@ -911,24 +911,19 @@ export default function Mc1Workspace({ onDatasetChange }) {
 
   return (
     <div className="app">
-      <header className="compact-header">
-        <h1>VAST MC1 — Agent 沟通分析</h1>
-        <nav
-          className="workspace-nav"
-          aria-label="工作区导航"
+      <WorkspaceHeader
+        title="MC1 · Agent 沟通分析"
+        description="结合角色活动、市场走势与沟通网络，逐条核对原始消息。"
+        dataset="MC1"
+        change={onDatasetChange}
+      >
+        <button
+          className="reload"
+          onClick={reloadDb}
         >
-          <span className="nav-current">MC1</span>
-          <button onClick={() => onDatasetChange("MC2")}>MC2</button>
-          <button onClick={() => onDatasetChange("CUSTOM")}>自建数据</button>
-          <button
-            className="reload"
-            onClick={reloadDb}
-          >
-            <RefreshCcw size={16} /> 刷新数据
-          </button>
-          <ThemeSelect />
-        </nav>
-      </header>
+          <RefreshCcw size={16} /> 刷新数据
+        </button>
+      </WorkspaceHeader>
 
       <ViewControls
         views={[

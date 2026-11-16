@@ -1218,9 +1218,17 @@ summary {
 }
 .compact-header h1 {
   font-size: 16px;
+  line-height: 1.5;
   margin: 0;
   font-weight: 600;
   color: var(--text-primary);
+}
+.compact-header .workspace-description {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--text-muted);
 }
 
 /* ---- heatmap cell numeric values ---- */

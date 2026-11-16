@@ -17,9 +17,9 @@ export function WorkspaceHeader({
 }) {
   return (
     <header className="compact-header">
-      <div>
+      <div className="workspace-heading">
         <h1>{title}</h1>
-        <p>{description}</p>
+        <p className="workspace-description">{description}</p>
       </div>
       <nav
         className="workspace-nav"
